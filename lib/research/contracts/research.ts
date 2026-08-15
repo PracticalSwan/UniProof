@@ -1,0 +1,361 @@
+import { z } from "zod";
+
+import {
+  claimSchema,
+  programSchema,
+  sourceSchema,
+  universitySchema,
+} from "@/lib/validation/domain";
+import { evidenceStatusSchema, sourceTypeSchema } from "@/lib/validation/evidence";
+
+const boundedId = z.string().min(1).max(120);
+const boundedName = z.string().min(1).max(200);
+const boundedSupportingText = z.string().min(1).max(2_000);
+const boundedWarning = z.string().min(1).max(500);
+
+export const researchCategorySchema = z.enum([
+  "admissions",
+  "tuition",
+  "scholarships",
+  "research",
+  "outcomes",
+  "support",
+]);
+
+export type ResearchCategory = z.infer<typeof researchCategorySchema>;
+
+const uniqueCategoriesSchema = z
+  .array(researchCategorySchema)
+  .max(6)
+  .transform((categories) => [...new Set(categories)]);
+
+const universityReferenceSchema = universitySchema
+  .pick({ id: true, name: true })
+  .partial()
+  .strict()
+  .superRefine((reference, context) => {
+    if (reference.id === undefined && reference.name === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "a university ID or name is required",
+        path: ["id"],
+      });
+    }
+  });
+
+const programReferenceSchema = programSchema
+  .pick({ id: true, universityId: true, name: true })
+  .partial()
+  .strict()
+  .superRefine((reference, context) => {
+    if (reference.id === undefined && reference.name === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "a program ID or name is required",
+        path: ["id"],
+      });
+    }
+  });
+
+export const researchTargetSchema = z
+  .object({
+    university: universityReferenceSchema.optional(),
+    program: programReferenceSchema.optional(),
+    subjectArea: z.string().min(1).max(120).optional(),
+  })
+  .strict()
+  .superRefine((target, context) => {
+    if (
+      target.university === undefined &&
+      target.program === undefined &&
+      target.subjectArea === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "a university, program, or subject area is required",
+        path: ["university"],
+      });
+    }
+  });
+
+/**
+ * A request contains only user research intent. Provider names, URLs, model
+ * IDs, retry counts, and server-owned limits are intentionally not accepted.
+ * The top-level name/id fields are kept as a small compatibility convenience;
+ * new callers can use the structured `target` reference.
+ */
+export const researchRequestSchema = z
+  .object({
+    target: researchTargetSchema.optional(),
+    universityId: boundedId.optional(),
+    universityName: boundedName.optional(),
+    programId: boundedId.optional(),
+    programName: boundedName.optional(),
+    categories: z
+      .array(researchCategorySchema)
+      .min(1)
+      .max(6)
+      .transform((categories) => [...new Set(categories)]),
+    intake: z.string().min(1).max(40).optional(),
+    academicYear: z.string().min(1).max(40).optional(),
+    locale: z.string().regex(/^[A-Za-z]{2}(?:-[A-Za-z]{2})?$/).optional(),
+    question: z.string().min(1).max(600).optional(),
+  })
+  .strict()
+  .superRefine((request, context) => {
+    const hasStructuredTarget =
+      request.target !== undefined ||
+      request.universityId !== undefined ||
+      request.universityName !== undefined ||
+      request.programId !== undefined ||
+      request.programName !== undefined;
+
+    if (!hasStructuredTarget && request.question === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "a target or focused research question is required",
+        path: ["target"],
+      });
+    }
+  });
+
+export const researchRunStatusSchema = z.enum([
+  "pending",
+  "queued",
+  "running",
+  "completed",
+  "succeeded",
+  "partial",
+  "failed",
+]);
+
+export const researchRunSchema = z
+  .object({
+    id: boundedId,
+    status: researchRunStatusSchema,
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+    startedAt: z.iso.datetime().optional(),
+    completedAt: z.iso.datetime().optional(),
+    discoveryProvider: z.string().min(1).max(80).optional(),
+    extractionModel: z.string().min(1).max(80).optional(),
+    maxExtractionCalls: z.number().int().min(0).max(100).optional(),
+    extractionCallsUsed: z.number().int().min(0).max(100).optional(),
+    partial: z.boolean().default(false),
+    processedCategories: uniqueCategoriesSchema.default([]),
+    unprocessedCategories: uniqueCategoriesSchema.default([]),
+    failureCode: z
+      .enum([
+        "validation",
+        "source-discovery",
+        "retrieval",
+        "provider-rate-limit",
+        "provider-error",
+        "timeout",
+        "source-limit",
+        "unknown",
+      ])
+      .optional(),
+    failureReason: boundedWarning.optional(),
+  })
+  .strict()
+  .superRefine((run, context) => {
+    if (
+      run.maxExtractionCalls !== undefined &&
+      run.extractionCallsUsed !== undefined &&
+      run.extractionCallsUsed > run.maxExtractionCalls
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "extraction call usage cannot exceed the run budget",
+        path: ["extractionCallsUsed"],
+      });
+    }
+  });
+
+export const candidateSourceSchema = z
+  .object({
+    url: z.url(),
+    title: z.string().min(1).max(300).optional(),
+    publisher: z.string().min(1).max(200).optional(),
+    domain: z.string().min(1).max(253).optional(),
+    sourceType: sourceTypeSchema,
+    discoveryProvider: z.string().min(1).max(80),
+    requestedCategory: researchCategorySchema.optional(),
+    discoveredAt: z.iso.datetime().optional(),
+    relevanceScore: z.number().min(0).max(1).optional(),
+    rank: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
+const researchDocumentSectionSchema = z
+  .object({
+    heading: z.string().min(1).max(300).optional(),
+    text: z.string().min(1).max(20_000),
+  })
+  .strict();
+
+const contentTypeSchema = z
+  .string()
+  .min(3)
+  .max(100)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*\/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*(?:;.*)?$/);
+
+export const researchDocumentSchema = z
+  .object({
+    id: boundedId,
+    sourceId: boundedId,
+    originalUrl: z.url(),
+    canonicalUrl: z.url(),
+    title: boundedName,
+    publisher: z.string().min(1).max(200),
+    sourceType: sourceTypeSchema,
+    retrievedAt: z.iso.datetime(),
+    contentType: contentTypeSchema,
+    retrievedBytes: z.number().int().min(0).max(2_000_000).optional(),
+    truncated: z.boolean().default(false),
+    partial: z.boolean().optional(),
+    normalizedText: z.string().min(1).max(200_000),
+    sections: z.array(researchDocumentSectionSchema).max(100).default([]),
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/i),
+  })
+  .strict();
+
+const claimCandidateBaseSchema = claimSchema
+  .omit({ universityId: true, programId: true, verificationStatus: true })
+  .extend({
+    universityId: boundedId.optional(),
+    universityName: boundedName.optional(),
+    programId: boundedId.nullable().optional(),
+    programName: z.string().min(1).max(200).optional(),
+    value: z.union([z.string().max(500), z.number().finite(), z.boolean()]),
+    supportingText: boundedSupportingText,
+    documentId: boundedId,
+    extractionMethod: z.enum(["model", "heuristic", "rule", "manual"]),
+    extractionModel: z.string().min(1).max(80).optional(),
+    /** Extraction confidence, not final evidence confidence or status. */
+    confidence: z.number().min(0).max(1).optional(),
+  })
+  .strict();
+
+export const claimCandidateSchema = claimCandidateBaseSchema.superRefine(
+  (candidate, context) => {
+    if (candidate.universityId === undefined && candidate.universityName === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "a university ID or name is required",
+        path: ["universityId"],
+      });
+    }
+  },
+);
+
+export const verifiedClaimSchema = claimSchema
+  .omit({ sourceId: true })
+  .extend({
+    sourceId: boundedId.optional(),
+    sourceIds: z.array(boundedId).min(1).max(12),
+    documentIds: z.array(boundedId).min(1).max(12),
+  })
+  .superRefine((claim, context) => {
+    if (new Set(claim.sourceIds).size !== claim.sourceIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "verified claim source IDs must be unique",
+        path: ["sourceIds"],
+      });
+    }
+  });
+
+const categoryCoverageSchema = z
+  .object({
+    category: researchCategorySchema,
+    claimCount: z.number().int().min(0),
+    hasEvidence: z.boolean(),
+    statuses: z.array(evidenceStatusSchema).max(8).default([]),
+  })
+  .strict();
+
+export const evidenceSummarySchema = z
+  .object({
+    statusCounts: z
+      .object({
+        verified: z.number().int().min(0),
+        corroborated: z.number().int().min(0),
+        "university-reported": z.number().int().min(0),
+        conflicting: z.number().int().min(0),
+        anecdotal: z.number().int().min(0),
+        inferred: z.number().int().min(0),
+        unknown: z.number().int().min(0),
+        outdated: z.number().int().min(0),
+      })
+      .strict(),
+    totalClaims: z.number().int().min(0),
+    categoryCoverage: z.array(categoryCoverageSchema).max(6).default([]),
+    categoriesProcessed: uniqueCategoriesSchema.default([]),
+    categoriesWithConflicts: uniqueCategoriesSchema.default([]),
+    categoriesUnknown: uniqueCategoriesSchema.default([]),
+    categoriesOutdated: uniqueCategoriesSchema.default([]),
+    categoriesUnprocessed: uniqueCategoriesSchema.default([]),
+    categoriesFailed: uniqueCategoriesSchema.default([]),
+  })
+  .strict()
+  .superRefine((summary, context) => {
+    const statusTotal = Object.values(summary.statusCounts).reduce(
+      (total, count) => total + count,
+      0,
+    );
+    if (summary.totalClaims !== statusTotal) {
+      context.addIssue({
+        code: "custom",
+        message: "totalClaims must equal the sum of all status counts",
+        path: ["totalClaims"],
+      });
+    }
+  });
+
+const researchFailureSchema = z
+  .object({
+    category: researchCategorySchema.optional(),
+    code: z.enum([
+      "source-discovery",
+      "retrieval",
+      "normalization",
+      "provider-rate-limit",
+      "provider-error",
+      "timeout",
+      "source-limit",
+      "unknown",
+    ]),
+    message: boundedWarning,
+  })
+  .strict();
+
+export const researchResultSchema = z
+  .object({
+    run: researchRunSchema,
+    candidateSources: z.array(candidateSourceSchema).max(12).default([]),
+    sources: z.array(sourceSchema).max(50).default([]),
+    documents: z.array(researchDocumentSchema).max(50).default([]),
+    candidates: z.array(claimCandidateSchema).max(500).default([]),
+    claims: z.array(verifiedClaimSchema).max(500).default([]),
+    evidenceSummary: evidenceSummarySchema,
+    failures: z.array(researchFailureSchema).max(12).default([]),
+    warnings: z.array(boundedWarning).max(50).default([]),
+  })
+  .strict();
+
+export type ResearchRequest = z.infer<typeof researchRequestSchema>;
+export type ResearchTarget = z.infer<typeof researchTargetSchema>;
+export type ResearchRunStatus = z.infer<typeof researchRunStatusSchema>;
+export type ResearchRun = z.infer<typeof researchRunSchema>;
+export type CandidateSource = z.infer<typeof candidateSourceSchema>;
+export type ResearchDocumentSection = z.infer<typeof researchDocumentSectionSchema>;
+export type ResearchDocument = z.infer<typeof researchDocumentSchema>;
+export type ClaimCandidate = z.infer<typeof claimCandidateSchema>;
+export type VerifiedClaim = z.infer<typeof verifiedClaimSchema>;
+export type EvidenceSummary = z.infer<typeof evidenceSummarySchema>;
+export type ResearchFailure = z.infer<typeof researchFailureSchema>;
+export type ResearchResult = z.infer<typeof researchResultSchema>;
+
+export { evidenceStatusSchema };

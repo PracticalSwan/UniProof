@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js / build output
+.next/
+out/
+dist/
+build/
+
+# Test and coverage output
+coverage/
+playwright-report/
+test-results/
+output/playwright/
+.playwright-cli/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Hosting / local service state
+.vercel/
+supabase/.temp/
+
+# Logs and caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+.cache/
+.turbo/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini

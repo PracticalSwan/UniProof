@@ -7,6 +7,12 @@ import {
   universitySchema,
 } from "@/lib/validation/domain";
 import { evidenceStatusSchema, sourceTypeSchema } from "@/lib/validation/evidence";
+import {
+  RESEARCH_MAX_CATEGORIES,
+  RESEARCH_MAX_QUERY_CHARACTERS,
+  RESEARCH_MAX_RESPONSE_BYTES,
+  RESEARCH_MAX_SOURCES_PER_RUN,
+} from "@/lib/security/research-limits";
 
 const boundedId = z.string().min(1).max(120);
 const boundedName = z.string().min(1).max(200);
@@ -26,7 +32,7 @@ export type ResearchCategory = z.infer<typeof researchCategorySchema>;
 
 const uniqueCategoriesSchema = z
   .array(researchCategorySchema)
-  .max(6)
+  .max(RESEARCH_MAX_CATEGORIES)
   .transform((categories) => [...new Set(categories)]);
 
 const universityReferenceSchema = universitySchema
@@ -94,12 +100,12 @@ export const researchRequestSchema = z
     categories: z
       .array(researchCategorySchema)
       .min(1)
-      .max(6)
+      .max(RESEARCH_MAX_CATEGORIES)
       .transform((categories) => [...new Set(categories)]),
     intake: z.string().min(1).max(40).optional(),
     academicYear: z.string().min(1).max(40).optional(),
     locale: z.string().regex(/^[A-Za-z]{2}(?:-[A-Za-z]{2})?$/).optional(),
-    question: z.string().min(1).max(600).optional(),
+    question: z.string().min(1).max(RESEARCH_MAX_QUERY_CHARACTERS).optional(),
   })
   .strict()
   .superRefine((request, context) => {
@@ -212,7 +218,7 @@ export const researchDocumentSchema = z
     sourceType: sourceTypeSchema,
     retrievedAt: z.iso.datetime(),
     contentType: contentTypeSchema,
-    retrievedBytes: z.number().int().min(0).max(2_000_000).optional(),
+    retrievedBytes: z.number().int().min(0).max(RESEARCH_MAX_RESPONSE_BYTES).optional(),
     truncated: z.boolean().default(false),
     partial: z.boolean().optional(),
     normalizedText: z.string().min(1).max(200_000),
@@ -291,7 +297,7 @@ export const evidenceSummarySchema = z
       })
       .strict(),
     totalClaims: z.number().int().min(0),
-    categoryCoverage: z.array(categoryCoverageSchema).max(6).default([]),
+    categoryCoverage: z.array(categoryCoverageSchema).max(RESEARCH_MAX_CATEGORIES).default([]),
     categoriesProcessed: uniqueCategoriesSchema.default([]),
     categoriesWithConflicts: uniqueCategoriesSchema.default([]),
     categoriesUnknown: uniqueCategoriesSchema.default([]),
@@ -334,7 +340,7 @@ const researchFailureSchema = z
 export const researchResultSchema = z
   .object({
     run: researchRunSchema,
-    candidateSources: z.array(candidateSourceSchema).max(12).default([]),
+    candidateSources: z.array(candidateSourceSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
     sources: z.array(sourceSchema).max(50).default([]),
     documents: z.array(researchDocumentSchema).max(50).default([]),
     candidates: z.array(claimCandidateSchema).max(500).default([]),

@@ -18,7 +18,7 @@ Phase 2 must work before Research Mode is wired to live providers. The core unit
 - Retrieval must reject SSRF destinations and remain bounded by protocol, redirects, time, bytes, and content type.
 - Provider failures must preserve already-validated partial results.
 - Gemini free-tier processing must not receive applicant personal data or sensitive documents.
-- Git initialization, deployment, publication, and production persistence remain out of scope unless separately authorized.
+- Deployment, publication, destructive Git operations, and production persistence remain out of scope unless separately authorized; repository initialization/publication was separately authorized and has already occurred.
 
 ## Gemini API decision — researched 2026-08-16
 
@@ -106,8 +106,8 @@ Implemented 2026-08-16:
 
 - Zod-first contracts live under `lib/research/contracts/` and reuse the existing domain/evidence schemas.
 - Server-owned retrieval bounds live under `lib/security/research-limits.ts`.
-- `lib/security/outbound-url.ts` exposes syntax validation, conservative canonicalization, public IPv4/IPv6 classification, resolver-injected resolution-time validation, and redirect-target revalidation.
-- Deterministic tests run with Vitest and do not perform live DNS, web, Tavily, Gemini, or Supabase calls.
+- `lib/security/outbound-url.ts` exposes syntax validation, conservative canonicalization, public IPv4/IPv6 classification, resolver-injected resolution-time validation, and redirect-target revalidation. The post-review IPv6 policy fails closed outside the current IANA `2000::/3` global-unicast allocation and blocks special-purpose/reserved prefixes such as IETF protocol assignments, documentation, returned 6bone, and mapped private IPv4 destinations.
+- Deterministic tests run with Vitest and do not perform live DNS, web, Tavily, Gemini, or Supabase calls. Review regressions cover current IANA cases including `100:0:0:1::/64`, deprecated `2001:10::/28`, returned `3ffe::/16`, reserved `4000::/3`, and malformed resolver address-family metadata.
 - Resolution-time validation returns the validated address set for a future pinned transport. It does not by itself prevent a later ordinary `fetch(url)` from resolving a hostname again; Phase 2C must pin or revalidate the connection lookup.
 
 ### Core research contracts
@@ -334,7 +334,7 @@ Required evidence before completion:
 - Free-tier Gemini calls contain public research content only.
 - `npx tsc --noEmit`, lint, build, relevant automated tests, dependency audit, and workspace verification pass.
 - Focused security review covers outbound retrieval, prompt injection, secrets, provider quotas, and safe logging.
-- Git remains uninitialized unless the user separately authorizes Git work.
+- Repository Git operations remain separately authorized actions; the public `origin/main` repository is already initialized and published.
 
 ## Explicitly deferred from Phase 2
 
@@ -346,7 +346,7 @@ Required evidence before completion:
 - admission-probability prediction;
 - autonomous recursive crawling;
 - long-running multi-agent production orchestration;
-- deployment, publication, Git remote creation, or Devpost submission.
+- deployment, publication changes, destructive Git operations, or Devpost submission.
 
 ## Execution order
 

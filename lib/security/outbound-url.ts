@@ -63,12 +63,10 @@ const IPV6_BLOCKED_PREFIXES: readonly {
   { bits: 64, groups: [0x0100, 0, 0, 0, 0, 0, 0, 0], reason: "IPv6 discard-only prefix 100::/64" },
   { bits: 96, groups: [0x0064, 0xff9b, 0, 0, 0, 0, 0, 0], reason: "well-known IPv4 NAT64 prefix 64:ff9b::/96" },
   { bits: 48, groups: [0x0064, 0xff9b, 0x0001, 0, 0, 0, 0, 0], reason: "local-use IPv4 NAT64 prefix 64:ff9b:1::/48" },
-  { bits: 32, groups: [0x2001, 0, 0, 0, 0, 0, 0, 0], reason: "IPv6 Teredo prefix 2001::/32" },
-  { bits: 28, groups: [0x2001, 0x0000, 0, 0, 0, 0, 0, 0], reason: "IPv6 ORCHID prefix 2001:10::/28" },
-  { bits: 28, groups: [0x2001, 0x0020, 0, 0, 0, 0, 0, 0], reason: "IPv6 ORCHIDv2 prefix 2001:20::/28" },
-  { bits: 48, groups: [0x2001, 0x0002, 0, 0, 0, 0, 0, 0], reason: "IPv6 benchmarking prefix 2001:2::/48" },
+  { bits: 23, groups: [0x2001, 0, 0, 0, 0, 0, 0, 0], reason: "IPv6 IETF protocol-assignment prefix 2001::/23" },
   { bits: 32, groups: [0x2001, 0x0db8, 0, 0, 0, 0, 0, 0], reason: "IPv6 documentation prefix 2001:db8::/32" },
   { bits: 16, groups: [0x2002, 0, 0, 0, 0, 0, 0, 0], reason: "IPv6 6to4 prefix 2002::/16" },
+  { bits: 16, groups: [0x3ffe, 0, 0, 0, 0, 0, 0, 0], reason: "returned IPv6 6bone prefix 3ffe::/16" },
   { bits: 20, groups: [0x3fff, 0x0000, 0, 0, 0, 0, 0, 0], reason: "IPv6 documentation prefix 3fff::/20" },
   { bits: 7, groups: [0xfc00, 0, 0, 0, 0, 0, 0, 0], reason: "IPv6 unique-local prefix fc00::/7" },
   { bits: 10, groups: [0xfe80, 0, 0, 0, 0, 0, 0, 0], reason: "IPv6 link-local prefix fe80::/10" },
@@ -289,9 +287,21 @@ function ipv6BlockedReason(addressGroups: Ipv6Groups, mappedIpv4: string | null)
     return ipv4BlockedReason(mappedIpv4);
   }
 
-  return IPV6_BLOCKED_PREFIXES.find((prefix) =>
+  const specialUseReason = IPV6_BLOCKED_PREFIXES.find((prefix) =>
     ipv6PrefixMatches(addressGroups, prefix.bits, prefix.groups),
-  )?.reason ?? null;
+  )?.reason;
+  if (specialUseReason !== undefined) {
+    return specialUseReason;
+  }
+
+  const currentGlobalUnicast = ipv6PrefixMatches(
+    addressGroups,
+    3,
+    [0x2000, 0, 0, 0, 0, 0, 0, 0],
+  );
+  return currentGlobalUnicast
+    ? null
+    : "IPv6 address is outside the current IANA global-unicast allocation 2000::/3";
 }
 
 export function classifyOutboundIpAddress(
@@ -549,11 +559,13 @@ function normalizeDnsAddresses(
     if (parsedFamily !== 4 && parsedFamily !== 6) {
       throw new Error("DNS resolver returned an invalid address");
     }
-    const family = typeof entry === "string"
-      ? parsedFamily
-      : entry.family === 6
-        ? 6
-        : 4;
+    let family: 4 | 6 = parsedFamily;
+    if (typeof entry !== "string") {
+      if ((entry.family !== 4 && entry.family !== 6) || entry.family !== parsedFamily) {
+        throw new Error("DNS resolver returned an address/family mismatch");
+      }
+      family = entry.family;
+    }
     const key = `${family}:${address}`;
     if (seen.has(key)) {
       continue;
@@ -613,22 +625,22 @@ export async function validateOutboundUrlAtResolutionTime(
   let resolved: readonly OutboundDnsAddress[];
   try {
     resolved = await resolveHostname(syntax.hostname, resolver);
-  } catch (error) {
+  } catch {
     return outboundFailure(
       syntax.canonicalUrl,
       "dns-resolution-failed",
-      error instanceof Error ? error.message : "unknown DNS resolution error",
+      "DNS resolution failed",
     );
   }
 
   let addresses: OutboundResolvedAddress[];
   try {
     addresses = normalizeDnsAddresses(resolved);
-  } catch (error) {
+  } catch {
     return outboundFailure(
       syntax.canonicalUrl,
       "dns-invalid-addresses",
-      error instanceof Error ? error.message : "DNS resolver returned invalid addresses",
+      "DNS resolver returned invalid addresses",
     );
   }
   if (addresses.length === 0) {

@@ -11,13 +11,16 @@ Do not disclose suspected credentials, private user data, or exploitable details
 - Never commit real API keys, database credentials, private keys, or `.env` files.
 - Keep Gemini, Tavily, Supabase service-role, and other privileged credentials server-side.
 - Treat all retrieved webpages and model output as untrusted input.
-- Block SSRF to loopback, private, link-local, and metadata-service destinations.
+- Block SSRF to loopback, private, link-local, reserved/special-purpose, and metadata-service destinations; direct IPv6 retrieval fails closed outside the current IANA `2000::/3` global-unicast allocation.
 - Validate redirect destinations and bound outbound requests.
 - Sanitize external content before rendering and never execute retrieved scripts.
 - Validate structured AI output before persistence or display.
 - Preserve unknown/conflict states rather than fabricating a result.
 - Derive ownership from authenticated server state when user persistence is introduced.
 - Do not log sensitive profile fields or secrets unnecessarily.
+- Remove task-local secret-bearing/debug residue when its purpose is complete; retain only sanitized evidence needed for debugging, regression coverage, or incident review.
+- Treat real user/private data, persistent database data, canonical datasets, and external resources as protected deletion targets that require explicit exact-scope authorization.
+- Use exact or bounded deletion targets; never use broad wildcard, blanket table, or destructive Git cleanup as routine residue removal.
 
 ## Before Public Deployment
 

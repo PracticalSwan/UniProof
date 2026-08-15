@@ -84,6 +84,7 @@ The retrieval layer must:
 - validate redirects at every hop;
 - bound request duration, redirect count, and response bytes;
 - resolve and validate every returned DNS address before connection; Phase 2C must pin that validated address or use a transport lookup that re-validates it, because URL validation alone does not eliminate DNS rebinding;
+- fail closed for direct IPv6 retrieval outside the current IANA `2000::/3` global-unicast allocation and block reserved/special-purpose prefixes used by the policy; IPv4-mapped IPv6 is evaluated against the IPv4 policy;
 - sanitize/normalize readable content before model use;
 - never interpret retrieved instructions as agent or system instructions.
 

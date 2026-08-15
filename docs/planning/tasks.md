@@ -27,7 +27,7 @@ Detailed plan: `docs/planning/phase-2-evidence-research-pipeline.md`.
 ### Phase 2A — Research safety and core contracts
 
 - [x] Define Zod-first ResearchRequest, ResearchRun, CandidateSource, ResearchDocument, ClaimCandidate, VerifiedClaim, EvidenceSummary, and ResearchResult contracts.
-- [x] Implement SSRF-resistant outbound URL validation with DNS/IP and redirect revalidation.
+- [x] Implement and review SSRF-resistant outbound URL validation with DNS/IP, conservative IPv6 special-use/global-unicast classification, and redirect revalidation.
 - [x] Define bounded retrieval limits for timeout, redirects, response bytes, MIME types, source counts, and duplicate URLs.
 - [x] Add deterministic security tests without requiring live provider credentials.
 

@@ -24,7 +24,8 @@
 Server retrieval must use an explicit outbound policy:
 
 - HTTP(S) only, with HTTPS preferred/required where the provider supports it.
-- Resolve and reject loopback, private, link-local, and metadata-service IP destinations.
+- Resolve and reject loopback, private, link-local, reserved/special-purpose, and metadata-service IP destinations.
+- For IPv6, fail closed outside the current IANA `2000::/3` global-unicast allocation and apply explicit special-purpose exclusions inside it; IPv4-mapped IPv6 inherits the IPv4 classification.
 - Re-check each redirect destination.
 - Treat resolution-time validation as a prerequisite, not a complete transport guarantee: Phase 2C must connect through the validated/pinned address or revalidate the transport lookup to close the DNS-rebinding gap.
 - Bound redirects, response bytes, request time, and content types.
@@ -50,6 +51,15 @@ Server retrieval must use an explicit outbound policy:
 - Avoid logging applicant profile details unless operationally necessary; redact identifiers from errors.
 - Do not collect sensitive documents in the MVP.
 
+## Cleanup and Sensitive Residue
+
+- Task-local disposable test residue may be removed under the standing cleanup authorization defined in `AGENTS.md`, but only when it is clearly temporary, inside the project root, safely reproducible, and no longer needed for regression, debugging, acceptance evidence, or future sessions.
+- Secret-bearing temporary files, raw tokens, credential copies, unsafe debug dumps, and similar sensitive residue must not be retained for convenience. Remove the exposed copy when authorized, preserve only sanitized evidence needed for incident review, and handle any required credential rotation/revocation as a separate external action.
+- Real user/private data is never routine cleanup. Delete it only with explicit authorization for the exact scope or when a higher-priority privacy/security requirement mandates removal.
+- Database cleanup must target exact test-only records or bounded predicates. Do not use vague predicates, blanket table deletion, or broad cleanup against persistent or production-like data.
+- Raw provider responses, source captures, logs, screenshots, and traces should be deleted after their debugging/test purpose unless a sanitized artifact is intentionally retained as a regression fixture or acceptance record.
+- Never retain secrets merely because they appear in logs, fixtures, screenshots, traces, or historical debug artifacts.
+
 ## Authorization
 
 When persistence/authentication is implemented, enable Supabase Row Level Security before treating saved profile, comparison, or plan data as private. Server-side authorization must derive ownership from the authenticated session, not from a caller-provided user ID.
@@ -59,6 +69,6 @@ When persistence/authentication is implemented, enable Supabase Row Level Securi
 - Rate-limit research endpoints.
 - Bound query length, source count, model tokens, and retries.
 - Cache reusable public research where freshness rules permit it.
-- Record provider failures without leaking request secrets or full private profile payloads.
+- Record provider failures without leaking request secrets or full private profile payloads; outbound DNS failures expose stable policy codes/messages rather than raw resolver error strings.
 
 Run a focused `security-auditor` review before public deployment and run `secret-scanning` before any authorized commit/push.

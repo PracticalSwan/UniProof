@@ -123,6 +123,41 @@ Do not use repository-irrelevant skills merely because they are installed. In pa
 - Never publish, deploy, submit to Devpost, create a remote repository, change repository visibility, or upload user data without explicit authorization.
 - Never delete or overwrite user work without explicit authorization and exact-path verification.
 
+## Deletion, Cleanup, and Destructive Operations
+
+The user has granted standing project authorization to remove task-local disposable test residue after its purpose is complete. This standing authorization is narrow: it applies only inside the UniProof workspace to artifacts that are clearly temporary, created for the current task or verification, and safely reproducible. Preserve anything that has clear regression, debugging, reproducibility, acceptance-evidence, or future-session value.
+
+Examples normally covered by routine cleanup include temporary test records, fake research runs, scratch files, one-off debug outputs, disposable screenshots/videos/traces, temporary logs, raw provider-response captures, temporary downloads, and task-local diagnostic artifacts. Promote useful cases into deliberate sanitized fixtures or maintained tooling instead of deleting them.
+
+For every other removal or cleanup operation:
+
+1. Resolve the exact target and confirm it is inside the approved project root. Never infer a deletion target from an ambiguous path or symlink.
+2. Inspect the exact deletion set before acting. Prefer exact paths over wildcards; do not use broad recursive deletion unless the expanded set has been reviewed and is fully within scope.
+3. Check references, imports, configuration, scripts, tests, documentation, migrations, runtime paths, and dynamic usage relevant to the target. Do not declare something unused after checking only one likely reference path.
+4. Determine whether the target is reproducible, user-owned, security-sensitive, canonical, historical, or expensive to recreate. Preserve evidence that is still needed for debugging, regression coverage, auditability, or future sessions.
+5. Use the smallest deletion that completes the task. Do not combine cleanup with unrelated refactors or modernization.
+6. After deletion, verify the target is gone, inspect the resulting workspace changes, and run validation proportional to the affected path.
+
+Additional rules:
+
+- Build outputs, caches, generated coverage, temporary exports, and similar regenerable artifacts may be removed when cleanup is useful and their regeneration path is known.
+- One-off diagnostic scripts, temporary debug instrumentation, obsolete commented-out implementation, empty directories, abandoned experiments, and superseded implementation files may be removed only after their purpose is complete and relevant references/tests show they are no longer needed.
+- Remove dead code only with evidence that it is unreachable or unused. Do not delete code merely because an agent cannot immediately find a caller.
+- Remove unused dependencies only after checking source, configuration, scripts, build tooling, tests, and dynamic imports. Update manifest and lockfile together and rebuild/test afterward.
+- Remove obsolete configuration, environment-variable declarations, feature flags, aliases, or provider settings only after verifying no active runtime, CI, documentation, deployment, or migration path depends on them.
+- Remove duplicate assets/data only after confirming reference, attribution, licensing, and path semantics are equivalent.
+- After a move or rename, remove the superseded original only after the new path works and all relevant references have been updated.
+- Do not remove or weaken tests merely to make a failing suite pass. A test may be deleted or rewritten only when its requirement is demonstrably obsolete or invalid, with the reason preserved in the change or project memory when material.
+- Preserve regression fixtures that reproduce bugs, parser edge cases, security cases, provider failures, evidence conflicts, or other durable behavior. Temporary fixtures may be deleted.
+- Historical architecture decisions, prior-provider references, lessons, and append-only memory entries are not cleanup targets merely because the project direction changed. Mark material as historical/deprecated or append a correction instead of erasing provenance.
+- Completed scratch plans may be removed only after durable decisions have been transferred to their canonical documentation. Canonical phase plans, requirements, migration history, and decision history are preserved unless the user explicitly authorizes their removal.
+- Do not create ad-hoc `*.bak`, `*.old`, `copy`, or backup folders as normal workflow. If a temporary backup is exceptionally necessary, remove it after validation unless it has been deliberately promoted to a retained artifact.
+- Security-sensitive residue such as accidental secret copies, secret-bearing debug files, raw tokens, or unsafe dumps must not be retained for convenience. Remove the exposed copy from the workspace when authorized, preserve only sanitized incident evidence, and separately handle any required credential rotation/revocation under the external-action rules.
+- Real user/private data, canonical datasets, expensive-to-recreate processed data, database migrations/history, persistent development fixtures, external resources, and files outside the UniProof root are never routine cleanup. Their deletion requires explicit user authorization for the exact scope.
+- Database cleanup must use exact test-only records or bounded predicates. Never use vague predicates, blanket table deletion, or wildcard-like cleanup against persistent or production-like data.
+- Git cleanup is not ordinary file cleanup. Never use `git clean -fd`, destructive reset, history rewriting, force push, branch/tag deletion, or equivalent destructive Git operations without explicit authorization for that action and target.
+- `.ai-bridge` or agent handoff residue may be removed when stale and no active session depends on it, but preserve durable plans/decisions until transferred to a canonical project file.
+
 ## Git and Dependency Rules
 
 - Do not run `git init`, create branches, commit, push, open PRs, or merge unless the user explicitly requests the relevant Git action.

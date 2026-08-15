@@ -95,3 +95,28 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - Changed: Initialized Git on `main`, created the public `PracticalSwan/UniProof` repository, configured `origin`, and pushed commit `375cb6adf45d5125fdfe504dfe4ab9fead6eec98`.
 - Verified: GitHub reports `isPrivate: false`, default branch `main`, detected `MIT License`, and the remote tree is clean/tracking `origin/main`.
 - Decided: Keep Devpost project creation/submission, hosted deployment, and demo-video publication separate until explicitly requested and those deliverables are ready.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — deletion and cleanup governance
+
+**Summary:** Added project-wide deletion, cleanup, and destructive-operation rules, including narrow standing authorization for disposable test residue.
+
+- Changed: Added the canonical deletion/cleanup workflow to `AGENTS.md` and added sensitive-residue protections to `docs/security.md` and root `SECURITY.md`.
+- Decided: Task-local disposable test residue inside the UniProof workspace should be removed after its purpose is complete unless it has regression, debugging, reproducibility, acceptance-evidence, or future-session value. Broader cleanup requires exact-target inspection and evidence; protected or irreversible targets require explicit exact-scope authorization.
+- Decided: Preserve regression fixtures, historical decisions, append-only memory, canonical plans/migrations/datasets, and meaningful test evidence; never remove tests merely to make failures disappear, and never treat destructive Git/database cleanup as ordinary residue removal.
+- Verified: `scripts/verify-workspace.ps1` passed after the governance/security updates and reported the Git repository as initialized.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Phase 2A independent review and hardening
+
+**Summary:** Reviewed the completed Phase 2A safety/contracts implementation, fixed verified SSRF and contract-bound defects, synchronized documentation, and prepared the authorized commit/push.
+
+- Changed: Hardened IPv6 classification to fail closed outside the current IANA `2000::/3` global-unicast allocation while blocking special-purpose ranges; fixed the deprecated `2001:10::/28` coverage via the broader IETF protocol-assignment boundary; blocked returned `3ffe::/16`; and retained IPv4-mapped IPv6 classification through the IPv4 policy.
+- Changed: DNS resolver normalization now rejects invalid or mismatched family metadata instead of coercing unexpected values, and DNS validation failures no longer expose raw resolver error strings.
+- Changed: `ResearchResult` source/document arrays and verified-claim source/document references now derive their maximum from `RESEARCH_MAX_SOURCES_PER_RUN` instead of duplicated larger/hard-coded bounds.
+- Verified: The focused `tests/phase2a.test.ts` regression suite passed 15/15 after the fixes; full repository verification is recorded in the final task result after all checks complete.
+
+## 2026-08-16 — Phase 2A review verification addendum
+
+- Verified: `npm test` passed 15/15 tests; the exact `tests/phase2a.test.ts` regression path also passed 15/15 after the final code edit.
+- Verified: `npx tsc --noEmit`, `npm run lint`, `npm run build`, `npm audit` (0 vulnerabilities), `scripts/verify-workspace.ps1`, and `git diff --check` all passed.
+- Verified: A fresh `git fetch origin main` confirmed local `HEAD` and `origin/main` were both `a861728bd890143a101b3f1140e6af5939bc60a4` before the authorized review commit.
+- Verified: Only `.env.example` exists at the repository root; no active `OPENAI_API_KEY` or `NEXT_PUBLIC_GEMINI_*` configuration was found in active code/config. UI behavior was unchanged, so browser QA was not required for this review.

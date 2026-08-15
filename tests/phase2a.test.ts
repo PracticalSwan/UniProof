@@ -20,6 +20,7 @@ import {
   RESEARCH_MAX_CATEGORIES,
   RESEARCH_MAX_REDIRECTS,
   RESEARCH_MAX_RESPONSE_BYTES,
+  RESEARCH_MAX_SOURCES_PER_RUN,
   validateResearchRedirectLimit,
 } from "@/lib/security/research-limits";
 
@@ -195,6 +196,37 @@ describe("Phase 2A research contracts", () => {
     expect(result.success).toBe(true);
   });
 
+  it("enforces the centralized per-run source bound across result records", () => {
+    const sources = Array.from({ length: RESEARCH_MAX_SOURCES_PER_RUN + 1 }, (_, index) => ({
+      id: `source-${index}`,
+      url: `https://example.edu/source-${index}`,
+      title: `Source ${index}`,
+      publisher: "Example University",
+      sourceType: "university" as const,
+      retrievedAt: timestamp,
+    }));
+
+    expect(
+      researchResultSchema.safeParse({
+        run: { id: "run-source-limit", status: "completed", createdAt: timestamp, updatedAt: timestamp },
+        sources,
+        evidenceSummary: {
+          statusCounts: {
+            verified: 0,
+            corroborated: 0,
+            "university-reported": 0,
+            conflicting: 0,
+            anecdotal: 0,
+            inferred: 0,
+            unknown: 0,
+            outdated: 0,
+          },
+          totalClaims: 0,
+        },
+      }).success,
+    ).toBe(false);
+  });
+
   it("keeps evidence-state counts consistent", () => {
     expect(
       evidenceSummarySchema.safeParse({
@@ -286,7 +318,12 @@ describe("Phase 2A outbound URL and IP policy", () => {
       "fc00::1",
       "fe80::1",
       "ff02::1",
+      "100:0:0:1::1",
+      "2001:10::1",
+      "2001:20::1",
       "2001:db8::1",
+      "3ffe::1",
+      "4000::1",
       "::ffff:127.0.0.1",
       "::ffff:10.0.0.1",
     ]) {
@@ -295,6 +332,7 @@ describe("Phase 2A outbound URL and IP policy", () => {
 
     expect(classifyOutboundIpAddress("::ffff:127.0.0.1", 6).mappedIpv4Address).toBe("127.0.0.1");
     expect(isPublicIpAddress("::ffff:8.8.8.8")).toBe(true);
+    expect(isPublicIpAddress("2001:4860:4860::8888")).toBe(true);
   });
 
   it("fails closed when DNS fails, returns no addresses, or returns any blocked address", async () => {
@@ -314,6 +352,13 @@ describe("Phase 2A outbound URL and IP policy", () => {
       dnsResolver: async () => [{ address: "not-an-ip", family: 4 as const }],
     });
     expect(invalidAddresses).toMatchObject({ valid: false, reason: "dns-invalid-addresses" });
+
+    const invalidFamily = await resolveAndValidateOutboundTarget("https://invalid-family.example/", {
+      dnsResolver: async () => [
+        { address: "93.184.216.34", family: 5 } as never,
+      ],
+    });
+    expect(invalidFamily).toMatchObject({ valid: false, reason: "dns-invalid-addresses" });
 
     const mixedAddresses = await resolveAndValidateOutboundTarget("https://mixed.example/", {
       dnsResolver: async () => [

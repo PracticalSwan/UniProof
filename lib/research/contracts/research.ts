@@ -260,8 +260,8 @@ export const verifiedClaimSchema = claimSchema
   .omit({ sourceId: true })
   .extend({
     sourceId: boundedId.optional(),
-    sourceIds: z.array(boundedId).min(1).max(12),
-    documentIds: z.array(boundedId).min(1).max(12),
+    sourceIds: z.array(boundedId).min(1).max(RESEARCH_MAX_SOURCES_PER_RUN),
+    documentIds: z.array(boundedId).min(1).max(RESEARCH_MAX_SOURCES_PER_RUN),
   })
   .superRefine((claim, context) => {
     if (new Set(claim.sourceIds).size !== claim.sourceIds.length) {
@@ -341,8 +341,8 @@ export const researchResultSchema = z
   .object({
     run: researchRunSchema,
     candidateSources: z.array(candidateSourceSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
-    sources: z.array(sourceSchema).max(50).default([]),
-    documents: z.array(researchDocumentSchema).max(50).default([]),
+    sources: z.array(sourceSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
+    documents: z.array(researchDocumentSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
     candidates: z.array(claimCandidateSchema).max(500).default([]),
     claims: z.array(verifiedClaimSchema).max(500).default([]),
     evidenceSummary: evidenceSummarySchema,

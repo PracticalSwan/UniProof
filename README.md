@@ -23,7 +23,7 @@ UniProof is an evidence-first AI platform for international students researching
 
 ## Current State
 
-Phase 2A is complete: the Next.js application foundation now includes Zod-first research contracts, centralized server-owned retrieval bounds, deterministic SSRF/DNS/redirect policy primitives, and offline security tests. Live source discovery, retrieval transport, Gemini calls, database migrations, Row Level Security, seed data, and persistence remain intentionally deferred to later phases.
+Phase 2A is complete and independently hardened: the Next.js application foundation includes Zod-first research contracts, centralized server-owned retrieval bounds, deterministic SSRF/DNS/redirect policy primitives, conservative IPv6 public-address classification reviewed against current IANA allocations, and offline security regression tests. Live source discovery, retrieval transport, Gemini calls, database migrations, Row Level Security, seed data, and persistence remain intentionally deferred to later phases.
 
 Open-source repository: <https://github.com/PracticalSwan/UniProof>
 

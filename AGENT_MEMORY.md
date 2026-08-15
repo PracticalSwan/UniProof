@@ -87,3 +87,11 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - Decided: Resolution-time DNS validation returns addresses for a future pinned transport; it does not claim that a later ordinary `fetch(url)` is protected from DNS rebinding. Phase 2C must pin or revalidate the connection lookup.
 - Verified: `npm.cmd test` (14 tests), `npx.cmd tsc --noEmit`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd audit` (0 vulnerabilities), and `scripts/verify-workspace.ps1` passed on 2026-08-16. No live Gemini, Tavily, DNS, or university retrieval call was added.
 - Deferred: Live discovery/retrieval transport, Gemini integration, extraction/reconciliation, persistence/RLS, deployment, and Devpost submission remain out of scope for Phase 2A.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — GitHub setup
+
+**Summary:** Initialized and published the authorized public GitHub repository required for Pixel Forge open-source judging.
+
+- Changed: Initialized Git on `main`, created the public `PracticalSwan/UniProof` repository, configured `origin`, and pushed commit `375cb6adf45d5125fdfe504dfe4ab9fead6eec98`.
+- Verified: GitHub reports `isPrivate: false`, default branch `main`, detected `MIT License`, and the remote tree is clean/tracking `origin/main`.
+- Decided: Keep Devpost project creation/submission, hosted deployment, and demo-video publication separate until explicitly requested and those deliverables are ready.

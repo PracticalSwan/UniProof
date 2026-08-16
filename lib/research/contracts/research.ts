@@ -8,6 +8,7 @@ import {
 } from "@/lib/validation/domain";
 import { evidenceStatusSchema, sourceTypeSchema } from "@/lib/validation/evidence";
 import {
+  RESEARCH_ALLOWED_RESPONSE_CONTENT_TYPES,
   RESEARCH_MAX_CATEGORIES,
   RESEARCH_MAX_QUERY_CHARACTERS,
   RESEARCH_MAX_RESPONSE_BYTES,
@@ -82,6 +83,17 @@ export const researchTargetSchema = z
         path: ["university"],
       });
     }
+    if (
+      target.university?.id !== undefined &&
+      target.program?.universityId !== undefined &&
+      target.university.id !== target.program.universityId
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "program universityId must match the target university ID",
+        path: ["program", "universityId"],
+      });
+    }
   });
 
 /**
@@ -109,14 +121,22 @@ export const researchRequestSchema = z
   })
   .strict()
   .superRefine((request, context) => {
-    const hasStructuredTarget =
-      request.target !== undefined ||
+    const hasLegacyTarget =
       request.universityId !== undefined ||
       request.universityName !== undefined ||
       request.programId !== undefined ||
       request.programName !== undefined;
+    const hasStructuredTarget = request.target !== undefined;
 
-    if (!hasStructuredTarget && request.question === undefined) {
+    if (hasStructuredTarget && hasLegacyTarget) {
+      context.addIssue({
+        code: "custom",
+        message: "use either target or legacy target fields, not both",
+        path: ["target"],
+      });
+    }
+
+    if (!hasStructuredTarget && !hasLegacyTarget && request.question === undefined) {
       context.addIssue({
         code: "custom",
         message: "a target or focused research question is required",
@@ -177,6 +197,28 @@ export const researchRunSchema = z
         path: ["extractionCallsUsed"],
       });
     }
+    if (run.status === "partial" && !run.partial) {
+      context.addIssue({
+        code: "custom",
+        message: "partial run status requires partial=true",
+        path: ["partial"],
+      });
+    }
+    if (run.status === "succeeded" && run.partial) {
+      context.addIssue({
+        code: "custom",
+        message: "succeeded run status cannot be partial",
+        path: ["partial"],
+      });
+    }
+    const unprocessed = new Set(run.unprocessedCategories);
+    if (run.processedCategories.some((category) => unprocessed.has(category))) {
+      context.addIssue({
+        code: "custom",
+        message: "processed and unprocessed run categories must be disjoint",
+        path: ["unprocessedCategories"],
+      });
+    }
   });
 
 export const candidateSourceSchema = z
@@ -205,7 +247,14 @@ const contentTypeSchema = z
   .string()
   .min(3)
   .max(100)
-  .regex(/^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*\/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*(?:;.*)?$/);
+  .regex(/^[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*\/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*(?:;.*)?$/)
+  .refine(
+    (value) =>
+      RESEARCH_ALLOWED_RESPONSE_CONTENT_TYPES.includes(
+        value.split(";", 1)[0].trim().toLowerCase(),
+      ),
+    { message: "unsupported research content type" },
+  );
 
 export const researchDocumentSchema = z
   .object({
@@ -234,6 +283,7 @@ const claimCandidateBaseSchema = claimSchema
     universityName: boundedName.optional(),
     programId: boundedId.nullable().optional(),
     programName: z.string().min(1).max(200).optional(),
+    category: researchCategorySchema,
     value: z.union([z.string().max(500), z.number().finite(), z.boolean()]),
     supportingText: boundedSupportingText,
     documentId: boundedId,
@@ -259,6 +309,7 @@ export const claimCandidateSchema = claimCandidateBaseSchema.superRefine(
 export const verifiedClaimSchema = claimSchema
   .omit({ sourceId: true })
   .extend({
+    category: researchCategorySchema,
     sourceId: boundedId.optional(),
     sourceIds: z.array(boundedId).min(1).max(RESEARCH_MAX_SOURCES_PER_RUN),
     documentIds: z.array(boundedId).min(1).max(RESEARCH_MAX_SOURCES_PER_RUN),
@@ -269,6 +320,20 @@ export const verifiedClaimSchema = claimSchema
         code: "custom",
         message: "verified claim source IDs must be unique",
         path: ["sourceIds"],
+      });
+    }
+    if (new Set(claim.documentIds).size !== claim.documentIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "verified claim document IDs must be unique",
+        path: ["documentIds"],
+      });
+    }
+    if (claim.sourceId !== undefined && !claim.sourceIds.includes(claim.sourceId)) {
+      context.addIssue({
+        code: "custom",
+        message: "sourceId must also appear in sourceIds",
+        path: ["sourceId"],
       });
     }
   });
@@ -318,6 +383,22 @@ export const evidenceSummarySchema = z
         path: ["totalClaims"],
       });
     }
+    const coverageCategories = summary.categoryCoverage.map((coverage) => coverage.category);
+    if (new Set(coverageCategories).size !== coverageCategories.length) {
+      context.addIssue({
+        code: "custom",
+        message: "category coverage entries must be unique by category",
+        path: ["categoryCoverage"],
+      });
+    }
+    const unprocessed = new Set(summary.categoriesUnprocessed);
+    if (summary.categoriesProcessed.some((category) => unprocessed.has(category))) {
+      context.addIssue({
+        code: "custom",
+        message: "processed and unprocessed categories must be disjoint",
+        path: ["categoriesUnprocessed"],
+      });
+    }
   });
 
 const researchFailureSchema = z
@@ -349,7 +430,83 @@ export const researchResultSchema = z
     failures: z.array(researchFailureSchema).max(12).default([]),
     warnings: z.array(boundedWarning).max(50).default([]),
   })
-  .strict();
+  .strict()
+  .superRefine((result, context) => {
+    const ensureUniqueIds = (items: readonly { id: string }[], path: string) => {
+      const ids = items.map((item) => item.id);
+      if (new Set(ids).size !== ids.length) {
+        context.addIssue({ code: "custom", message: `${path} IDs must be unique`, path: [path] });
+      }
+    };
+
+    ensureUniqueIds(result.sources, "sources");
+    ensureUniqueIds(result.documents, "documents");
+    ensureUniqueIds(result.candidates, "candidates");
+    ensureUniqueIds(result.claims, "claims");
+
+    const sourceIds = new Set(result.sources.map((source) => source.id));
+    const documents = new Map(result.documents.map((document) => [document.id, document]));
+
+    for (const [index, document] of result.documents.entries()) {
+      if (!sourceIds.has(document.sourceId)) {
+        context.addIssue({ code: "custom", message: "document sourceId must reference a result source", path: ["documents", index, "sourceId"] });
+      }
+    }
+
+    for (const [index, candidate] of result.candidates.entries()) {
+      const document = documents.get(candidate.documentId);
+      if (!sourceIds.has(candidate.sourceId)) {
+        context.addIssue({ code: "custom", message: "candidate sourceId must reference a result source", path: ["candidates", index, "sourceId"] });
+      }
+      if (document === undefined) {
+        context.addIssue({ code: "custom", message: "candidate documentId must reference a result document", path: ["candidates", index, "documentId"] });
+      } else if (document.sourceId !== candidate.sourceId) {
+        context.addIssue({ code: "custom", message: "candidate sourceId must match its document sourceId", path: ["candidates", index, "sourceId"] });
+      }
+    }
+
+    for (const [index, claim] of result.claims.entries()) {
+      for (const sourceId of claim.sourceIds) {
+        if (!sourceIds.has(sourceId)) {
+          context.addIssue({ code: "custom", message: "claim sourceIds must reference result sources", path: ["claims", index, "sourceIds"] });
+        }
+      }
+      for (const documentId of claim.documentIds) {
+        const document = documents.get(documentId);
+        if (document === undefined) {
+          context.addIssue({ code: "custom", message: "claim documentIds must reference result documents", path: ["claims", index, "documentIds"] });
+        } else if (!claim.sourceIds.includes(document.sourceId)) {
+          context.addIssue({ code: "custom", message: "claim document sources must appear in sourceIds", path: ["claims", index, "sourceIds"] });
+        }
+      }
+    }
+
+    if (result.evidenceSummary.totalClaims !== result.claims.length) {
+      context.addIssue({
+        code: "custom",
+        message: "evidenceSummary totalClaims must equal the number of verified claims",
+        path: ["evidenceSummary", "totalClaims"],
+      });
+    }
+    const actualStatusCounts = new Map(
+      evidenceStatusSchema.options.map((status) => [status, 0]),
+    );
+    for (const claim of result.claims) {
+      actualStatusCounts.set(
+        claim.verificationStatus,
+        (actualStatusCounts.get(claim.verificationStatus) ?? 0) + 1,
+      );
+    }
+    for (const status of evidenceStatusSchema.options) {
+      if (result.evidenceSummary.statusCounts[status] !== actualStatusCounts.get(status)) {
+        context.addIssue({
+          code: "custom",
+          message: `evidenceSummary status count for ${status} must match verified claims`,
+          path: ["evidenceSummary", "statusCounts", status],
+        });
+      }
+    }
+  });
 
 export type ResearchRequest = z.infer<typeof researchRequestSchema>;
 export type ResearchTarget = z.infer<typeof researchTargetSchema>;

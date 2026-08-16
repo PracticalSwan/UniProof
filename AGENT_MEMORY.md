@@ -120,3 +120,17 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - Verified: `npx tsc --noEmit`, `npm run lint`, `npm run build`, `npm audit` (0 vulnerabilities), `scripts/verify-workspace.ps1`, and `git diff --check` all passed.
 - Verified: A fresh `git fetch origin main` confirmed local `HEAD` and `origin/main` were both `a861728bd890143a101b3f1140e6af5939bc60a4` before the authorized review commit.
 - Verified: Only `.env.example` exists at the repository root; no active `OPENAI_API_KEY` or `NEXT_PUBLIC_GEMINI_*` configuration was found in active code/config. UI behavior was unchanged, so browser QA was not required for this review.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Phase 2A follow-up review
+
+**Summary:** Continued the Phase 2A re-review without CodexPro at the user's direction, proved additional contract/error-sanitization defects with regressions, fixed them narrowly, and re-verified the repository.
+
+- Changed: Research requests reject mixed structured/legacy targeting and contradictory structured university/program IDs. Research claims are restricted to supported Phase 2 categories; verified-claim document IDs are unique and optional `sourceId` must belong to `sourceIds`.
+- Changed: `ResearchRun` now rejects contradictory partial/succeeded state and processed/unprocessed category overlap. Research-document content types are constrained by the centralized MIME allowlist.
+- Changed: `ResearchResult` validates unique IDs and source/document/candidate/claim provenance, and its evidence summary must match actual claim totals and evidence-status counts. Evidence summaries also reject duplicate category coverage and processed/unprocessed overlap.
+- Changed: Outbound validation failure metadata now removes HTTP(S) paths, queries, fragments, and credentials and does not echo opaque-scheme payloads. Planning/security documentation was synchronized with that behavior and with the Phase 2C transport boundary.
+- Decided: Retain the intentionally conservative `2001::/23` IPv6 exclusion. Current IANA globally reachable special-purpose service prefixes were reviewed but were not newly blocked merely because they appear in the special-purpose registries.
+- Verified: `npm test` and focused `tests/phase2a.test.ts` each passed 22/22; `npx tsc --noEmit`, `npm run lint`, `npm run build`, `npm audit` (0 vulnerabilities), `scripts/verify-workspace.ps1`, and `git diff --check` passed after the code/documentation changes.
+- Verified: Root environment-file inspection found only `.env.example`; tracked secret-pattern scanning found only historical documentation mentions of old configuration names, and no non-empty server credential assignments or key/private-key patterns were found.
+- Deferred: Phase 2C still must pin validated addresses or revalidate transport DNS and implement/test actual HTTP connect/request timeouts, streamed byte limits, response MIME enforcement, and redirect following. `completed` versus `succeeded` lifecycle naming and stricter timestamp/failure-state semantics remain for orchestration design rather than being guessed in Phase 2A.
+- Tooling note: This continuation intentionally did not use CodexPro. A separate fresh CodexPro re-review is requested next and must not silently fall back if CodexPro is not functioning as intended.

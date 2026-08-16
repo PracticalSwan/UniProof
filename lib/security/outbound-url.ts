@@ -140,9 +140,16 @@ function outboundFailure(
   let safeUrl = "<unparseable outbound URL>";
   try {
     const parsed = new URL(url);
-    parsed.username = "";
-    parsed.password = "";
-    safeUrl = parsed.toString();
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      parsed.username = "";
+      parsed.password = "";
+      parsed.pathname = "/";
+      parsed.search = "";
+      parsed.hash = "";
+      safeUrl = parsed.toString();
+    } else {
+      safeUrl = `<${parsed.protocol} outbound URL>`;
+    }
   } catch {
     // Do not echo malformed input into logs or error payloads.
   }

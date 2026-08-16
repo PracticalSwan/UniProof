@@ -27,6 +27,7 @@ Server retrieval must use an explicit outbound policy:
 - Resolve and reject loopback, private, link-local, reserved/special-purpose, and metadata-service IP destinations.
 - For IPv6, fail closed outside the current IANA `2000::/3` global-unicast allocation and apply explicit special-purpose exclusions inside it; IPv4-mapped IPv6 inherits the IPv4 classification.
 - Re-check each redirect destination.
+- Redact outbound-validation failure targets: do not echo credentials, paths, query strings, fragments, or opaque-scheme payloads in error metadata.
 - Treat resolution-time validation as a prerequisite, not a complete transport guarantee: Phase 2C must connect through the validated/pinned address or revalidate the transport lookup to close the DNS-rebinding gap.
 - Bound redirects, response bytes, request time, and content types.
 - Sanitize content before rendering; never render retrieved HTML directly.

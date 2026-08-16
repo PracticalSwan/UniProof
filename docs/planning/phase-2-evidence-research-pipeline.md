@@ -147,9 +147,9 @@ Phase 2A should define, even before full HTML cleaning exists:
 
 ### Phase 2A tests
 
-Cover valid public HTTPS URLs, malformed URLs, unsupported schemes, embedded credentials, localhost variants, IPv4/IPv6 loopback, private/link-local ranges, metadata IPs/hostnames, DNS resolution to blocked addresses, safe redirects, redirects to blocked addresses, too many redirects, timeout, oversized body, unsupported MIME type, and duplicate canonical URLs.
+Phase 2A covers URL syntax/canonicalization, IPv4/IPv6 classification, metadata/localhost blocking, resolver failures and DNS timeout, redirect-target validation, redirect budgets, contract-level MIME restrictions, source/reference integrity, and duplicate/contradictory contract state.
 
-Phase 2A must use deterministic local/mocked network behavior for security tests. It must not require real Tavily or Gemini credentials.
+Actual HTTP transport enforcement for connect/request timeout, streamed response-byte limits, response MIME handling, and redirect following belongs to Phase 2C and must receive transport-level tests when that fetcher exists. Phase 2A must use deterministic local/mocked network behavior and must not require real Tavily or Gemini credentials.
 
 ## Phase 2B — Source discovery and provider adapters
 

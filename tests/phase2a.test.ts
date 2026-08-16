@@ -1,11 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   candidateSourceSchema,
   claimCandidateSchema,
   evidenceSummarySchema,
+  researchDocumentSchema,
   researchRequestSchema,
   researchResultSchema,
+  researchRunSchema,
+  verifiedClaimSchema,
 } from "@/lib/research/contracts";
 import {
   assertPublicIpAddress,
@@ -76,6 +79,112 @@ describe("Phase 2A research contracts", () => {
         universityName: "Example University",
         categories: ["admissions"],
         maxRetries: 99,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects contradictory legacy and structured target representations", () => {
+    expect(
+      researchRequestSchema.safeParse({
+        target: { university: { id: "university-1" } },
+        universityId: "university-2",
+        categories: ["admissions"],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects contradictory structured university/program targeting", () => {
+    expect(
+      researchRequestSchema.safeParse({
+        target: {
+          university: { id: "university-1" },
+          program: { id: "program-1", universityId: "university-2" },
+        },
+        categories: ["admissions"],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("restricts research claims to supported categories and coherent references", () => {
+    const claim = {
+      id: "claim-1",
+      universityId: "university-1",
+      category: "admissions",
+      property: "deadline",
+      value: "2027-01-01",
+      sourceIds: ["source-1"],
+      documentIds: ["document-1"],
+      supportingText: "Applications close on 1 January 2027.",
+      verificationStatus: "verified",
+    };
+
+    expect(verifiedClaimSchema.safeParse({ ...claim, category: "rankings" }).success).toBe(false);
+    expect(
+      claimCandidateSchema.safeParse({
+        id: "candidate-unsupported-category",
+        universityId: "university-1",
+        category: "rankings",
+        property: "rank",
+        value: 1,
+        sourceId: "source-1",
+        documentId: "document-1",
+        supportingText: "Unsupported research category.",
+        extractionMethod: "model",
+      }).success,
+    ).toBe(false);
+    expect(
+      verifiedClaimSchema.safeParse({
+        ...claim,
+        documentIds: ["document-1", "document-1"],
+      }).success,
+    ).toBe(false);
+    expect(verifiedClaimSchema.safeParse({ ...claim, sourceId: "source-2" }).success).toBe(false);
+  });
+
+  it("rejects contradictory partial run state and unsupported document MIME types", () => {
+    expect(
+      researchRunSchema.safeParse({
+        id: "run-succeeded-partial",
+        status: "succeeded",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        partial: true,
+      }).success,
+    ).toBe(false);
+
+    expect(
+      researchRunSchema.safeParse({
+        id: "run-overlap",
+        status: "running",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        processedCategories: ["admissions"],
+        unprocessedCategories: ["admissions"],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      researchRunSchema.safeParse({
+        id: "run-partial",
+        status: "partial",
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }).success,
+    ).toBe(false);
+
+    expect(
+      researchDocumentSchema.safeParse({
+        id: "document-unsupported-mime",
+        sourceId: "source-1",
+        originalUrl: "https://example.edu/file.bin",
+        canonicalUrl: "https://example.edu/file.bin",
+        title: "Binary",
+        publisher: "Example",
+        sourceType: "university",
+        retrievedAt: timestamp,
+        contentType: "application/octet-stream",
+        normalizedText: "Not a supported research document.",
+        contentHash: "b".repeat(64),
       }).success,
     ).toBe(false);
   });
@@ -194,6 +303,22 @@ describe("Phase 2A research contracts", () => {
     });
 
     expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error("expected the valid research result fixture to parse");
+    }
+    expect(
+      researchResultSchema.safeParse({
+        ...result.data,
+        evidenceSummary: {
+          ...result.data.evidenceSummary,
+          statusCounts: {
+            ...result.data.evidenceSummary.statusCounts,
+            verified: 0,
+            anecdotal: 1,
+          },
+        },
+      }).success,
+    ).toBe(false);
   });
 
   it("enforces the centralized per-run source bound across result records", () => {
@@ -223,6 +348,76 @@ describe("Phase 2A research contracts", () => {
           },
           totalClaims: 0,
         },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects contradictory evidence summaries and broken result provenance", () => {
+    const emptyCounts = {
+      verified: 0,
+      corroborated: 0,
+      "university-reported": 0,
+      conflicting: 0,
+      anecdotal: 0,
+      inferred: 0,
+      unknown: 0,
+      outdated: 0,
+    };
+
+    expect(
+      evidenceSummarySchema.safeParse({
+        statusCounts: emptyCounts,
+        totalClaims: 0,
+        categoryCoverage: [
+          { category: "admissions", claimCount: 0, hasEvidence: false },
+          { category: "admissions", claimCount: 0, hasEvidence: false },
+        ],
+        categoriesProcessed: ["admissions"],
+        categoriesUnprocessed: ["admissions"],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      researchResultSchema.safeParse({
+        run: {
+          id: "run-broken-provenance",
+          status: "completed",
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+        sources: [{
+          id: "source-1",
+          url: "https://example.edu/a",
+          title: "A",
+          publisher: "Example",
+          sourceType: "university",
+          retrievedAt: timestamp,
+        }],
+        documents: [{
+          id: "document-1",
+          sourceId: "source-1",
+          originalUrl: "https://example.edu/a",
+          canonicalUrl: "https://example.edu/a",
+          title: "A",
+          publisher: "Example",
+          sourceType: "university",
+          retrievedAt: timestamp,
+          contentType: "text/html",
+          normalizedText: "Evidence",
+          contentHash: "a".repeat(64),
+        }],
+        claims: [{
+          id: "claim-1",
+          universityId: "university-1",
+          category: "admissions",
+          property: "deadline",
+          value: "2027-01-01",
+          sourceIds: ["missing-source"],
+          documentIds: ["document-1"],
+          supportingText: "Evidence",
+          verificationStatus: "verified",
+        }],
+        evidenceSummary: { statusCounts: emptyCounts, totalClaims: 0 },
       }).success,
     ).toBe(false);
   });
@@ -290,6 +485,25 @@ describe("Phase 2A outbound URL and IP policy", () => {
     }
   });
 
+  it("does not echo URL path, query, or fragment secrets in validation failures", async () => {
+    const failure = await resolveAndValidateOutboundTarget(
+      "http://public.example/private-token?api_key=super-secret#fragment",
+      { dnsResolver: publicResolver },
+    );
+
+    expect(failure).toMatchObject({ valid: false, reason: "http-not-allowed" });
+    expect(JSON.stringify(failure)).not.toContain("private-token");
+    expect(JSON.stringify(failure)).not.toContain("super-secret");
+    expect(JSON.stringify(failure)).not.toContain("api_key");
+
+    const opaqueFailure = await resolveAndValidateOutboundTarget(
+      "data:text/plain,opaque-secret",
+      { dnsResolver: publicResolver },
+    );
+    expect(opaqueFailure).toMatchObject({ valid: false, reason: "unsupported-protocol" });
+    expect(JSON.stringify(opaqueFailure)).not.toContain("opaque-secret");
+  });
+
   it("blocks special-use IPv4, IPv6, and mapped IPv4 destinations", () => {
     const blocked = [
       "127.0.0.1",
@@ -341,7 +555,12 @@ describe("Phase 2A outbound URL and IP policy", () => {
         throw new Error("resolver unavailable");
       },
     });
-    expect(dnsFailure).toMatchObject({ valid: false, reason: "dns-resolution-failed" });
+    expect(dnsFailure).toMatchObject({
+      valid: false,
+      reason: "dns-resolution-failed",
+      detail: "DNS resolution failed",
+    });
+    expect(JSON.stringify(dnsFailure)).not.toContain("resolver unavailable");
 
     const noAddresses = await resolveAndValidateOutboundTarget("https://no-addresses.example/", {
       dnsResolver: async () => [],
@@ -367,6 +586,23 @@ describe("Phase 2A outbound URL and IP policy", () => {
       ],
     });
     expect(mixedAddresses).toMatchObject({ valid: false, reason: "blocked-ip-address" });
+  });
+
+  it("fails closed when DNS resolution exceeds the bounded lookup window", async () => {
+    vi.useFakeTimers();
+    try {
+      const pending = resolveAndValidateOutboundTarget("https://dns-timeout.example/", {
+        dnsResolver: async () => new Promise<never>(() => {}),
+      });
+      await vi.advanceTimersByTimeAsync(3_000);
+      await expect(pending).resolves.toMatchObject({
+        valid: false,
+        reason: "dns-resolution-failed",
+        detail: "DNS resolution failed",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("revalidates relative and absolute redirects and enforces the redirect budget", async () => {

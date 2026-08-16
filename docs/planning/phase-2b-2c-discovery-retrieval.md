@@ -66,7 +66,7 @@ Provider wire types stop inside `lib/integrations/*`. Research modules consume p
 
 Create small internal types rather than passing provider payloads through the pipeline.
 
-`ResolvedResearchTarget` is the project-owned identity used by query planning. It should contain the request's canonical university/program IDs when known, resolved names, optional campus/degree/country context, and an optional trusted official URL/host only when that value came from approved local identity data or a confidently disambiguated structured identity source. Never fabricate an official URL from a university name.
+`ResolvedResearchTarget` is the project-owned identity used by query planning. It contains the request's canonical university/program IDs when known, resolved names, optional degree/country/subject context, and an optional trusted official URL/host only when that value came from approved local identity data or a confidently disambiguated structured identity source. The implemented contract has no first-class campus field; do not imply otherwise or invent a campus identifier/property convention. Never fabricate an official URL from a university name.
 
 Target resolution must return a project-owned discriminated result rather than throwing vendor-shaped errors: either `{ resolved: true, target: ResolvedResearchTarget, warnings: [...] }` or `{ resolved: false, reason, warnings: [...] }`. Use a bounded reason vocabulary at least covering `unresolved-id`, `identity-conflict`, `ambiguous-identity`, and `insufficient-institutional-identity`. These are discovery/identity outcomes, not provider failures. If a later `ResearchResult` needs to surface one, map it to the existing bounded `source-discovery` operational failure while preserving the more specific internal reason in bounded safe metadata; do not broaden public failure vocabularies merely to expose an implementation detail.
 
@@ -114,14 +114,14 @@ BRAVE_SEARCH_API_KEY=
 
 Keep all provider keys server-only. Do not add any `NEXT_PUBLIC_*` provider credential.
 
-Add `npm run setup:providers` backed by `scripts/setup-providers.mjs`. During this batch it configures discovery credentials only; Phase 2D extends the same command for AI credentials rather than creating a second setup mechanism.
+Add `npm run setup:providers` backed by `scripts/setup-providers.mjs`. The Phase 2B–2C batch established the discovery-key behavior; the implemented Phase 2D extension manages the same file and fixed key flow for Gemini, Groq, and OpenRouter without creating a second setup mechanism.
 
 The setup script must preserve unrelated `.env.local` lines, replace only exact managed keys, hide key input when stdin is an interactive TTY (neutral mask characters may provide typing feedback), restore terminal state in `finally`, never print key values, and keep `.env.local` ignored. If stdin is non-interactive, accept already-set environment variables rather than attempting a visible prompt.
-Do not automatically enable full live research mode after only discovery keys are configured, because Phase 2D extraction is not implemented yet. Report which discovery providers are configured and which fallback path is available.
+Do not automatically enable full live research mode after provider keys are configured, because Phase 2E reconciliation and Phase 2F orchestration/UI wiring remain separate batches. Report which managed providers are configured and which fallback path is available.
 
 Connectivity checks must be explicit opt-in because they consume provider quota/credits. A default setup run validates file/env configuration only.
 
-This batch deliberately does not configure or prompt for any provider beyond Tavily and Brave. An interactive TTY run prompts for those two discovery keys with terminal echo disabled; submitting a blank line preserves an existing managed value. Non-interactive setup skips prompting and validates only already-present environment values. AI-provider key entry remains deferred to Phase 2D.
+The Phase 2B–2C acceptance scope deliberately covered only Tavily and Brave. The current shared command additionally manages Gemini, Groq, and OpenRouter with terminal echo disabled for interactive entry; submitting a blank line preserves an existing managed value. Non-interactive setup skips prompting and validates only already-present environment values. The command still does not enable live mode or perform connectivity checks.
 
 ## Phase 2B.2 — Deterministic query planning
 

@@ -237,3 +237,56 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - Tested: Added regressions for the above defects plus streamed response-byte cutoff, stalled-body timeout, private redirect revalidation, response-header allowlisting, and origin-only sanitized retrieval failures. The full suite passed 76/76.
 - Verified: `npx.cmd tsc --noEmit`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd audit --omit=dev` (0 vulnerabilities), workspace verification, and `git diff --check` passed. Changed-file encoding/control scans and publication-set secret-prefix/nonempty-credential-assignment scans passed; `.env.local` remains ignored and outside the publication set.
 - Deferred: No live Tavily, Brave, ROR, or arbitrary public-site smoke request was made during this review. Phase 2D–2F AI extraction/reconciliation/orchestration, persistence/RLS, and UI wiring remain deferred.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Playwright UI QA and one-pass live discovery
+
+**Summary:** Installed Playwright for local browser QA, exercised the rendered home/research workflow on desktop and mobile, fixed two reproducible Research-page UI defects, and used the actual server pipeline for one explicitly authorized live discovery/retrieval pass.
+
+- Changed: Added `playwright@^1.62.1` as a development dependency. The Research preview now lists all seven categories including Program structure, uses a real disabled Research button, and explains that live research is not yet connected to the preview UI.
+- Verified: Playwright navigated Home -> Research at 1440px and 390px widths, accepted query text, confirmed the Research action remains disabled by design, and finished with no console warnings/errors after disabling Playwright's screenshot caret-hiding artifact. No clipping or horizontal-overflow defect was observed.
+- Live check: Exactly one routable QA invocation of `runDiscoveryRetrieval()` was made with one admissions question. Tavily succeeded on the first provider attempt; the pipeline produced 4 candidates, 4 retrieved sources, and 4 normalized documents with no failure codes. The run remained `partial` as expected because Phase 2D claim extraction/reconciliation is not implemented. No second provider pass was sent.
+- Cleanup: The temporary server-only QA route, temporary browser scripts, generated `next-env.d.ts` dev change, and stale dev server were handled as disposable task-local residue; no QA route remains in the app.
+- Verified: `npm.cmd test -- --run` passed 76/76; TypeScript, lint, production build, audit (0 vulnerabilities), workspace verification, and `git diff --check` passed.
+- Deferred: Research UI-to-pipeline wiring remains a later phase; the current page is intentionally an illustrative preview rather than a live result surface.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Phase 2D implementation-plan closure
+
+**Summary:** Reconciled the live Phase 2A–2C contracts and current provider documentation into a Phase 2D-only implementation runbook, preserving unrelated UI/Playwright work and keeping Phase 2E/2F runtime behavior deferred.
+
+- Changed: Corrected Gemini planning to the explicit `gemini-3.5-flash-lite` -> bounded `gemini-3.5-flash` quality path, fixed the current Interactions REST/structured-output shape, and removed the stale claim that `gemini-3.6-flash` is paid-only; 3.6 remains outside the Phase 2D allowlist by product policy, not pricing assumption.
+- Changed: Tightened the portable extraction contract, non-transforming exact-quote provenance checks, mixed-valid/invalid response handling, deterministic segmentation/provenance-preserving dedupe, pre/in-flight abort semantics, and the distinction between the 24 actual-AI-attempt operational budget and the existing 100-call schema ceiling.
+- Changed: Reconciled setup/privacy/telemetry requirements, removed stale campus-field and SDK/token-metadata assumptions, and kept OpenAlex explicitly inactive. Phase 2E name-only identity/evidence semantics and Phase 2F lifecycle/attempt-ceiling work remain separate later batches.
+- Verified: Windows `npm.cmd test -- --run` passed 76/76; `npx.cmd tsc --noEmit`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd audit --omit=dev` (0 vulnerabilities), workspace verification, `git diff --check`, strict changed-file UTF-8/control scanning, tracked-file secret scanning, and targeted contradiction scanning passed. `git diff --check` emitted only expected LF-to-CRLF working-copy warnings.
+- Tooling: CodexPro Full 2.0 and Remote Desktop Commander were both used against `D:\Side Projects\UniProof`; one transient CodexPro network read failure succeeded on retry, and RDC provided the independent Windows-side status/edit/verification path.
+- Deferred: No Phase 2D runtime code, live AI-provider request, provider-key entry, persistence/RLS, UI wiring, deployment, commit, or push was performed by this planning review.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Phase 2D extraction implementation
+
+**Summary:** Implemented the Phase 2D-only provider-neutral structured extraction boundary while preserving the dirty UI/Playwright work and leaving Phase 2E/2F runtime behavior deferred.
+
+- Changed: Added deterministic code-point segmentation with bounded same-section overlap, one strict portable extraction schema, exact non-transforming supporting-text promotion, typed overlap dedupe, bounded `ClaimCandidate.intake`, and safe provider-model provenance.
+- Changed: Added server-only native REST adapters for Gemini (`gemini-3.5-flash-lite` plus one `gemini-3.5-flash` quality escalation), Groq `openai/gpt-oss-120b`, and OpenRouter `openrouter/free`, with current Gemini `/v1beta/interactions` handling, strict structured output, concrete OpenRouter model enforcement, sequential fallback, bounded retries, cancellation, response limits, and a distinct 24-actual-HTTP-attempt budget.
+- Changed: Extended the existing provider setup command to exactly Tavily/Brave/Gemini/Groq/OpenRouter while preserving unmanaged `.env.local` content, newline style, terminal restoration, server-only keys, seed mode, and no-connectivity defaults.
+- Tested: Added deterministic Phase 2D regressions for schema closure/scalars/categories, exact quote mutations and mixed validity, segmentation/dedupe, prompt privacy, adapter request shapes, model provenance, failure mapping, Retry-After, bounded malformed bodies, cancellation, quality/fallback behavior, budget exhaustion, setup behavior, and contract additions.
+- Verified so far: Focused Phase 2D tests pass (18/18), the complete suite passes (90/90), and TypeScript validation passes. Full lint/build/audit/workspace/encoding/secret/contradiction gates and required final-review cycles remain part of closure.
+- Deferred: No live AI-provider request, real provider-key modification, persistence/RLS, Phase 2E reconciliation, Phase 2F orchestration, deployment, publication, commit, or push occurred.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Phase 2D implementation and final GPT review closure
+
+**Summary:** Completed the authorized Phase 2D-only extraction boundary, addressed all findings from the bounded GPT review cycles, and closed the final read-only GPT code review with no remaining valid fixable issues.
+
+- Changed: Added strict provider-neutral extraction/promotion contracts, deterministic Unicode/code-point segmentation and deduplication, exact supporting-text provenance, trusted provider/model candidate provenance, server-owned 24-actual-HTTP-attempt budgeting, sanitized retry/failure telemetry, bounded response/body cleanup, sequential Gemini quality escalation followed by Groq and OpenRouter Free fallback, and canonical `.env.local` provider setup with masked interactive input and no arbitrary file override.
+- Changed: Added the final regression coverage for malformed Unicode, caller-overridden budgets, timeout/fallback behavior, response-stream cancellation, earlier-candidate preservation, no-key preflight, provider ZDR precedence, setup masking/backspace/terminal restoration, and promotion-invalid attempt relabeling.
+- Tested: Focused Phase 2D tests passed 24/24; the complete suite passed 100/100. `npx.cmd tsc --noEmit`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd audit --omit=dev` (0 vulnerabilities), `scripts/verify-workspace.ps1`, `git diff --check`, strict changed/public-file UTF-8/control scanning, targeted secret/public-boundary scanning, and the contradiction scan all passed. Diff output contained only expected Windows LF-to-CRLF working-copy warnings.
+- Reviewed: The first GPT review identified five findings and the final GPT-variant read-only closure review found no remaining valid fixable issues. Earlier GLM delegation attempts returned HTTP 429 and were stopped; no further GLM delegation was attempted. Finished children were interrupted, and exactly one bounded final GPT code reviewer was used for closure.
+- Deferred: No live AI-provider request, real provider-key modification, persistence/RLS, Phase 2E reconciliation, Phase 2F orchestration, deployment, publication, commit, or push occurred. Existing user-owned UI/Playwright/package/screenshot changes remain preserved.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Phase 2D live-provider and website release review
+
+**Summary:** Performed the explicitly authorized one-pass live connectivity validation for all five configured providers, re-reviewed the full Phase 2D extraction boundary and all public routes, fixed post-review correctness/security/UI defects, and prepared the verified release for Git publication.
+
+- Live providers: Exactly one bounded request each succeeded for Tavily, Brave Search, Gemini `gemini-3.5-flash-lite`, Groq `openai/gpt-oss-120b`, and OpenRouter `openrouter/free`; OpenRouter returned concrete route `dots-studio/dots-3-note-preview:free`. No key or raw provider response was recorded. Gemini live validation used the implemented `/v1beta/interactions`; Google stable `/v1/interactions` remains a future deliberate revalidated migration.
+- Fixed: Aligned generated segment/candidate IDs and returned model provenance with UTF-16 schema bounds; made rejected/oversize response cancellation best-effort/non-blocking; added provider-specific attempt budgets with provider-local fallback versus total-run terminal semantics; recorded reached missing providers once per run; changed Compare/Guide preview actions to native disabled controls.
+- Website QA: Playwright checked `/`, `/research`, `/compare`, and `/guide` at 1440x1000 and 390x844; all responses were 200 with no console/page errors or horizontal overflow, internal links resolved, the Research evidence anchor worked, provider environment names were absent from rendered HTML, and all preview actions were natively disabled.
+- Verified: `npm.cmd test` passed 105/105; TypeScript, lint, production build, `npm audit --omit=dev` (0 vulnerabilities), workspace verifier, `git diff --check`, strict UTF-8/control scan, ignored-env check, tracked/unignored secret scan, targeted contradiction scan, and final browser QA passed. Diff check emitted only expected LF-to-CRLF warnings.
+- Deferred: Phase 2E reconciliation/evidence gating, Phase 2F full orchestration, persistence/RLS, live Research UI wiring, and deployment remain deferred.

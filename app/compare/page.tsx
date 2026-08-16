@@ -59,7 +59,7 @@ export default function ComparePage() {
               ))}
             </div>
           </div>
-          <Button type="button" variant="outline" aria-disabled="true" className="h-[42px] self-start px-4 lg:self-auto">
+          <Button type="button" variant="outline" disabled className="h-[42px] self-start px-4 lg:self-auto">
             Edit priorities
           </Button>
         </div>

@@ -43,7 +43,7 @@ export default function GuidePage() {
               </div>
             ))}
           </dl>
-          <Button type="button" variant="outline" aria-disabled="true" className="mt-8 h-[42px] px-4">
+          <Button type="button" variant="outline" disabled className="mt-8 h-[42px] px-4">
             Edit profile
           </Button>
         </aside>
@@ -81,7 +81,7 @@ export default function GuidePage() {
               <li>2. Confirm grade equivalency with the admissions office</li>
               <li>3. Prepare required documents before the published deadline</li>
             </ol>
-            <Button type="button" aria-disabled="true" className="mt-6 h-[42px] px-4 sm:float-right sm:mt-[-42px]">
+            <Button type="button" disabled className="mt-6 h-[42px] px-4 sm:float-right sm:mt-[-42px]">
               Build full checklist
             </Button>
             <div className="clear-both" />

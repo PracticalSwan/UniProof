@@ -26,15 +26,15 @@ Phase 2 uses a project-owned AI interface so extraction, reconciliation, and exp
 
 Availability order:
 
-1. Gemini free: `gemini-3.5-flash-lite` normal path, with `gemini-3.6-flash` only for bounded recorded quality escalation;
+1. Gemini free: `gemini-3.5-flash-lite` normal path, with `gemini-3.5-flash` only for bounded recorded quality escalation while the active Gemini account exposes free-tier Standard inference;
 2. Groq Free: `openai/gpt-oss-120b`;
 3. OpenRouter Free: `openrouter/free`, requiring the requested structured-output capability and recording the concrete routed model.
 
-Use the Gemini Interactions API with `store: false` and validate all provider structured output again with project Zod contracts. Groq should use strict JSON-schema Structured Outputs where supported. OpenRouter must require compatible parameters/providers and apply configured data-collection/privacy filtering; if no eligible free endpoint satisfies the requirement, fail to a partial result rather than select paid inference or weaken privacy.
+Use fixed server-owned REST endpoints for Gemini Interactions, Groq chat completions, and OpenRouter chat completions through one bounded provider transport pattern: credentials in headers, `redirect: "error"`, explicit timeout/response-byte bounds, best-effort non-blocking failure-body cleanup, and no raw error-body logging. The current Gemini adapter uses `/v1beta/interactions`, which passed the authorized live smoke on 2026-08-16; Google also supports GA stable `/v1/interactions`, so any endpoint migration must be deliberate and separately live-validated. Gemini uses stateless Interactions with `store: false`; Groq uses strict JSON-schema Structured Outputs; OpenRouter requires compatible parameters plus configured data-collection/privacy filtering and records the concrete routed model. All provider output crosses the same portable project schema and Zod validation boundary.
 
-Free-tier quotas and model availability are mutable. The server uses provider-specific and total call budgets, sequential failover, bounded retry/backoff, and one-request-at-a-time defaults. Availability failover and Gemini quality escalation are separate mechanisms.
+Free-tier quotas, model availability, and account billing configuration are mutable. The server uses provider-specific and total call budgets, sequential failover, bounded retry/backoff, and one-request-at-a-time defaults. Availability failover and Gemini quality escalation are separate mechanisms. UniProof never deliberately selects a paid-only model/route or enables paid capacity automatically, but a supplied provider account's billing configuration remains operator-controlled; do not claim a per-request zero-cost guarantee that the provider does not expose.
 
-Phase 2 sends public research content only to the AI chain. Applicant profiles and sensitive/personal documents are outside the free-tier extraction/reconciliation boundary.
+Phase 2D sends public normalized research segments only to the extraction chain. Applicant profiles and sensitive/personal documents are outside the free-tier extraction/reconciliation boundary. The extraction stage is sequential and bounded to 24 actual AI HTTP attempts per run, with provider-specific counters checked before the shared total; provider-local exhaustion falls through to the next eligible provider while total exhaustion stops dispatch. The existing 100-call extraction schema ceiling remains a separate contract limit. Phase 2E reconciliation and Phase 2F lifecycle orchestration remain separate runtime batches.
 
 The Phase 2B/2D implementation must provide a cross-platform setup command such as `npm run setup:providers`. The user should only obtain and paste API keys; the repository-owned setup flow handles `.env.local`, server environment validation, model/endpoints, fallback order, and safe defaults without echoing secrets.
 

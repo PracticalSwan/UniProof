@@ -13,7 +13,7 @@ UniProof is an evidence-first AI platform for international students researching
 - Next.js + React + TypeScript
 - Tailwind CSS + shadcn/ui
 - Supabase PostgreSQL + Supabase Auth
-- Provider-neutral AI with Gemini free primary (`gemini-3.5-flash-lite`, bounded `gemini-3.6-flash` quality escalation), Groq Free `openai/gpt-oss-120b` fallback, and OpenRouter `openrouter/free` final fallback
+- Provider-neutral AI with Gemini free primary (`gemini-3.5-flash-lite`, bounded free-tier `gemini-3.5-flash` quality escalation), Groq Free `openai/gpt-oss-120b` fallback, and OpenRouter `openrouter/free` final fallback
 - Tavily primary source discovery with Brave Search fallback, then direct/structured-source degraded discovery
 - ROR, College Scorecard, Discover Uni, and official university/government sources
 - Zod for runtime contracts
@@ -23,7 +23,7 @@ UniProof is an evidence-first AI platform for international students researching
 
 ## Current State
 
-Phase 2B and 2C now include deterministic source discovery with Tavily -> Brave -> direct/ROR fallback, DNS-pinned bounded retrieval, HTML/plain-text normalization, and offline source/document integration coverage. Multi-provider AI calls/reconciliation, database migrations, Row Level Security, seed data, and persistence remain intentionally deferred to later phases.
+Phase 2B and 2C include deterministic source discovery with Tavily -> Brave -> direct/ROR fallback, DNS-pinned bounded retrieval, HTML/plain-text normalization, and source/document integration coverage. Phase 2D adds multi-provider structured claim extraction with deterministic segmentation, exact supporting-text promotion, bounded Gemini quality escalation, Groq/OpenRouter Free fallback, provider-specific plus total request budgets, and the fixed provider setup flow. Automated coverage remains offline and deterministic; on 2026-08-16 one explicitly authorized live smoke request succeeded for each configured Tavily, Brave, Gemini, Groq, and OpenRouter connection. Phase 2E reconciliation, Phase 2F full orchestration, database migrations, Row Level Security, seed data, persistence, and live Research UI wiring remain intentionally deferred.
 
 Open-source repository: <https://github.com/PracticalSwan/UniProof>
 

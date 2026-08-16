@@ -36,14 +36,17 @@ Server retrieval must use an explicit outbound policy:
 
 ## AI and Evidence Controls
 
-- Use schema-validated structured model output.
-- Allow factual summaries to reference stored claims only.
+- Use one strict portable schema-validated structured-output boundary across Gemini, Groq, and OpenRouter; all objects reject unknown fields, and model output never supplies trusted IDs, source authority, or evidence state.
+- Segment normalized public documents deterministically before AI use and promote an extracted claim only when its application-supplied segment ID exists and the raw returned supporting text, before trim/case/Unicode normalization, is an exact substring of that segment; never fuzzy-repair or normalize an invented quote into validity.
+- Allow factual summaries to reference gated claims only.
 - Label AI-derived interpretation separately from source-derived facts.
-- Reject invented URLs and source attributions.
-- Preserve conflict and unknown states through the UI.
-- Keep bounded retries; malformed model output must not become persisted truth.
-- Treat AI semantic reconciliation as untrusted structured interpretation: deterministic source-authority/freshness/evidence gates make the final evidence-state decision.
-- Use sequential Gemini -> Groq -> OpenRouter Free failover; never fan out by default, silently relax privacy rules, or select a paid model automatically.
+- Reject invented URLs, source attributions, identifiers, supporting passages, and factual values.
+- Preserve conflict and category-level unknown states through the UI; operational provider failure must not be mislabeled as evidence unknown.
+- Keep request/response/token/retry budgets bounded; malformed, oversize, invalid-UTF8, schema-invalid, or provenance-invalid model output must not become persisted truth.
+- Phase 2D uses one active AI request at a time, a 30-second provider-attempt deadline, a 256 KiB response-body bound, at most one transient retry per provider/task, provider-specific attempt counters, and a separate 24-actual-HTTP-attempt total run budget; the existing 100-call extraction contract ceiling is not the transport budget. Provider-local budget exhaustion remains a bounded fallback condition, while total-run exhaustion stops dispatch. Promoted candidates retain trusted provider/model provenance, while promotion-invalid payloads are recorded as `invalid-response` attempts.
+- Treat AI semantic reconciliation as untrusted structured interpretation: deterministic identity/scope/period/source-authority/freshness/evidence gates make the final evidence-state decision.
+- Use sequential Gemini -> Groq -> OpenRouter Free failover; never fan out by default, silently relax privacy/capability rules, or deliberately select a paid-only model/route automatically.
+- Use fixed server-owned provider endpoints, credentials in headers, `redirect: "error"`, explicit request deadlines, bounded response reads, best-effort non-blocking response-body cancellation on rejected/oversize responses, and no raw provider-error-body logging so credentials/source prompts cannot be replayed or echoed through logs or keep a bounded failure pending indefinitely.
 
 ## Secrets and Privacy
 
@@ -51,8 +54,8 @@ Server retrieval must use an explicit outbound policy:
 - `NEXT_PUBLIC_` variables must contain only values safe for browser exposure.
 - Supabase service-role credentials and all AI/search provider keys are server-only.
 - Send only public-source research content and minimum non-sensitive research context through Gemini, Groq, OpenRouter, Tavily, and Brave; do not send applicant profiles or sensitive/personal documents through the Phase 2 free-provider pipeline.
-- Use Gemini Interactions requests statelessly with `store: false`; use the strongest compatible Groq/OpenRouter data controls, including OpenRouter provider data-collection filtering, and fail closed if an eligible free endpoint cannot satisfy the configured privacy requirement.
-- The planned provider setup command must write secrets only to ignored local environment files, preserve existing values, and never echo/log keys.
+- Use Gemini Interactions requests statelessly with `store: false`, but do not misrepresent that flag as overriding the provider's service-level data-use policy; the public-only input boundary remains mandatory. Use the strongest compatible Groq/OpenRouter data controls, including OpenRouter `data_collection="deny"` and configured ZDR routing when required, and fail closed if an eligible free endpoint cannot satisfy the configured privacy requirement.
+- The provider setup command writes secrets only to ignored local environment files, preserves unrelated values/comments/newline style, never echoes/logs keys or secret fingerprints, performs no live connectivity call by default, and does not automatically enable live research mode.
 - Avoid logging applicant profile details unless operationally necessary; redact identifiers from errors.
 - Do not collect sensitive documents in the MVP.
 

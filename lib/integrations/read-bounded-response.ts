@@ -2,6 +2,19 @@ import "server-only";
 
 const MAX_CONTENT_LENGTH_DIGITS = 15;
 
+function ignoreCancellation(cancellation: Promise<void> | undefined): void {
+  void cancellation?.catch(() => undefined);
+}
+
+function cancelBody(response: Response, reason: string): void {
+  try {
+    ignoreCancellation(response.body?.cancel(reason));
+  } catch {
+    // The body may already be closed or failed; bounded failure remains the
+    // caller-visible result either way.
+  }
+}
+
 function declaredContentLength(response: Response, maximumBytes: number): number | null | false {
   const value = response.headers.get("content-length");
   if (value === null) return null;
@@ -13,7 +26,10 @@ function declaredContentLength(response: Response, maximumBytes: number): number
 
 export async function readBoundedText(response: Response, maximumBytes: number): Promise<string | null> {
   const declared = declaredContentLength(response, maximumBytes);
-  if (declared === false) return null;
+  if (declared === false) {
+    cancelBody(response, "response exceeds the server byte bound");
+    return null;
+  }
 
   if (response.body === null) {
     const text = await response.text();
@@ -29,14 +45,14 @@ export async function readBoundedText(response: Response, maximumBytes: number):
       if (next.done) break;
       bytes += next.value.byteLength;
       if (bytes > maximumBytes) {
-        await reader.cancel("response exceeds the server byte bound");
+        ignoreCancellation(reader.cancel("response exceeds the server byte bound"));
         return null;
       }
       chunks.push(next.value);
     }
   } catch {
     try {
-      await reader.cancel();
+      ignoreCancellation(reader.cancel());
     } catch {
       // The stream is already failed; return the bounded failure below.
     }

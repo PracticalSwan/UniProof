@@ -3,7 +3,7 @@ import { ModeShell } from "@/components/layout/mode-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const categories = ["Admissions", "Tuition", "Scholarships", "Research", "Outcomes", "Support"];
+const categories = ["Admissions", "Tuition", "Scholarships", "Program structure", "Research", "Outcomes", "Support"];
 
 const sections = [
   {
@@ -47,10 +47,11 @@ export default function ResearchPage() {
             placeholder="e.g. MSc Computer Science — tuition, admissions, research and scholarships"
             aria-label="Research question"
           />
-          <Button type="button" aria-disabled="true" className="h-12 px-6 lg:self-start">
+          <Button type="button" disabled className="h-12 px-6 lg:self-start">
             Research
           </Button>
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">Live research is not connected to this preview yet.</p>
         <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-label="Research categories">
           <span>Filters:</span>
           {categories.map((label) => (

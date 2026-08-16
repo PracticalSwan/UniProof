@@ -67,34 +67,39 @@ Completed in the current Phase 2B–2C batch; retain the runbook below as the ac
 
 Implement only after Phase 2B–2C passes its acceptance gate.
 
-- [ ] Define a strict provider-facing extracted-claim schema that excludes trusted IDs, source authority, and final evidence state.
-- [ ] Implement one project-owned AI task interface and shared bounded provider error/attempt model.
-- [ ] Implement Gemini `gemini-3.5-flash-lite` with `gemini-3.6-flash` only for recorded quality escalation, current Interactions API, `store: false`, and structured output.
-- [ ] Implement Groq Free `openai/gpt-oss-120b` as availability fallback using strict JSON-schema Structured Outputs where supported.
-- [ ] Implement OpenRouter `openrouter/free` as final availability fallback with parameter-capability/privacy filtering and concrete returned-model provenance.
-- [ ] Extend the same provider setup CLI for Gemini/Groq/OpenRouter keys; no second configuration workflow and no automatic paid inference.
-- [ ] Verify supporting passages against the supplied ResearchDocument before application code promotes provider output to ClaimCandidate.
-- [ ] Add deterministic tests for schema rejection, supporting-passage integrity, quality escalation, sequential failover, retries/budgets, privacy-safe telemetry, and full-chain exhaustion.
+- [x] Make the minimal additive Phase 2D contract changes: bounded optional provider-attempt `model` provenance, bounded optional `ClaimCandidate.intake`, and bounded trusted `ClaimCandidate.extractionProvider` provenance, with regressions; `VerifiedClaim` identity remains unchanged for Phase 2E.
+- [x] Define one strict portable provider-facing extraction schema shared by Gemini/Groq/OpenRouter: all object properties required at JSON-schema level, nullable optionals, no trusted IDs/source authority/evidence state/model confidence, max 12 claims/response; validate raw supporting text exactly before normalization and preserve valid siblings when another returned claim fails promotion.
+- [x] Deterministically segment normalized ResearchDocuments (5,000 Unicode code points, 250 same-section overlap with monotonic advancement), preserve section/source boundaries, and verify returned segment ID + exact supporting substring before promotion to ClaimCandidate; overlap dedupe preserves distinct-source/document provenance.
+- [x] Implement one project-owned AI structured-task interface over fixed server-owned REST endpoints with credentials in headers, `redirect:"error"`, 30-second timeout, 256 KiB response bound, one transient retry, concurrency 1, provider-specific attempt ceilings, and a 24-actual-request total extraction budget; provider-local exhaustion fails over while total exhaustion stops dispatch.
+- [x] Implement Gemini `gemini-3.5-flash-lite` with exactly one `gemini-3.5-flash` quality escalation only for recorded invalid-response/integrity failure; use the live-validated `/v1beta/interactions` surface statelessly with `store:false` and current text/JSON `response_format`, keep the explicit two-model Phase 2D allowlist, and treat any future migration to Google’s stable `/v1/interactions` as a separately revalidated provider-contract change; never opt into paid inference.
+- [x] Implement Groq `openai/gpt-oss-120b` as availability fallback using strict JSON-schema Structured Outputs, low reasoning, `max_completion_tokens`, no streaming/tools, and no paid model substitution.
+- [x] Implement OpenRouter `openrouter/free` as final availability fallback with strict structured output, `require_parameters`, `data_collection="deny"`/configured ZDR policy, concrete returned-model provenance, and no paid route fallback.
+- [x] Extend the existing provider setup CLI to the fixed Tavily/Brave/Gemini/Groq/OpenRouter key set; preserve unrelated `.env.local` content/newlines/comments, never print secret fingerprints, run no connectivity check by default, and do not automatically enable live research mode.
+- [x] Preserve earlier validated candidates across retry/fallback/budget exhaustion and classify config/auth/429/timeout/5xx/invalid-response/capability/policy/budget through the existing bounded vocabulary without raw provider errors in telemetry.
+- [x] Add the deterministic Phase 2D matrix for portable schema constraints, segmentation/quote integrity, UTF-16-safe generated IDs/model provenance, mixed valid/invalid and valid-empty extraction results, all seven categories, exact provider request/response shapes, quality-vs-availability fallback, provider-local versus total budget exhaustion, pre-abort/in-flight-abort semantics, non-blocking bounded-response cleanup, privacy-safe telemetry, once-per-run configuration skips, setup CLI behavior, and full-chain exhaustion while all Phase 2A–2C regressions stay green.
+- [x] After explicit authorization and provider-key configuration, run one bounded live smoke request each against Tavily, Brave Search, Gemini, Groq, and OpenRouter; all five configured connections succeeded on 2026-08-16 without exposing key material, and normal automated tests remain offline.
 
 ### Phase 2E — AI-assisted reconciliation with deterministic evidence gates
 
-- [ ] Normalize entity/program/campus/period/property/value identity deterministically before semantic grouping.
-- [ ] Define strict semantic relationship output: equivalent, contradictory, period/scope differences, general-specific compatibility, conditional exception, broader/narrower compatibility, or insufficient evidence.
-- [ ] Use AI reconciliation only for genuinely semantic ambiguity; exact cases remain deterministic and provider output can reference only supplied candidate IDs.
-- [ ] Implement deterministic source/scope/freshness/independence gates for verified, university-reported, corroborated, conflicting, outdated, anecdotal, inferred, and unknown states.
-- [ ] Ensure mirrored/shared-origin sources do not count as independent corroboration and current contradictions are not promoted away.
-- [ ] Represent a processed category with no eligible evidence through EvidenceSummary coverage/categoriesUnknown rather than fabricating a sentinel-valued unknown claim.
-- [ ] Add optional evidence-bounded explanation with deterministic fallback and no new factual values.
-- [ ] Add deterministic gate tests for source independence, scope/year separation, verified/university-reported distinction, conflicts, stale/unknown/anecdotal states, AI exhaustion, and rejected model proposals.
+- [ ] Evolve `VerifiedClaim` before gating so university identity is truthful ID-or-name (with optional program ID/name and intake), preserve Unicode-safe cross-record identity checks, and never fabricate IDs for name-only research.
+- [ ] Normalize university/program/degree/period/property/value identity deterministically before semantic grouping; the live contract has no trusted campus field, so campus-specific evidence remains scope-incompatible unless a deliberate tested campus contract is added.
+- [ ] Define strict portable semantic relationship output: equivalent, contradictory, period/scope differences, general-specific compatibility, conditional exception, broader/narrower compatibility, or insufficient evidence; only supplied candidate IDs may be referenced.
+- [ ] Use AI reconciliation only for genuinely semantic ambiguity; exact equivalence and provable period/scope differences remain deterministic, and AI equivalence cannot override identity/period incompatibility.
+- [ ] Implement deterministic source/scope/freshness/independence gates for verified, university-reported, corroborated, conflicting, outdated, anecdotal, inferred, and category-level unknown states with explicit precedence.
+- [ ] Ensure mirrors/shared datasets/same-origin evidence do not count as independent corroboration; unresolved independence fails closed, and current credible contradiction is not promoted away by majority count.
+- [ ] Represent a **processed** category with no eligible evidence through exact EvidenceSummary coverage/categoriesUnknown and zero claims; keep operational extraction/reconciliation exhaustion unprocessed/failed instead of calling it unknown.
+- [ ] Add optional evidence-bounded explanation with strict supplied-ID references and deterministic fallback; explanation failure cannot change a successful evidence decision.
+- [ ] Add deterministic gate tests for name-only identity, intake/scope separation, absent-campus behavior, source independence, verified/university-reported distinction, conflicts, stale/unknown/anecdotal/inferred states, AI exhaustion, rejected model proposals, and explanation fallback.
 
 ### Phase 2F — Orchestration and Phase 2 verification
 
-- [ ] Implement a small in-memory deterministic coordinator for discovery -> retrieval -> extraction -> normalization -> reconciliation -> evidence gate -> explanation -> ResearchResult.
-- [ ] Finalize schema invariants for terminal lifecycle/timestamps: orchestrator emits succeeded/partial/failed, not legacy completed/queued, and partial boolean matches terminal status.
-- [ ] Keep evidence outcomes separate from operational outcomes: unknown/outdated/conflicting can be fully processed; unprocessed/failed categories remain explicit operational state.
-- [ ] Make EvidenceSummary counts/coverage/hasEvidence semantics match the final gated claims and category lifecycle exactly.
-- [ ] Retain the complete offline fixture matrix for discovery/AI failover, network failures, evidence states, malformed provider output, policy-gate rejection, and succeeded/partial/failed runs.
-- [ ] Run focused security/secret review plus typecheck, lint, build, tests, audit, workspace verification, and diff checks.
+- [ ] Implement a new small in-memory coordinator that resolves target identity once and reuses the Phase 2B/C modules through discovery -> retrieval -> segmentation/extraction -> normalization -> reconciliation -> evidence gate -> explanation/fallback -> ResearchResult; keep `runDiscoveryRetrieval()` as the existing B/C boundary.
+- [ ] Finalize schema invariants for terminal lifecycle/timestamps: orchestrator emits only succeeded/partial/failed; terminal partial boolean is exact; created <= started <= updated <= completed; no legacy completed/queued emission.
+- [ ] Make requested-category lifecycle a complete partition: processed/unprocessed unique/disjoint/union=requested, run and EvidenceSummary sets match, failed is operational, unknown is processed-only, and retained source/candidate data alone does not make a run partial.
+- [ ] Make EvidenceSummary exact from final gated claims: one coverage row per processed category only, exact claimCount/statuses/hasEvidence, zero-claim unknown row, exact total/statusCounts, conflict/outdated subsets derived from claims.
+- [ ] Calculate the legal worst-case provider-attempt count from actual discovery/extraction/reconciliation/explanation budgets; raise the current max only if required, to the smallest justified bound with regression, never truncate history.
+- [ ] Retain the complete offline fixture matrix for name/ID identity, all seven categories, discovery/retrieval security failures, segmentation/extraction failover, evidence independence/conflict/unknown/outdated/anecdotal/inferred states, semantic rejection, explanation fallback, and succeeded/partial/failed lifecycle invariants.
+- [ ] Run focused security/secret/requirements-traceability review plus typecheck, lint, build, tests, audit, workspace verification, diff/encoding checks; repeatedly fix and re-review until the final integrated reviewer reports no remaining fixable issues.
 - [ ] Keep pipeline correctness in memory; persistence remains a later explicit task after stable contracts/evidence semantics and RLS design.
 
 ## Phase 3 — Research Mode

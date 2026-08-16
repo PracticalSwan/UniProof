@@ -24,6 +24,17 @@ export const RESEARCH_MAX_SOURCES_PER_RUN = 12;
 export const RESEARCH_MAX_SOURCES_PER_DOMAIN = 3;
 export const RESEARCH_MAX_FAILURES_PER_RUN = RESEARCH_MAX_SOURCES_PER_RUN + RESEARCH_MAX_CATEGORIES;
 
+// Phase 2D AI transport and segmentation limits are intentionally separate
+// from the historical Phase 2A extraction-call/schema ceiling above.
+export const RESEARCH_AI_HTTP_ATTEMPT_TIMEOUT_MS = 30_000;
+export const RESEARCH_AI_MAX_RESPONSE_BYTES = 256 * 1024;
+export const RESEARCH_AI_MAX_OUTPUT_TOKENS = 1_500;
+export const RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN = 24;
+export const RESEARCH_MAX_AI_HTTP_ATTEMPTS_PER_RUN = RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN;
+export const RESEARCH_MAX_EXTRACTION_SEGMENT_CHARACTERS = 5_000;
+export const RESEARCH_EXTRACTION_SEGMENT_OVERLAP_CHARACTERS = 250;
+export const RESEARCH_MAX_RETRY_AFTER_MS = 2_000;
+
 export const RESEARCH_ALLOWED_RESPONSE_CONTENT_TYPES: readonly string[] =
   Object.freeze(["text/html", "text/plain", "application/pdf"]);
 

@@ -31,6 +31,7 @@ const boundedClaimValue = z.union([
 ]);
 const boundedUnit = z.string().trim().min(1).max(40);
 const boundedAcademicYear = z.string().trim().min(1).max(40);
+const boundedIntake = z.string().trim().min(1).max(40);
 const boundedWarning = z.string().min(1).max(500);
 
 const researchHttpUrlSchema = z.url().refine((value) => {
@@ -228,6 +229,13 @@ export const researchProviderSchema = z.enum([
   "openrouter",
 ]);
 
+/** Providers that may produce Phase 2D model-extracted candidates. */
+export const researchExtractionProviderSchema = z.enum([
+  "gemini",
+  "groq",
+  "openrouter",
+]);
+
 export const researchProviderAttemptOutcomeSchema = z.enum([
   "success",
   "empty",
@@ -268,6 +276,7 @@ export const researchProviderAttemptSchema = z
     outcome: researchProviderAttemptOutcomeSchema,
     retryCount: z.number().int().min(0).max(1).default(0),
     durationMs: z.number().int().min(0).max(120_000).optional(),
+    model: z.string().trim().min(1).max(80).optional(),
     failureKind: researchProviderAttemptFailureKindSchema.optional(),
   })
   .strict()
@@ -469,7 +478,9 @@ const claimCandidateBaseSchema = claimSchema
     supportingText: boundedSupportingText,
     documentId: boundedId,
     extractionMethod: z.enum(["model", "heuristic", "rule", "manual"]),
+    extractionProvider: researchExtractionProviderSchema.optional(),
     extractionModel: z.string().trim().min(1).max(80).optional(),
+    intake: boundedIntake.optional(),
     /** Extraction confidence, not final evidence confidence or status. */
     confidence: z.number().min(0).max(1).optional(),
   })
@@ -832,7 +843,9 @@ export type ResearchRequest = z.infer<typeof researchRequestSchema>;
 export type ResearchTarget = z.infer<typeof researchTargetSchema>;
 export type ResearchRunStatus = z.infer<typeof researchRunStatusSchema>;
 export type ResearchProvider = z.infer<typeof researchProviderSchema>;
+export type ResearchExtractionProvider = z.infer<typeof researchExtractionProviderSchema>;
 export type ResearchProviderAttempt = z.infer<typeof researchProviderAttemptSchema>;
+export type ResearchProviderAttemptFailureKind = z.infer<typeof researchProviderAttemptFailureKindSchema>;
 export type ResearchRun = z.infer<typeof researchRunSchema>;
 export type CandidateSource = z.infer<typeof candidateSourceSchema>;
 export type ResearchDocumentSection = z.infer<typeof researchDocumentSectionSchema>;

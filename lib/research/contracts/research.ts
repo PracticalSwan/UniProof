@@ -10,15 +10,66 @@ import { evidenceStatusSchema, sourceTypeSchema } from "@/lib/validation/evidenc
 import {
   RESEARCH_ALLOWED_RESPONSE_CONTENT_TYPES,
   RESEARCH_MAX_CATEGORIES,
+  RESEARCH_MAX_CLAIMS_PER_RUN,
+  RESEARCH_MAX_EXTRACTION_CALLS_PER_RUN,
+  RESEARCH_MAX_NORMALIZED_TEXT_CHARACTERS,
   RESEARCH_MAX_QUERY_CHARACTERS,
   RESEARCH_MAX_RESPONSE_BYTES,
   RESEARCH_MAX_SOURCES_PER_RUN,
 } from "@/lib/security/research-limits";
 
-const boundedId = z.string().min(1).max(120);
-const boundedName = z.string().min(1).max(200);
-const boundedSupportingText = z.string().min(1).max(2_000);
+const boundedId = z.string().trim().min(1).max(120);
+const boundedName = z.string().trim().min(1).max(200);
+const boundedSupportingText = z.string().trim().min(1).max(2_000);
+const boundedClaimProperty = z.string().trim().min(1).max(200);
+const boundedClaimValue = z.union([
+  z.string().trim().min(1).max(500),
+  z.number().finite(),
+  z.boolean(),
+]);
+const boundedUnit = z.string().trim().min(1).max(40);
+const boundedAcademicYear = z.string().trim().min(1).max(40);
 const boundedWarning = z.string().min(1).max(500);
+
+const researchHttpUrlSchema = z.url().refine((value) => {
+  const parsed = new URL(value);
+  return (
+    (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+    parsed.username === "" &&
+    parsed.password === ""
+  );
+}, { message: "research URLs must use HTTP(S) without embedded credentials" });
+
+const candidateDomainSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(253)
+  .refine((value) => {
+    const normalized = value.toLowerCase().replace(/\.+$/, "");
+    if (normalized === "" || /[\/@?#:]/.test(normalized)) {
+      return false;
+    }
+    try {
+      return new URL(`https://${normalized}/`).hostname !== "";
+    } catch {
+      return false;
+    }
+  }, { message: "candidate domain must be a DNS hostname" })
+  .transform((value) => {
+    const normalized = value.toLowerCase().replace(/\.+$/, "");
+    return new URL(`https://${normalized}/`).hostname.toLowerCase().replace(/\.+$/, "");
+  })
+  .refine((value) => value.length > 0, { message: "candidate domain cannot be empty" });
+
+const canonicalResearchUrlSchema = researchHttpUrlSchema.transform((value) => {
+  const parsed = new URL(value);
+  parsed.hash = "";
+  if (!parsed.hostname.startsWith("[") && parsed.hostname.endsWith(".")) {
+    parsed.hostname = parsed.hostname.slice(0, -1);
+  }
+  return parsed.toString();
+});
 
 export const researchCategorySchema = z.enum([
   "admissions",
@@ -39,6 +90,10 @@ const uniqueCategoriesSchema = z
 const universityReferenceSchema = universitySchema
   .pick({ id: true, name: true })
   .partial()
+  .extend({
+    id: boundedId.optional(),
+    name: boundedName.optional(),
+  })
   .strict()
   .superRefine((reference, context) => {
     if (reference.id === undefined && reference.name === undefined) {
@@ -53,6 +108,11 @@ const universityReferenceSchema = universitySchema
 const programReferenceSchema = programSchema
   .pick({ id: true, universityId: true, name: true })
   .partial()
+  .extend({
+    id: boundedId.optional(),
+    universityId: boundedId.optional(),
+    name: boundedName.optional(),
+  })
   .strict()
   .superRefine((reference, context) => {
     if (reference.id === undefined && reference.name === undefined) {
@@ -68,7 +128,7 @@ export const researchTargetSchema = z
   .object({
     university: universityReferenceSchema.optional(),
     program: programReferenceSchema.optional(),
-    subjectArea: z.string().min(1).max(120).optional(),
+    subjectArea: z.string().trim().min(1).max(120).optional(),
   })
   .strict()
   .superRefine((target, context) => {
@@ -114,10 +174,10 @@ export const researchRequestSchema = z
       .min(1)
       .max(RESEARCH_MAX_CATEGORIES)
       .transform((categories) => [...new Set(categories)]),
-    intake: z.string().min(1).max(40).optional(),
-    academicYear: z.string().min(1).max(40).optional(),
+    intake: z.string().trim().min(1).max(40).optional(),
+    academicYear: z.string().trim().min(1).max(40).optional(),
     locale: z.string().regex(/^[A-Za-z]{2}(?:-[A-Za-z]{2})?$/).optional(),
-    question: z.string().min(1).max(RESEARCH_MAX_QUERY_CHARACTERS).optional(),
+    question: z.string().trim().min(1).max(RESEARCH_MAX_QUERY_CHARACTERS).optional(),
   })
   .strict()
   .superRefine((request, context) => {
@@ -165,8 +225,8 @@ export const researchRunSchema = z
     completedAt: z.iso.datetime().optional(),
     discoveryProvider: z.string().min(1).max(80).optional(),
     extractionModel: z.string().min(1).max(80).optional(),
-    maxExtractionCalls: z.number().int().min(0).max(100).optional(),
-    extractionCallsUsed: z.number().int().min(0).max(100).optional(),
+    maxExtractionCalls: z.number().int().min(0).max(RESEARCH_MAX_EXTRACTION_CALLS_PER_RUN).optional(),
+    extractionCallsUsed: z.number().int().min(0).max(RESEARCH_MAX_EXTRACTION_CALLS_PER_RUN).optional(),
     partial: z.boolean().default(false),
     processedCategories: uniqueCategoriesSchema.default([]),
     unprocessedCategories: uniqueCategoriesSchema.default([]),
@@ -221,12 +281,12 @@ export const researchRunSchema = z
     }
   });
 
-export const candidateSourceSchema = z
+const candidateSourceBaseSchema = z
   .object({
     url: z.url(),
     title: z.string().min(1).max(300).optional(),
     publisher: z.string().min(1).max(200).optional(),
-    domain: z.string().min(1).max(253).optional(),
+    domain: candidateDomainSchema.optional(),
     sourceType: sourceTypeSchema,
     discoveryProvider: z.string().min(1).max(80),
     requestedCategory: researchCategorySchema.optional(),
@@ -235,6 +295,20 @@ export const candidateSourceSchema = z
     rank: z.number().int().min(1).max(100).optional(),
   })
   .strict();
+
+export const candidateSourceSchema = candidateSourceBaseSchema.superRefine((candidate, context) => {
+  if (candidate.domain === undefined) {
+    return;
+  }
+  const hostname = new URL(candidate.url).hostname.toLowerCase().replace(/\.+$/, "");
+  if (candidate.domain !== hostname) {
+    context.addIssue({
+      code: "custom",
+      message: "candidate domain must match the candidate URL hostname",
+      path: ["domain"],
+    });
+  }
+});
 
 const researchDocumentSectionSchema = z
   .object({
@@ -256,12 +330,12 @@ const contentTypeSchema = z
     { message: "unsupported research content type" },
   );
 
-export const researchDocumentSchema = z
+const researchDocumentBaseSchema = z
   .object({
     id: boundedId,
     sourceId: boundedId,
-    originalUrl: z.url(),
-    canonicalUrl: z.url(),
+    originalUrl: researchHttpUrlSchema,
+    canonicalUrl: canonicalResearchUrlSchema,
     title: boundedName,
     publisher: z.string().min(1).max(200),
     sourceType: sourceTypeSchema,
@@ -270,25 +344,44 @@ export const researchDocumentSchema = z
     retrievedBytes: z.number().int().min(0).max(RESEARCH_MAX_RESPONSE_BYTES).optional(),
     truncated: z.boolean().default(false),
     partial: z.boolean().optional(),
-    normalizedText: z.string().min(1).max(200_000),
+    normalizedText: z.string().min(1).max(RESEARCH_MAX_NORMALIZED_TEXT_CHARACTERS),
     sections: z.array(researchDocumentSectionSchema).max(100).default([]),
-    contentHash: z.string().regex(/^[a-f0-9]{64}$/i),
+    contentHash: z.string().regex(/^[a-f0-9]{64}$/i).transform((value) => value.toLowerCase()),
   })
   .strict();
+
+export const researchDocumentSchema = researchDocumentBaseSchema.superRefine((document, context) => {
+  const sectionCharacters = document.sections.reduce(
+    (total, section) => total + section.text.length,
+    0,
+  );
+  if (sectionCharacters > RESEARCH_MAX_NORMALIZED_TEXT_CHARACTERS) {
+    context.addIssue({
+      code: "custom",
+      message: "aggregate section text exceeds the normalized document text limit",
+      path: ["sections"],
+    });
+  }
+});
 
 const claimCandidateBaseSchema = claimSchema
   .omit({ universityId: true, programId: true, verificationStatus: true })
   .extend({
+    id: boundedId,
     universityId: boundedId.optional(),
     universityName: boundedName.optional(),
     programId: boundedId.nullable().optional(),
-    programName: z.string().min(1).max(200).optional(),
+    programName: boundedName.optional(),
     category: researchCategorySchema,
-    value: z.union([z.string().max(500), z.number().finite(), z.boolean()]),
+    property: boundedClaimProperty,
+    value: boundedClaimValue,
+    unit: boundedUnit.optional(),
+    academicYear: boundedAcademicYear.optional(),
+    sourceId: boundedId,
     supportingText: boundedSupportingText,
     documentId: boundedId,
     extractionMethod: z.enum(["model", "heuristic", "rule", "manual"]),
-    extractionModel: z.string().min(1).max(80).optional(),
+    extractionModel: z.string().trim().min(1).max(80).optional(),
     /** Extraction confidence, not final evidence confidence or status. */
     confidence: z.number().min(0).max(1).optional(),
   })
@@ -309,11 +402,20 @@ export const claimCandidateSchema = claimCandidateBaseSchema.superRefine(
 export const verifiedClaimSchema = claimSchema
   .omit({ sourceId: true })
   .extend({
+    id: boundedId,
+    universityId: boundedId,
+    programId: boundedId.nullable().optional(),
     category: researchCategorySchema,
+    property: boundedClaimProperty,
+    value: boundedClaimValue,
+    unit: boundedUnit.optional(),
+    academicYear: boundedAcademicYear.optional(),
+    supportingText: boundedSupportingText,
     sourceId: boundedId.optional(),
     sourceIds: z.array(boundedId).min(1).max(RESEARCH_MAX_SOURCES_PER_RUN),
     documentIds: z.array(boundedId).min(1).max(RESEARCH_MAX_SOURCES_PER_RUN),
   })
+  .strict()
   .superRefine((claim, context) => {
     if (new Set(claim.sourceIds).size !== claim.sourceIds.length) {
       context.addIssue({
@@ -343,7 +445,11 @@ const categoryCoverageSchema = z
     category: researchCategorySchema,
     claimCount: z.number().int().min(0),
     hasEvidence: z.boolean(),
-    statuses: z.array(evidenceStatusSchema).max(8).default([]),
+    statuses: z
+      .array(evidenceStatusSchema)
+      .max(8)
+      .refine((statuses) => new Set(statuses).size === statuses.length, { message: "coverage statuses must be unique" })
+      .default([]),
   })
   .strict();
 
@@ -391,6 +497,27 @@ export const evidenceSummarySchema = z
         path: ["categoryCoverage"],
       });
     }
+    const coverageClaimTotal = summary.categoryCoverage.reduce(
+      (total, coverage) => total + coverage.claimCount,
+      0,
+    );
+    if (coverageClaimTotal > summary.totalClaims) {
+      context.addIssue({
+        code: "custom",
+        message: "category coverage claim counts cannot exceed totalClaims",
+        path: ["categoryCoverage"],
+      });
+    }
+    for (const [index, coverage] of summary.categoryCoverage.entries()) {
+      if (coverage.claimCount === 0 && coverage.statuses.length > 0) {
+        context.addIssue({
+          code: "custom",
+          message: "zero-claim category coverage cannot report claim statuses",
+          path: ["categoryCoverage", index, "statuses"],
+        });
+      }
+    }
+
     const unprocessed = new Set(summary.categoriesUnprocessed);
     if (summary.categoriesProcessed.some((category) => unprocessed.has(category))) {
       context.addIssue({
@@ -400,6 +527,16 @@ export const evidenceSummarySchema = z
       });
     }
   });
+
+const researchSourceSchema = sourceSchema
+  .extend({
+    id: boundedId,
+    url: researchHttpUrlSchema,
+    title: z.string().min(1).max(300),
+    publisher: z.string().min(1).max(200),
+    academicYear: z.string().trim().min(1).max(40).optional(),
+  })
+  .strict();
 
 const researchFailureSchema = z
   .object({
@@ -422,12 +559,12 @@ export const researchResultSchema = z
   .object({
     run: researchRunSchema,
     candidateSources: z.array(candidateSourceSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
-    sources: z.array(sourceSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
+    sources: z.array(researchSourceSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
     documents: z.array(researchDocumentSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
-    candidates: z.array(claimCandidateSchema).max(500).default([]),
-    claims: z.array(verifiedClaimSchema).max(500).default([]),
+    candidates: z.array(claimCandidateSchema).max(RESEARCH_MAX_CLAIMS_PER_RUN).default([]),
+    claims: z.array(verifiedClaimSchema).max(RESEARCH_MAX_CLAIMS_PER_RUN).default([]),
     evidenceSummary: evidenceSummarySchema,
-    failures: z.array(researchFailureSchema).max(12).default([]),
+    failures: z.array(researchFailureSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
     warnings: z.array(boundedWarning).max(50).default([]),
   })
   .strict()
@@ -466,6 +603,7 @@ export const researchResultSchema = z
     }
 
     for (const [index, claim] of result.claims.entries()) {
+      const claimDocumentSourceIds = new Set<string>();
       for (const sourceId of claim.sourceIds) {
         if (!sourceIds.has(sourceId)) {
           context.addIssue({ code: "custom", message: "claim sourceIds must reference result sources", path: ["claims", index, "sourceIds"] });
@@ -475,8 +613,20 @@ export const researchResultSchema = z
         const document = documents.get(documentId);
         if (document === undefined) {
           context.addIssue({ code: "custom", message: "claim documentIds must reference result documents", path: ["claims", index, "documentIds"] });
-        } else if (!claim.sourceIds.includes(document.sourceId)) {
-          context.addIssue({ code: "custom", message: "claim document sources must appear in sourceIds", path: ["claims", index, "sourceIds"] });
+        } else {
+          claimDocumentSourceIds.add(document.sourceId);
+          if (!claim.sourceIds.includes(document.sourceId)) {
+            context.addIssue({ code: "custom", message: "claim document sources must appear in sourceIds", path: ["claims", index, "sourceIds"] });
+          }
+        }
+      }
+      for (const sourceId of claim.sourceIds) {
+        if (sourceIds.has(sourceId) && !claimDocumentSourceIds.has(sourceId)) {
+          context.addIssue({
+            code: "custom",
+            message: "every claim sourceId must be backed by a referenced document",
+            path: ["claims", index, "sourceIds"],
+          });
         }
       }
     }
@@ -505,6 +655,86 @@ export const researchResultSchema = z
           path: ["evidenceSummary", "statusCounts", status],
         });
       }
+    }
+
+    const requiredStatusCategorySets = [
+      ["conflicting", result.evidenceSummary.categoriesWithConflicts, "categoriesWithConflicts"],
+      ["unknown", result.evidenceSummary.categoriesUnknown, "categoriesUnknown"],
+      ["outdated", result.evidenceSummary.categoriesOutdated, "categoriesOutdated"],
+    ] as const;
+    for (const [status, reportedCategories, path] of requiredStatusCategorySets) {
+      const reported = new Set(reportedCategories);
+      const actual = new Set(
+        result.claims
+          .filter((claim) => claim.verificationStatus === status)
+          .map((claim) => claim.category),
+      );
+      for (const category of actual) {
+        if (!reported.has(category)) {
+          context.addIssue({
+            code: "custom",
+            message: `evidence summary ${path} must include claim-level ${status} categories`,
+            path: ["evidenceSummary", path],
+          });
+        }
+      }
+    }
+
+    for (const [index, coverage] of result.evidenceSummary.categoryCoverage.entries()) {
+      const actualClaims = result.claims.filter((claim) => claim.category === coverage.category);
+      if (coverage.claimCount !== actualClaims.length) {
+        context.addIssue({
+          code: "custom",
+          message: "category coverage claimCount must match verified claims",
+          path: ["evidenceSummary", "categoryCoverage", index, "claimCount"],
+        });
+      }
+
+      const actualStatuses = new Set(actualClaims.map((claim) => claim.verificationStatus));
+      const reportedStatuses = new Set(coverage.statuses);
+      if (
+        actualStatuses.size !== reportedStatuses.size ||
+        [...actualStatuses].some((status) => !reportedStatuses.has(status))
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "category coverage statuses must match verified claims",
+          path: ["evidenceSummary", "categoryCoverage", index, "statuses"],
+        });
+      }
+    }
+
+    const coveredCategories = new Set(
+      result.evidenceSummary.categoryCoverage.map((coverage) => coverage.category),
+    );
+    for (const category of new Set(result.claims.map((claim) => claim.category))) {
+      if (!coveredCategories.has(category)) {
+        context.addIssue({
+          code: "custom",
+          message: "every verified-claim category must have a category coverage entry",
+          path: ["evidenceSummary", "categoryCoverage"],
+        });
+      }
+    }
+
+    const sameCategorySet = (
+      left: readonly ResearchCategory[],
+      right: readonly ResearchCategory[],
+    ) => left.length === right.length && left.every((category) => right.includes(category));
+
+    if (!sameCategorySet(result.run.processedCategories, result.evidenceSummary.categoriesProcessed)) {
+      context.addIssue({
+        code: "custom",
+        message: "run processedCategories must match evidence summary categoriesProcessed",
+        path: ["evidenceSummary", "categoriesProcessed"],
+      });
+    }
+    if (!sameCategorySet(result.run.unprocessedCategories, result.evidenceSummary.categoriesUnprocessed)) {
+      context.addIssue({
+        code: "custom",
+        message: "run unprocessedCategories must match evidence summary categoriesUnprocessed",
+        path: ["evidenceSummary", "categoriesUnprocessed"],
+      });
     }
   });
 

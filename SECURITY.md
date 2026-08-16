@@ -9,13 +9,15 @@ Do not disclose suspected credentials, private user data, or exploitable details
 ## Security Invariants
 
 - Never commit real API keys, database credentials, private keys, or `.env` files.
-- Keep Gemini, Tavily, Supabase service-role, and other privileged credentials server-side.
+- Keep Gemini, Groq, OpenRouter, Tavily, Brave, Supabase service-role, and other privileged credentials server-side.
 - Treat all retrieved webpages and model output as untrusted input.
 - Block SSRF to loopback, private, link-local, reserved/special-purpose, and metadata-service destinations; direct IPv6 retrieval fails closed outside the current IANA `2000::/3` global-unicast allocation.
 - Validate redirect destinations and bound outbound requests.
 - Sanitize external content before rendering and never execute retrieved scripts.
 - Validate structured AI output before persistence or display.
-- Preserve unknown/conflict states rather than fabricating a result.
+- Treat AI semantic reconciliation as untrusted interpretation and enforce source authority, freshness, and final evidence-state policy deterministically.
+- Use only public research content in the free AI/search provider chain; do not send applicant profiles or sensitive documents to those providers.
+- Preserve unknown/conflict/partial states rather than fabricating a result when the Tavily -> Brave discovery chain or Gemini -> Groq -> OpenRouter Free AI chain is exhausted.
 - Derive ownership from authenticated server state when user persistence is introduced.
 - Do not log sensitive profile fields or secrets unnecessarily.
 - Remove task-local secret-bearing/debug residue when its purpose is complete; retain only sanitized evidence needed for debugging, regression coverage, or incident review.

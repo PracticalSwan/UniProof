@@ -2,6 +2,13 @@
 
 Status: Phase 2A implemented; Phase 2B–2F remain planned.
 
+Implementation runbooks:
+
+- Phase 2B–2C: `docs/planning/phase-2b-2c-discovery-retrieval.md` is the exact next-batch execution specification.
+- Phase 2D–2F: docs/planning/phase-2d-2f-ai-reconciliation-orchestration.md is the implementation-grade execution specification after Phase 2B–2C passes.
+
+The parent plan owns Phase 2 architecture and cross-phase invariants. A batch runbook may specialize file paths and execution order but may not weaken this plan, `AGENTS.md`, Phase 2A contracts, or the security model.
+
 ## Goal
 
 Build the evidence-first backend pipeline that converts a bounded university/program research request into validated, traceable claims. Every material factual value must retain its source, supporting passage, retrieval time, applicable intake/year when known, and evidence status.
@@ -17,85 +24,139 @@ Phase 2 must work before Research Mode is wired to live providers. The core unit
 - Every factual claim must point to one or more source records and supporting evidence.
 - Retrieval must reject SSRF destinations and remain bounded by protocol, redirects, time, bytes, and content type.
 - Provider failures must preserve already-validated partial results.
-- Gemini free-tier processing must not receive applicant personal data or sensitive documents.
+- Discovery and AI-provider failover must be sequential, bounded, and provenance-preserving rather than parallel fan-out by default.
+- Free-tier AI processing must receive only public-source research content and the minimum non-sensitive research question; it must not receive applicant personal data or sensitive documents.
 - Deployment, publication, destructive Git operations, and production persistence remain out of scope unless separately authorized; repository initialization/publication was separately authorized and has already occurred.
 
-## Gemini API decision — researched 2026-08-16
+## AI provider and fallback decision — researched 2026-08-16
 
-UniProof will use the Gemini Developer API through Google AI Studio rather than OpenAI.
+UniProof will use project-owned provider interfaces for both discovery and AI inference so that orchestration never depends on one vendor payload or SDK. The application must preserve the same research contracts, evidence rules, and partial-result semantics regardless of which provider is active.
 
-### Connection
+### Primary AI provider: Gemini
 
-- Use the current official JavaScript SDK: `@google/genai`.
-- Keep `GEMINI_API_KEY` server-only; never expose it through `NEXT_PUBLIC_*` or browser bundles.
-- Use the Gemini Interactions API for new integration work because Google currently recommends it as the primary API surface for Gemini models and new capabilities.
-- Construct the SDK client only inside server-only provider modules.
-- Use stateless interactions with `store: false`; no Phase 2 flow needs server-managed Gemini conversation history.
-- Use schema-constrained JSON output and validate the returned JSON again with the project Zod contract before it becomes a claim candidate.
-- Do not enable Gemini Google Search grounding on the free tier. Gemini 3.x Search grounding is not available on the free tier, and UniProof already has a separate discovery/retrieval boundary.
+Primary extraction model: `gemini-3.5-flash-lite`.
 
-### Free-tier model policy
+Use it for high-volume claim extraction, document classification, category assignment, temporal-field extraction, and first-pass semantic reconciliation.
 
-Primary model: `gemini-3.5-flash-lite`.
+Gemini quality escalation model: `gemini-3.6-flash`.
 
-Use it for high-volume claim extraction, document classification, category assignment, temporal-field extraction, and simple normalization. Google describes it as the GA model optimized for high-throughput and simple data processing, which matches most Phase 2 extraction calls.
+Use it only when Gemini is available and a recorded quality condition requires escalation: schema-invalid output after one bounded repair attempt, material disagreement between a supporting passage and extracted value, semantically complex conflicts, or difficult table/requirement interpretation.
 
-Escalation model: `gemini-3.6-flash`.
+Gemini integration rules:
 
-Use it only when the primary extraction is ambiguous, schema-invalid after one bounded repair attempt, or the evidence set contains a material conflict requiring a higher-quality semantic comparison. It is also free for input/output tokens on the current free tier, but it should not become the default high-frequency model.
+- use the official `@google/genai` JavaScript SDK;
+- use the current Interactions API for new work;
+- set `store: false`;
+- request schema-constrained JSON and validate it again with project Zod contracts;
+- keep `GEMINI_API_KEY`, model IDs, budgets, and retry configuration server-only;
+- do not use Google Search grounding as the discovery layer; Phase 2B owns source discovery independently.
 
-Do not use `gemini-3.1-pro-preview`: the current pricing table marks it unavailable on the free tier.
+### AI availability fallback 1: Groq
 
-### Rate-limit strategy
+If the Gemini provider is unavailable after bounded handling, use Groq Free with model `openai/gpt-oss-120b`.
 
-Google no longer publishes a stable universal RPM/TPM/RPD table for every free-tier project. Active limits are shown in AI Studio, are applied per project rather than per key, and are explicitly not guaranteed.
+Groq is an availability fallback, not a silent quality downgrade. Its adapter must use the project-owned extraction/reconciliation interface and strict JSON-schema Structured Outputs when supported by the active endpoint. Groq provider/model identity, retries, token metadata when available, and fallback reason must be recorded safely.
 
-Therefore UniProof must not hard-code a claimed quota. Instead:
+The implementation must remain within the account's current free-plan limits. It must never upgrade a plan, enable billable capacity, or spend money automatically.
 
-- treat AI Studio's current project limits as the operational source of truth;
-- default to one concurrent Gemini request per research run;
-- impose a server-side maximum Gemini-call budget per research run;
-- batch cleaned documents where doing so preserves source identity and fits token bounds;
-- use Flash-Lite for the normal path and Flash only for escalation;
-- honor `429 RESOURCE_EXHAUSTED` with bounded exponential backoff plus jitter;
-- parse provider retry hints when available;
+### AI availability fallback 2: OpenRouter Free
+
+If Gemini and Groq are unavailable, use `openrouter/free` as the final inference fallback.
+
+Do not pin the final fallback to one nominally free model because OpenRouter's free-model inventory changes. The adapter must request the required structured-output capability, require providers to support the requested parameters, and validate the response with the same project Zod schema. Record the concrete model ID returned by OpenRouter on every successful call so claim provenance identifies the actual model that performed the work.
+
+Use provider data-policy filtering so the router does not select an endpoint that collects prompt data when the requested privacy policy cannot be met. If no eligible free endpoint is available, fail closed to a partial research result instead of relaxing the policy or selecting a paid model.
+
+### Quality escalation versus availability failover
+
+These are separate mechanisms:
+
+1. normal Gemini call uses `gemini-3.5-flash-lite`;
+2. a recorded semantic/quality condition may escalate within Gemini to `gemini-3.6-flash`;
+3. provider unavailability triggers cross-provider failover to Groq `openai/gpt-oss-120b`;
+4. Groq unavailability triggers final failover to `openrouter/free`;
+5. if all eligible providers fail, keep validated work and return a partial result.
+
+Availability failover may be triggered by a missing/disabled provider key, bounded retry exhaustion, quota/rate-limit exhaustion, timeout, provider `5xx`, service unavailability, or a required capability being unavailable. Authentication/configuration failures should be recorded distinctly, but the run may continue to the next configured provider.
+
+Do not call multiple AI providers in parallel for the same extraction merely to compare answers. Sequential failover conserves free quotas and makes provenance/failure behavior deterministic.
+
+### Rate-limit and call-budget strategy
+
+Provider limits are mutable and must be treated as runtime configuration rather than hard-coded product promises.
+
+- treat each provider's current dashboard/documentation as the operational source of truth;
+- default to one concurrent AI request per research run;
+- impose per-provider and total AI-call budgets per run;
+- batch or segment normalized documents only when source identity and supporting passages remain recoverable;
+- honor provider retry hints where available;
+- retry only transient failures with bounded exponential backoff plus jitter;
 - never spin in an unbounded retry loop;
-- return partial/incomplete research when the call budget or quota is exhausted;
-- make model IDs and call budgets server-side configuration, not browser-controlled parameters.
+- stop using a provider when its per-run budget or current free quota is exhausted;
+- continue through the configured fallback chain and return partial/incomplete research when all eligible providers are exhausted.
 
 ### Free-tier privacy consequence
 
-Google states that content submitted to unpaid Gemini API services may be used to improve Google products and may be reviewed under the applicable terms. `store: false` disables Interactions API state storage but does not convert unpaid usage into paid-service data handling.
+Phase 2 sends only public university/research source content plus the minimum non-sensitive research question to every free AI provider.
 
-Phase 2 therefore sends only public-source research content plus the minimum research question needed for extraction. Do not send applicant profiles, citizenship, GPA, contact details, documents, or other personal/sensitive data to Gemini while the project uses the unpaid tier.
+Applicant citizenship, GPA, contact information, personal documents, financial documents, and other sensitive/profile data must not enter the Phase 2 AI extraction or reconciliation chain. Groq and OpenRouter have their own data-control behavior, so adapters must use the strongest compatible no-training/no-collection settings and must never silently relax a configured privacy requirement to obtain a response.
+
+### Operator credential setup
+
+Phase 2B/2D implementation must include a cross-platform setup command such as `npm run setup:providers`. The intended operator experience is that the user obtains provider API keys and pastes them into prompts; the implementor handles the rest.
+
+The setup command must:
+
+- prompt only for the provider keys required by the enabled live mode;
+- write/update `.env.local` without echoing or logging secret values;
+- preserve unrelated existing environment values;
+- ensure local secret files remain Git-ignored;
+- update/validate the server environment schema and `.env.example` as providers are implemented;
+- configure model IDs, fallback order, endpoints, retry policies, and safe defaults automatically;
+- optionally perform minimal provider connectivity/capability checks without printing secrets or source content;
+- report missing/invalid providers individually and explain which fallback path remains usable.
+
+No popup-specific mechanism is required. A repository-owned CLI is preferred because it is reproducible across Windows, WSL, and CI/dev environments and does not require manually editing source files.
 
 ## Planned server configuration
 
-The later Gemini integration should introduce server-only configuration equivalent to:
+The provider implementation should introduce server-only configuration equivalent to:
 
+- `TAVILY_API_KEY`
+- `BRAVE_SEARCH_API_KEY`
 - `GEMINI_API_KEY`
+- `GROQ_API_KEY`
+- `OPENROUTER_API_KEY`
 - `GEMINI_PRIMARY_MODEL=gemini-3.5-flash-lite`
 - `GEMINI_ESCALATION_MODEL=gemini-3.6-flash`
-- `GEMINI_MAX_CALLS_PER_RUN`
-- `GEMINI_MAX_RETRIES`
-- `GEMINI_CONCURRENCY`
+- `GROQ_FALLBACK_MODEL=openai/gpt-oss-120b`
+- `OPENROUTER_FALLBACK_MODEL=openrouter/free`
+- provider-specific maximum calls/retries plus a total AI-call budget;
+- conservative concurrency configuration.
 
-Exact numeric call/concurrency defaults must be conservative and tested against the project's current AI Studio limits before live research is enabled. Do not expose quota configuration to untrusted clients.
+Exact numeric quotas must be checked against the active provider accounts before live research is enabled. Do not expose quota or fallback configuration to untrusted clients.
 
 ## End-to-end Phase 2 flow
 
 ```text
 ResearchRequest
   -> discovery query planning
-  -> candidate source discovery
+  -> Tavily discovery
+       -> Brave Search fallback when Tavily is unavailable
+       -> direct/structured-provider fallback when web discovery is unavailable
   -> outbound URL policy
   -> bounded retrieval
   -> document normalization
-  -> Gemini structured claim extraction
+  -> provider-neutral AI structured claim extraction
+       -> Gemini
+       -> Groq fallback
+       -> OpenRouter Free final fallback
   -> Zod validation
-  -> deterministic claim normalization/reconciliation
-  -> evidence/freshness/conflict classification
-  -> ResearchResult + partial/failure metadata
+  -> deterministic value/scope normalization
+  -> AI-assisted semantic reconciliation
+  -> deterministic evidence-policy gate
+  -> evidence-bounded AI explanation
+  -> ResearchResult + partial/failure/provider metadata
 ```
 
 ## Phase 2A — Research safety boundary and core contracts
@@ -104,10 +165,10 @@ Purpose: establish safe, testable boundaries before any live search or AI provid
 
 Implemented 2026-08-16:
 
-- Zod-first contracts live under `lib/research/contracts/` and reuse the existing domain/evidence schemas.
-- Server-owned retrieval bounds live under `lib/security/research-limits.ts`.
+- Zod-first contracts live under `lib/research/contracts/` and reuse the existing domain/evidence schemas. Research-specific boundaries now override permissive base fields where necessary so request intent, source records, claims, document URLs/hashes, provenance references, and evidence-summary aggregates remain bounded and internally consistent.
+- Server-owned research/retrieval bounds live under `lib/security/research-limits.ts`, including normalized-document text, claim/run ceilings, source budgets, response bytes, redirects, and timeouts.
 - `lib/security/outbound-url.ts` exposes syntax validation, conservative canonicalization, public IPv4/IPv6 classification, resolver-injected resolution-time validation, and redirect-target revalidation. The post-review IPv6 policy fails closed outside the current IANA `2000::/3` global-unicast allocation and blocks special-purpose/reserved prefixes such as IETF protocol assignments, documentation, returned 6bone, and mapped private IPv4 destinations.
-- Deterministic tests run with Vitest and do not perform live DNS, web, Tavily, Gemini, or Supabase calls. Review regressions cover current IANA cases including `100:0:0:1::/64`, deprecated `2001:10::/28`, returned `3ffe::/16`, reserved `4000::/3`, and malformed resolver address-family metadata.
+- Deterministic tests run with Vitest and do not perform live DNS, web, Tavily, Gemini, or Supabase calls. Review regressions cover current IANA cases, alternate loopback literals, unsafe redirect forms, candidate URL/domain consistency, canonical research-document URL/hash identity, bounded claim/evidence payloads, and result/evidence-summary provenance consistency.
 - Resolution-time validation returns the validated address set for a future pinned transport. It does not by itself prevent a later ordinary `fetch(url)` from resolving a hostname again; Phase 2C must pin or revalidate the connection lookup.
 
 ### Core research contracts
@@ -151,9 +212,80 @@ Phase 2A covers URL syntax/canonicalization, IPv4/IPv6 classification, metadata/
 
 Actual HTTP transport enforcement for connect/request timeout, streamed response-byte limits, response MIME handling, and redirect following belongs to Phase 2C and must receive transport-level tests when that fetcher exists. Phase 2A must use deterministic local/mocked network behavior and must not require real Tavily or Gemini credentials.
 
+## Remaining-phase execution contract
+
+The following rules remove ambiguity for Phase 2B–2F implementations.
+
+### Contract-change discipline
+
+Phase 2A contracts and security primitives are implemented source-of-truth code, not illustrative pseudocode. Before changing `lib/research/contracts/research.ts`, `lib/security/outbound-url.ts`, or `lib/security/research-limits.ts`, identify the exact downstream requirement, add a regression that fails under the old behavior, and preserve all existing Phase 2A regression coverage.
+
+Provider payloads must never become domain contracts. Each adapter converts vendor data into project-owned internal types before orchestration sees it.
+
+When a model/provider needs a narrower schema than the final domain object, define a provider-facing schema instead of asking the provider to manufacture trusted IDs, source authority, evidence states, or application-owned metadata.
+
+### Provider-attempt telemetry
+
+Multi-provider fallback requires an ordered attempt history. Add one bounded project-owned attempt shape when Phase 2B first needs it and reuse it through Phase 2D–2F.
+
+At minimum record:
+
+- stage: discovery, retrieval, extraction, reconciliation, or explanation;
+- provider;
+- optional concrete model;
+- optional requested category/query identifier;
+- outcome: success, empty, skipped, or failed;
+- retry count;
+- safe duration metadata when available;
+- bounded failure kind such as configuration, authentication, rate-limit, timeout, upstream, invalid-response, capability, policy, or budget.
+
+Do not record API keys, provider request/response bodies, full source text, full prompts, or full completions in attempt telemetry.
+
+Keep existing `ResearchRun.discoveryProvider` / `extractionModel` fields for compatibility until an explicit migration removes them. Do not encode fallback history into comma-separated strings.
+
+### Default test boundary
+
+The default Vitest suite is deterministic and offline. Provider adapters use mocked HTTP/SDK responses; retrieval uses injected DNS plus local/mock HTTP servers. Real Tavily, Brave, Gemini, Groq, OpenRouter, university, DNS, or Supabase access must not be required for `npm test`.
+
+Optional live smoke checks must be explicit commands, use synthetic/public research inputs only, consume the minimum quota, and never become a completion prerequisite when credentials are unavailable.
+
+### Partial-result semantics
+
+Evidence outcome and pipeline execution status are different concepts.
+
+- `unknown`, `outdated`, and `conflicting` may be valid outputs from a fully executed category.
+- `unprocessed` means a requested category could not complete the required pipeline because a stage was skipped/exhausted/blocked.
+- `failed` category metadata means the pipeline attempted the category but a stage ended in a terminal operational failure.
+- already validated candidates/documents/claims survive failures in later stages.
+
+A later phase must not relabel a legitimate `unknown` as a provider failure merely because the evidence was absent.
+
+### Phase 2F lifecycle decision
+
+Orchestration will use these terminal semantics:
+
+- `succeeded`: every requested category completed the required pipeline; evidence may still be unknown, outdated, anecdotal, or conflicting;
+- `partial`: at least one requested category completed and at least one requested category is unprocessed/operationally failed;
+- `failed`: no requested category reached a usable gated result because of fatal validation/configuration/pipeline failure.
+
+`completed` remains a legacy accepted contract value but the Phase 2F orchestrator must not emit it. `queued` is reserved for a future asynchronous queue and is not emitted by the in-memory MVP orchestrator.
+
+For orchestrator-produced runs, `partial` must equal `status === "partial"`. `completedAt` is required for every terminal status and must not precede `startedAt`; `updatedAt` must not precede `createdAt`. Add these schema invariants when orchestration is implemented rather than leaving the timestamp semantics implicit.
+
+### Evidence-summary decision
+
+A category is `processed` when deterministic/AI stages required for that category ran to an evidence-policy decision, even if the final result is `unknown`.
+
+`hasEvidence` means the category has at least one non-`unknown` gated claim. `outdated`, `conflicting`, `anecdotal`, and `inferred` are still evidence-bearing states; a category containing only an `unknown` placeholder has `hasEvidence=false`.
+
+`categoriesUnprocessed` is operational and must remain disjoint from `categoriesProcessed`. `categoriesFailed` may identify attempted categories with operational failure but must not be used as a synonym for `unknown`.
+
+
 ## Phase 2B — Source discovery and provider adapters
 
-Purpose: discover likely authoritative sources without coupling research orchestration to one provider payload.
+Purpose: discover likely authoritative sources without coupling research orchestration to one provider payload, and preserve useful research when a discovery provider is unavailable.
+
+Exact execution details, file ownership, retry semantics, setup behavior, and deterministic acceptance tests are defined in docs/planning/phase-2b-2c-discovery-retrieval.md.
 
 ### Discovery policy
 
@@ -165,19 +297,49 @@ Prefer sources in this order when the claim category allows it:
 4. high-quality independent sources;
 5. rankings or community sources only for categories where those sources are semantically appropriate.
 
-Tavily is a discovery provider, not automatically the evidence authority. Store the underlying publisher URL as the source whenever possible.
+Search providers discover candidate URLs; they are not evidence authorities. Store and later retrieve the underlying publisher URL whenever possible.
+
+### Discovery failure model
+
+The required web-discovery failover is:
+
+```text
+Tavily unavailable
+  -> Brave Search
+  -> direct/structured providers
+  -> partial ResearchResult when coverage remains incomplete
+```
+
+Tavily remains the primary general-web discovery adapter. Brave Search is the independent-index fallback and must use its Search API/free monthly credits rather than its answer-generation product. If both general-web providers are unavailable, continue with known official URLs and configured structured providers such as ROR, OpenAlex, College Scorecard, Discover Uni, and applicable government datasets.
+
+Provider failure must be recorded by provider and reason. A discovery outage must not erase candidates already found by another provider. If provider/transport exhaustion prevents the category from completing the required research path, mark it operationally unprocessed/failed and preserve an explicit partial result. If every required discovery mechanism completes successfully but no usable evidence exists, that is evidence absence and may later become a processed `unknown`, not a provider failure.
+
+Fallback should be sequential, not automatic parallel fan-out. Treat timeout, `429`/quota exhaustion, provider `5xx`, and provider unavailability as retryable/failover conditions after bounded handling. Missing or invalid credentials are configuration failures but may still fall through to the next configured provider.
 
 ### Adapter boundary
 
-Each provider adapter returns normalized `CandidateSource` records and hides provider-specific response fields. Initial adapters may include Tavily discovery plus ROR/OpenAlex and selected national datasets.
+Every discovery adapter returns normalized `CandidateSource` records and hides provider-specific response fields. Initial adapters should include:
 
-Discovery must support category-aware queries, deduplicate equivalent URLs, avoid repeatedly selecting many pages from the same domain, retain provider provenance, and enforce a source-count budget before retrieval.
+- Tavily general-web discovery;
+- Brave Search fallback;
+- ROR/OpenAlex and selected national/open authoritative datasets;
+- direct known-source candidates where the university/program identity already supplies an authoritative URL.
+
+Discovery must support category-aware queries, deduplicate equivalent URLs, avoid repeatedly selecting many pages from one domain, retain provider provenance, and enforce a source-count budget before retrieval.
+
+Do not persist search-provider snippets or payloads beyond what provider terms/license permit; use them to identify the underlying publisher source and fetch that source through Phase 2C when possible.
 
 No adapter may bypass the outbound URL policy when a discovered URL is later fetched directly.
+
+### Credential/setup requirement
+
+The Phase 2B implementor owns provider wiring, environment-schema changes, fallback configuration, adapter setup, and tests. The user-facing setup should require only `TAVILY_API_KEY` and `BRAVE_SEARCH_API_KEY` entry through the repository setup command; the user should not need to edit adapter code, endpoints, or fallback logic manually.
 
 ## Phase 2C — Source acquisition and normalization
 
 Purpose: convert safely retrieved source material into a stable model/input representation while preserving provenance.
+
+Use the same Phase 2B–2C runbook for the required DNS-pinned transport, streamed byte enforcement, redirect revalidation/re-pinning, MIME/content-encoding policy, HTML/plain-text normalizers, and mock/local transport tests.
 
 `ResearchDocument` should retain the canonical URL, title, publisher/domain, source type, retrieval timestamp, HTTP metadata needed for diagnostics, content type, normalized readable text, section/headings where useful, and a deterministic content hash.
 
@@ -190,101 +352,185 @@ Normalization rules:
 - normalize whitespace and obvious encoding issues safely;
 - detect duplicate content by canonical URL and content hash;
 - keep raw provider payloads out of domain contracts;
-- truncate/segment oversized documents deterministically before Gemini input;
+- truncate/segment oversized documents deterministically before AI-provider input;
 - mark partial/truncated documents explicitly.
 
 The MVP should use focused page retrieval, not recursive crawling. A research run has a hard source/page budget.
 
-PDF support may be added only if it can use the same bounded retrieval and provenance rules; broad document-upload support remains outside Phase 2.
+pplication/pdf remains transport-allowed by the Phase 2A MIME contract, but PDF text normalization is not required in the Phase 2B–2C batch. A safely retrieved PDF without an implemented bounded normalizer must produce an explicit normalization/unsupported-normalizer failure, never a fabricated empty ResearchDocument. Broad document-upload support remains outside Phase 2.
 
-## Phase 2D — Gemini structured claim extraction
+## Phase 2D — Multi-provider structured claim extraction
 
-Purpose: extract claim candidates from normalized public-source documents without allowing model output to become truth directly.
+Purpose: extract claim candidates from normalized public-source documents while surviving free-tier provider limits without allowing model output to become truth directly.
 
-### Provider module
+Exact provider-facing schemas, adapter error/fallback rules, setup extension, and acceptance tests are defined in docs/planning/phase-2d-2f-ai-reconciliation-orchestration.md.
 
-Create a server-only Gemini adapter around `@google/genai`. The rest of the codebase consumes a project-owned interface rather than importing the Google SDK directly.
+### Project-owned AI adapter
 
-The adapter must:
+Create one server-only project interface for structured extraction and semantic-evidence tasks. Provider SDK/request types must stop at their adapters.
 
-- read only server-side Gemini configuration;
-- use `gemini-3.5-flash-lite` on the normal path;
-- set `store: false` for every Interactions API request;
-- request structured JSON matching the project extraction schema;
-- validate returned JSON with Zod again;
-- classify provider errors into retryable/non-retryable categories;
-- implement bounded retries with exponential backoff and jitter;
-- record safe metrics such as model, duration, token metadata when provided, outcome, and retry count without logging full source text or secrets;
-- escalate to `gemini-3.6-flash` only under explicit deterministic conditions.
+Provider order:
+
+1. Gemini (`gemini-3.5-flash-lite`, with `gemini-3.6-flash` only for recorded quality escalation);
+2. Groq Free `openai/gpt-oss-120b`;
+3. OpenRouter Free `openrouter/free`.
+
+All three paths must produce the same project-owned result contract and then cross the same Zod validation boundary.
+
+The provider layer must:
+
+- read only server-side provider configuration;
+- use schema-constrained JSON/Structured Outputs when supported;
+- validate every response with the project Zod contract;
+- classify provider errors into retryable, quota/unavailable, capability, configuration/authentication, and non-retryable categories;
+- implement bounded retries with exponential backoff and jitter for transient failures;
+- record safe provider/model, duration, token metadata when available, outcome, retry count, and failover reason;
+- never log API keys, full source documents, or prompt/completion bodies;
+- preserve already-validated candidates when later provider calls fail;
+- never route to a paid model automatically.
+
+### Gemini adapter
+
+Use the official `@google/genai` SDK and Interactions API with `store: false`.
+
+Normal path: `gemini-3.5-flash-lite`.
+
+Quality escalation: `gemini-3.6-flash`, only under an explicitly recorded semantic/quality condition. A provider outage or exhausted Gemini free quota should move to Groq rather than repeatedly escalating Gemini calls.
+
+### Groq adapter
+
+Use Groq's OpenAI-compatible API with `openai/gpt-oss-120b`.
+
+Require strict JSON-schema Structured Outputs for extraction/reconciliation calls where the endpoint supports it. Keep the adapter project-owned so no Groq/OpenAI-compatible wire type leaks into research contracts.
+
+Use only free-plan capacity. Hitting the active free quota or bounded retry exhaustion moves the request to OpenRouter Free.
+
+### OpenRouter adapter
+
+Use `openrouter/free` as the final fallback rather than a fixed free model ID.
+
+Requests must declare the structured-output requirement and require eligible routed providers to support the requested parameters. Record the concrete model returned by OpenRouter. Apply the configured data-collection/privacy filter; if no eligible free endpoint satisfies both capability and privacy requirements, return a provider-unavailable result rather than routing to paid inference or weakening privacy.
 
 ### Extraction contract
 
-Each `ClaimCandidate` must include category/property/value, optional unit/currency/date/academic year/intake, source/document reference, supporting text, extraction method/model, and extraction confidence only if its semantics are explicitly documented.
-Extraction instructions must tell Gemini to extract only facts supported by the supplied document, quote or identify the supporting passage, preserve uncertainty, and omit fields that are not supported. Retrieved webpage instructions must be treated as quoted source content, never as model/system instructions.
+Models must not emit the trusted `ClaimCandidate` domain object directly. Define a strict bounded provider-facing extracted-claim schema containing only model-observable fields: category/property/value, optional unit/currency/date/academic year/intake, exact supporting passage or validated document locator, and optional extraction confidence only if its semantics are explicitly documented.
 
-Gemini must not assign the final UniProof evidence status. Final evidence classification is deterministic application logic in Phase 2E.
+After Zod validation, application code verifies the supporting passage against the supplied `ResearchDocument` and attaches deterministic IDs, source/document references, extraction method, and actual provider/model provenance before constructing `ClaimCandidate`. Provider output cannot assign source authority, final evidence state, trusted IDs, or other application-owned metadata.
 
-### Escalation conditions
+Extraction instructions must tell every model to extract only facts supported by the supplied document, identify the supporting passage, preserve uncertainty, and omit unsupported fields. Retrieved webpage instructions are source content, never model/system instructions.
 
-An escalation to `gemini-3.6-flash` is permitted only when one of these conditions is recorded:
-
-- primary output remains schema-invalid after one bounded repair attempt;
-- the supporting passage and extracted value are materially inconsistent;
-- multiple credible source candidates appear semantically contradictory and deterministic normalization cannot establish whether they refer to different periods/scopes;
-- a complex table/requirement needs higher-quality semantic interpretation.
-
-Do not escalate simply to make prose sound better. Phase 2 is an extraction pipeline, not a chat-completion loop.
+No Phase 2D model assigns the final UniProof evidence state.
 
 ### Call-budget behavior
 
-When the Gemini budget is exhausted, keep validated candidates already produced, mark unprocessed documents/categories, and return a partial run. Never substitute synthetic values for skipped extraction.
+Call budgets apply both per provider and across the full run. When one provider is exhausted, retain validated work and move only unfinished work through the next eligible provider. If the total budget or the entire provider chain is exhausted, mark unprocessed documents/categories and return a partial run. Never substitute synthetic values for skipped extraction.
 
-## Phase 2E — Deterministic reconciliation and evidence classification
+### Credential/setup requirement
 
-Purpose: convert claim candidates into normalized claims and evidence states without delegating truth decisions to an LLM.
+The Phase 2D implementor owns SDK/REST wiring, environment-schema changes, model/fallback configuration, retries, validation, and provider tests. The user should only provide `GEMINI_API_KEY`, `GROQ_API_KEY`, and `OPENROUTER_API_KEY` through the repository setup command; no manual source-code configuration should be required.
 
-Group comparable candidates using university/program identity, normalized property, category, scope, and applicable intake/academic year. Normalize dates, currencies, units, booleans, and known categorical values before comparing evidence.
+## Phase 2E — AI-assisted reconciliation with deterministic evidence gates
 
-Evidence-state rules must be explicit and testable. At minimum:
+Purpose: make AI a core reasoning component for semantic evidence comparison while keeping source authority, provenance, and final evidence-policy constraints deterministic and testable.
 
-- `verified`: supported by the relevant authoritative primary source under the project's evidence policy;
-- `corroborated`: materially equivalent claim supported by multiple independent reliable sources;
-- `university-reported`: university-published information where independent corroboration is absent or not expected;
-- `conflicting`: current/relevant credible sources materially disagree after period/scope normalization;
-- `anecdotal`: claim is opinion/community experience rather than institutional fact;
-- `inferred`: an application-derived interpretation based on identified evidence, never a substituted source fact;
-- `unknown`: no sufficiently reliable evidence supports a value;
-- `outdated`: evidence exists but applies to a superseded intake/year or is outside the defined freshness rule.
+Phase 2E intentionally separates tasks that require exact computation from tasks that require semantic interpretation.
 
-Conflict records must preserve each competing value/source. Unknown values must not become zero, false, or the least favorable comparison value.
+### Step 1 — Deterministic normalization
 
-`EvidenceSummary` should expose state counts, category coverage, unresolved conflicts, stale categories, and unprocessed/failed categories separately.
+Application code normalizes facts that have objective transformations before semantic comparison:
+
+- university/program/campus identity;
+- property/category names;
+- dates, academic years, and intake periods;
+- currencies and units without inventing exchange-rate conversions;
+- booleans and known categorical values;
+- canonical URLs/source identity;
+- duplicate values and duplicate content.
+
+This prevents the model from spending quota on transformations that code can perform exactly and keeps comparisons scoped to the same entity, period, and property.
+
+### Step 2 — AI semantic reconciliation
+
+For candidate claims that are not safely comparable by exact rules, use the Phase 2D AI-provider chain to classify their semantic relationship.
+
+The structured reconciliation result should distinguish at least:
+
+- materially equivalent wording;
+- genuine contradiction;
+- different academic/intake periods;
+- different campuses/program scopes/degree levels;
+- general rule versus program-specific rule;
+- exception or conditional qualification;
+- broader/narrower statements that can coexist;
+- insufficient evidence to determine the relationship.
+
+The model must cite only the supplied candidate/source/document references in its reconciliation output. It cannot create new source IDs, facts, or evidence.
+
+AI reconciliation is a core product capability because university requirements are frequently expressed in different natural-language forms that exact string/value comparison cannot reliably resolve.
+
+### Step 3 — Deterministic evidence-policy gate
+
+Application code converts validated candidate relationships into allowed UniProof evidence states according to explicit source-policy rules.
+
+The AI may propose semantic relationships, but it cannot override hard evidence constraints. For example:
+
+- only an eligible authoritative source can satisfy the policy for `verified`;
+- multiple materially equivalent independent reliable sources are required for `corroborated`;
+- credible current sources that remain materially contradictory stay `conflicting`;
+- anecdotal/community evidence cannot be promoted to institutional fact;
+- old-period evidence remains `outdated` when the requested period is newer;
+- missing evidence remains `unknown`;
+- AI-derived interpretation remains `inferred` when it is not itself a source fact.
+
+Conflict records preserve each competing value/source. Unknown values never become zero, false, or a pessimistic substitute.
+
+### Step 4 — Evidence-bounded AI explanation
+
+After the deterministic gate produces the allowed claim/evidence graph, AI may generate concise user-facing explanations of equivalence, conflict, scope differences, or freshness decisions.
+
+Explanations must reference only gated claims and evidence, must not introduce new factual values, and must remain replaceable by a non-AI fallback representation if all AI providers are unavailable.
+
+### Provider-failure behavior
+
+If AI reconciliation becomes unavailable after the full Gemini -> Groq -> OpenRouter Free chain, deterministic rules should still resolve exact/obvious cases. Ambiguous semantic cases remain explicitly unresolved/conflicting/unknown rather than being guessed.
+
+`EvidenceSummary` should expose state counts, category coverage, unresolved semantic cases, conflicts, stale categories, and unprocessed/failed categories separately.
+
+This design keeps AI central to extraction, semantic interpretation, reconciliation, and explanation while keeping the product's evidence guarantees outside model control.
 
 ## Phase 2F — Fixtures, orchestration, and verification
 
-Purpose: prove the pipeline with deterministic cases before connecting it to the Research UI.
+Purpose: prove the pipeline, provider fallbacks, and evidence gates with deterministic cases before connecting it to the Research UI.
 
 Create fixtures/tests for:
 
 - one current authoritative claim;
-- corroborated equivalent claims;
+- corroborated equivalent claims expressed with materially different wording;
 - materially conflicting current claims;
+- same-looking values that apply to different years/campuses/scopes;
+- an AI semantic-equivalence decision accepted by the deterministic policy gate;
+- an AI-proposed evidence state that the deterministic gate must reject/downgrade;
 - old intake/year evidence classified as outdated;
 - no usable evidence classified as unknown;
 - anecdotal-only evidence;
 - duplicate canonical URLs and duplicate content;
-- malformed Gemini JSON;
-- valid JSON that fails project semantic validation;
-- Gemini 429/rate-limit response and retry exhaustion;
-- Gemini non-retryable failure;
-- source discovery failure with retained direct/structured sources;
+- Tavily success without Brave use;
+- Tavily timeout/429/unavailability followed by successful Brave discovery;
+- Tavily and Brave failure followed by retained direct/structured sources and a partial result;
+- malformed AI-provider JSON;
+- valid structured output that fails project semantic validation;
+- Gemini quota/unavailability followed by successful Groq extraction;
+- Gemini and Groq failure followed by successful `openrouter/free` extraction;
+- OpenRouter provenance recording the concrete routed model ID;
+- complete AI-provider-chain exhaustion with retained validated candidates and unprocessed categories;
+- provider retry exhaustion and non-retryable failure;
 - retrieval timeout/oversize/unsupported content;
 - blocked SSRF URL and redirect-to-private-IP case;
 - partial research run with successful and failed categories.
 
-The orchestrator should be a small deterministic pipeline coordinator. Avoid production-style multi-agent orchestration. Each step consumes and returns project-owned contracts and records a bounded status/failure result.
+The orchestrator should remain a small deterministic pipeline coordinator, not a production-style multi-agent system. Each stage consumes and returns project-owned contracts, records bounded provider/failure status, and never discards validated results because a later stage fails.
 
-Only after these tests pass should Phase 3 connect `/research` to a live research endpoint and expose loading, partial, conflict, stale, error, and retry states.
+Only after these tests pass should Phase 3 connect `/research` to a live research endpoint and expose loading, partial, conflict, stale, unresolved-semantic, error, provider-fallback, and retry states.
 
 ## Planned module boundaries
 
@@ -302,7 +548,10 @@ lib/
     orchestration/
   integrations/
     gemini/
+    groq/
+    openrouter/
     tavily/
+    brave/
     ror/
     openalex/
   security/
@@ -310,7 +559,7 @@ lib/
     research-limits.ts
 ```
 
-Provider SDK types must stop at the integration adapter. UI and domain code must not depend on Gemini/Tavily response shapes.
+Provider SDK/wire types must stop at the integration adapters. UI, orchestration, and domain code must not depend on Gemini, Groq, OpenRouter, Tavily, or Brave response shapes.
 
 ## Persistence decision
 
@@ -329,11 +578,13 @@ Required evidence before completion:
 - All model output crosses structured-output plus Zod validation before claim use.
 - Every factual claim resolves to source/supporting evidence.
 - Unknown/conflicting/outdated states survive reconciliation without fabricated resolution.
-- Gemini rate-limit and provider-failure tests prove bounded retries and partial-result behavior.
-- No Gemini secret can enter a client bundle or `NEXT_PUBLIC_*` variable.
-- Free-tier Gemini calls contain public research content only.
+- Discovery failover tests prove Tavily -> Brave -> direct/structured degraded behavior without losing validated candidates.
+- AI-provider tests prove Gemini -> Groq -> OpenRouter Free failover, bounded retries, concrete model provenance, and partial-result behavior.
+- No AI/search provider secret can enter a client bundle or `NEXT_PUBLIC_*` variable.
+- Free-tier AI/search calls contain only public research content and minimum non-sensitive research context.
+- AI semantic reconciliation cannot bypass deterministic evidence-policy gates.
 - `npx tsc --noEmit`, lint, build, relevant automated tests, dependency audit, and workspace verification pass.
-- Focused security review covers outbound retrieval, prompt injection, secrets, provider quotas, and safe logging.
+- Focused security review covers outbound retrieval, prompt injection, provider failover, secrets, free-tier quotas, privacy routing, and safe logging.
 - Repository Git operations remain separately authorized actions; the public `origin/main` repository is already initialized and published.
 
 ## Explicitly deferred from Phase 2
@@ -350,24 +601,44 @@ Required evidence before completion:
 
 ## Execution order
 
-1. Phase 2A: core contracts, outbound URL policy, retrieval limits, deterministic security tests.
-2. Phase 2B: discovery contract and first approved provider adapters.
-3. Phase 2C: bounded retrieval implementation and normalized research documents.
-4. Phase 2D: Gemini adapter, structured extraction, call budgets, retries, escalation.
-5. Phase 2E: deterministic normalization, freshness, conflict, evidence classification.
-6. Phase 2F: orchestration, full fixture matrix, focused security review, handoff to Phase 3.
+1. Phase 2A is complete: core contracts, outbound URL policy, retrieval limits, and deterministic security tests.
+2. Next implementation batch: Phase 2B + Phase 2C together, following the dedicated discovery/retrieval runbook. Discovery is not accepted until its candidates can pass through the actual safe pinned transport and normalization boundary.
+3. Phase 2D as its own batch: Gemini -> Groq -> OpenRouter Free structured extraction, budgets, retries, quality escalation, and provider failover.
+4. Phase 2E as its own batch: deterministic normalization, AI semantic reconciliation, deterministic evidence-policy gates, and evidence-bounded explanation.
+5. Phase 2F as its own batch: orchestration, terminal lifecycle/evidence-summary invariants, the full fallback/evidence fixture matrix, focused security review, and handoff to Phase 3.
 
-Do not skip Phase 2A to connect live Gemini or Tavily earlier.
+Do not skip the established Phase 2A safety boundary when connecting live discovery or AI providers.
 
-## Official Gemini references verified for this plan
+## Official provider references verified for this plan
 
-- Gemini API overview / Interactions API recommendation: https://ai.google.dev/gemini-api/docs
-- Latest models: https://ai.google.dev/gemini-api/docs/latest-model
+Gemini:
+
+- API overview / Interactions API: https://ai.google.dev/gemini-api/docs
 - Pricing/free-tier availability: https://ai.google.dev/gemini-api/docs/pricing
-- Rate-limit behavior: https://ai.google.dev/gemini-api/docs/rate-limits
-- API-key setup/security: https://ai.google.dev/gemini-api/docs/api-key
-- Interactions storage/retention: https://ai.google.dev/gemini-api/docs/interactions-overview
+- Rate limits: https://ai.google.dev/gemini-api/docs/rate-limits
 - Structured outputs: https://ai.google.dev/gemini-api/docs/structured-output
-- Free/unpaid-service data handling: https://ai.google.dev/gemini-api/terms
 
-Re-check these sources before implementing the Gemini adapter because models, free-tier availability, and quotas are mutable.
+Groq:
+
+- GPT-OSS 120B: https://console.groq.com/docs/model/openai/gpt-oss-120b
+- Structured Outputs: https://console.groq.com/docs/structured-outputs
+- Free-plan rate limits: https://console.groq.com/docs/rate-limits
+- Data handling: https://console.groq.com/docs/your-data
+
+OpenRouter:
+
+- Free Models Router: https://openrouter.ai/docs/guides/routing/routers/free-router
+- Structured Outputs: https://openrouter.ai/docs/guides/features/structured-outputs
+- Provider routing/privacy controls: https://openrouter.ai/docs/guides/routing/provider-selection
+- Provider logging/data retention: https://openrouter.ai/docs/guides/privacy/provider-logging/
+
+Brave:
+
+- Search API/pricing: https://brave.com/search/api/
+- API privacy notice: https://api-dashboard.search.brave.com/privacy-policy
+
+Tavily:
+
+- Rate limits: https://docs.tavily.com/documentation/rate-limits
+
+Re-check provider models, free quotas/credits, privacy controls, and API behavior immediately before implementing or materially changing an adapter because these are mutable external facts.

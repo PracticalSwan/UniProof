@@ -36,9 +36,18 @@ Store, when available:
 - **ROR:** canonical research-organization identities and identifiers.
 - **College Scorecard:** US institution-level public education/outcome data where applicable.
 - **Discover Uni:** UK course and outcome information where applicable.
-- **Tavily:** bounded source discovery and retrieval support, not an authority by itself.
+- **Tavily:** primary bounded general-web source discovery, not an authority by itself.
+- **Brave Search API:** independent-index fallback when Tavily is unavailable or its bounded quota/retries are exhausted; use search results to identify underlying publisher URLs rather than treating Brave as the evidence authority.
 
-Provider use must be re-checked against current documentation, API terms, licensing, and rate limits before implementation.
+Provider use must be re-checked against current documentation, API terms, licensing, privacy behavior, and rate limits before implementation. Discovery failover is sequential: Tavily -> Brave Search -> direct/structured providers -> explicit partial result when requested evidence remains uncovered. Search queries must contain public research context only, not applicant profile or sensitive personal data.
+
+## Evidence Independence and Authority
+
+Evidence authority is claim-specific. An official university page may directly verify a normative admissions, tuition, deadline, or program rule, while a university-originated self-reported outcome/marketing claim may remain `university-reported` until independently supported.
+
+`corroborated` requires materially equivalent support from at least two reliable sources with distinct owning organizations and independent underlying evidence. Mirrored pages, syndication, copied press releases, or two interfaces over the same originating dataset do not count as independent corroboration.
+
+Scope and period compatibility are prerequisites: evidence for another campus, program, degree level, intake, or academic year cannot verify the requested claim merely because the value looks similar.
 
 ## Conflict and Freshness Rules
 

@@ -21,6 +21,7 @@ The system shall:
 - Store and expose source links and evidence metadata for important factual claims.
 - Display missing, conflicting, outdated, anecdotal, and inferred information explicitly.
 - Provide direct official links for critical application information.
+- Use AI for structured claim extraction and semantic reconciliation of differently worded evidence while preserving exact supporting source references.
 
 ## Comparison Mode
 
@@ -64,6 +65,8 @@ The MVP shall not require passports, national IDs, transcripts, bank statements,
 ## Quality and Safety Requirements
 
 - Validate AI outputs against runtime schemas before persistence or display.
+- Keep deterministic evidence-policy gates authoritative over AI reconciliation so source class, freshness, conflicts, unknowns, and anecdotal evidence cannot be silently promoted by a model.
+- Degrade provider failures to explicit partial results where possible instead of making one search or AI vendor a single point of failure.
 - Treat external content as untrusted and prevent retrieved text from controlling agent behavior.
 - Prevent server-side retrieval from reaching localhost, private networks, metadata endpoints, or unsupported protocols.
 - Keep secrets server-side and exclude local environment files from version control.

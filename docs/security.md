@@ -4,7 +4,7 @@
 
 1. Browser to Next.js server actions/route handlers.
 2. Server to Supabase.
-3. Server to AI provider.
+3. Server to configured AI providers and their fallback endpoints.
 4. Server to search/retrieval providers and arbitrary approved public URLs.
 5. Retrieved external content to the claim-extraction model.
 6. Stored claims back to user-visible summaries and comparisons.
@@ -41,14 +41,17 @@ Server retrieval must use an explicit outbound policy:
 - Reject invented URLs and source attributions.
 - Preserve conflict and unknown states through the UI.
 - Keep bounded retries; malformed model output must not become persisted truth.
+- Treat AI semantic reconciliation as untrusted structured interpretation: deterministic source-authority/freshness/evidence gates make the final evidence-state decision.
+- Use sequential Gemini -> Groq -> OpenRouter Free failover; never fan out by default, silently relax privacy rules, or select a paid model automatically.
 
 ## Secrets and Privacy
 
 - Secrets belong in local environment variables or approved secret stores, never source files.
 - `NEXT_PUBLIC_` variables must contain only values safe for browser exposure.
-- Supabase service-role credentials and AI/search provider keys are server-only.
-- While UniProof uses the unpaid Gemini API tier, send only public-source research content and minimum non-sensitive research context to Gemini; do not send applicant profiles or sensitive/personal documents.
-- Use Gemini Interactions requests statelessly with `store: false`; this reduces Interaction state retention but does not change the unpaid-service data-use terms.
+- Supabase service-role credentials and all AI/search provider keys are server-only.
+- Send only public-source research content and minimum non-sensitive research context through Gemini, Groq, OpenRouter, Tavily, and Brave; do not send applicant profiles or sensitive/personal documents through the Phase 2 free-provider pipeline.
+- Use Gemini Interactions requests statelessly with `store: false`; use the strongest compatible Groq/OpenRouter data controls, including OpenRouter provider data-collection filtering, and fail closed if an eligible free endpoint cannot satisfy the configured privacy requirement.
+- The planned provider setup command must write secrets only to ignored local environment files, preserve existing values, and never echo/log keys.
 - Avoid logging applicant profile details unless operationally necessary; redact identifiers from errors.
 - Do not collect sensitive documents in the MVP.
 
@@ -70,6 +73,7 @@ When persistence/authentication is implemented, enable Supabase Row Level Securi
 - Rate-limit research endpoints.
 - Bound query length, source count, model tokens, and retries.
 - Cache reusable public research where freshness rules permit it.
-- Record provider failures without leaking request secrets or full private profile payloads; outbound DNS failures expose stable policy codes/messages rather than raw resolver error strings.
+- Record provider failures and fallback reasons without leaking request secrets or full prompt/source payloads; outbound DNS failures expose stable policy codes/messages rather than raw resolver error strings.
+- Bound both per-provider and total discovery/AI calls so fallback cannot multiply free-tier usage without limit.
 
 Run a focused `security-auditor` review before public deployment and run `secret-scanning` before any authorized commit/push.

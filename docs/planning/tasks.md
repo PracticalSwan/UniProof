@@ -81,15 +81,28 @@ Implement only after Phase 2B–2C passes its acceptance gate.
 
 ### Phase 2E — AI-assisted reconciliation with deterministic evidence gates
 
-- [ ] Evolve `VerifiedClaim` before gating so university identity is truthful ID-or-name (with optional program ID/name and intake), preserve Unicode-safe cross-record identity checks, and never fabricate IDs for name-only research.
-- [ ] Normalize university/program/degree/period/property/value identity deterministically before semantic grouping; the live contract has no trusted campus field, so campus-specific evidence remains scope-incompatible unless a deliberate tested campus contract is added.
-- [ ] Define strict portable semantic relationship output: equivalent, contradictory, period/scope differences, general-specific compatibility, conditional exception, broader/narrower compatibility, or insufficient evidence; only supplied candidate IDs may be referenced.
-- [ ] Use AI reconciliation only for genuinely semantic ambiguity; exact equivalence and provable period/scope differences remain deterministic, and AI equivalence cannot override identity/period incompatibility.
-- [ ] Implement deterministic source/scope/freshness/independence gates for verified, university-reported, corroborated, conflicting, outdated, anecdotal, inferred, and category-level unknown states with explicit precedence.
-- [ ] Ensure mirrors/shared datasets/same-origin evidence do not count as independent corroboration; unresolved independence fails closed, and current credible contradiction is not promoted away by majority count.
-- [ ] Represent a **processed** category with no eligible evidence through exact EvidenceSummary coverage/categoriesUnknown and zero claims; keep operational extraction/reconciliation exhaustion unprocessed/failed instead of calling it unknown.
-- [ ] Add optional evidence-bounded explanation with strict supplied-ID references and deterministic fallback; explanation failure cannot change a successful evidence decision.
-- [ ] Add deterministic gate tests for name-only identity, intake/scope separation, absent-campus behavior, source independence, verified/university-reported distinction, conflicts, stale/unknown/anecdotal/inferred states, AI exhaustion, rejected model proposals, and explanation fallback.
+- [x] Keep Phase 2E standalone/in-memory: consume validated candidates/sources/documents, the one resolved target, requested period context, and an explicit caller-supplied decision-eligible category set; do not rerun B–D stages or emit terminal Phase 2F lifecycle.
+- [x] Generalize the Phase 2D structured-AI transport from extraction-only to extraction/reconciliation/explanation stage telemetry and stage-neutral provider/total budgets while preserving the verified extraction API/24-request behavior; add 12 actual reconciliation attempts/run, 6 explanation attempts/run, 12 pair questions/request, and 144 ambiguous pair questions/run with fail-closed overflow.
+- [x] Evolve `VerifiedClaim` so university identity is truthful ID-or-name, optional program ID/name/intake survives, Phase 2E `candidateIds` mechanically backs exact source/document/supporting-text provenance, inherited uncalibrated confidence is removed, and claim-level `unknown` is rejected; never fabricate IDs for name-only research.
+- [x] Reuse the exact Phase 2B Unicode identity normalizer and build non-mutating conservative property/value/period comparison views; preserve scalar types, perform no exchange-rate/unsafe unit/numeric-string coercion, never infer missing periods, and do not use retrieval recency as claim validity.
+- [x] Define deterministic, bounded, deduplicated semantic pair questions and one strict portable relationship schema for equivalent/contradictory/period/scope/general-specific/conditional/broader-narrower/insufficient-evidence; only exact supplied question/candidate IDs may be referenced, valid siblings survive, and only unresolved pairs fail over.
+- [x] Use AI only for genuine semantic ambiguity; safe exact-equivalent evidence and structurally provable incompatible program/degree/period cases remain deterministic, same-looking differently worded passages with possible campus/modality/residency/cohort qualifiers do not bypass semantics, and AI equivalence cannot override hard identity/period/scope gates.
+- [x] Reconciliation uses Gemini Flash-Lite -> one Flash quality escalation only for schema/provenance-invalid output -> Groq -> OpenRouter Free; valid `insufficient-evidence` and availability failures do not quality-escalate, provider-local budget exhaustion fails over, stage-total exhaustion stops new reconciliation calls, and caller abort prevents retry/escalation/fallback.
+- [x] Implement deterministic authority/source/scope/freshness/independence gates with conservative source-type/category rules for verified, university-reported, corroborated, conflicting, outdated, anecdotal, inferred, and category-level unknown; unknown/unsupported properties never guess upward to verified.
+- [x] Ensure same content/source, same normalized publisher, multiple official pages for the resolved university, mirrors/shared datasets/syndication, and host-only differences do not manufacture independent corroboration; unresolved independence fails closed, and current credible contradiction produces separate conflicting value clusters without majority override.
+- [x] Every final factual value must correspond to a referenced candidate after allowed deterministic normalization; Phase 2E never synthesizes a new factual scalar, and inferred evidence remains candidate/source traceable.
+- [x] Only a caller-marked decision-eligible category may become processed category-level unknown with zero claims; operational extraction/reconciliation/question-overflow/provider exhaustion remains unresolved/unprocessed/failed for Phase 2F rather than unknown.
+- [x] Add optional evidence-bounded explanation after gating with strict category/claim references, no URLs or novel fact-like tokens, no Gemini quality escalation, six-attempt presentation budget, and deterministic fallback that cannot change evidence status/completion.
+- [x] Add the deterministic Phase 2E matrix for truthful identity/provenance, Unicode/UTF-16 boundaries, conservative normalization, pair batching/caps, relationship validation/partial fallback, stage budgets/telemetry/abort, authority/independence/conflict/freshness/unknown/anecdotal/inferred semantics, privacy, explanation rejection/fallback, and preservation of every Phase 2A–2D regression.
+- [x] Follow the Phase 2E final-review policy in the execution runbook: no implementation subagents; only the final looping read-only reviewer, GLM variant first, one-way fallback to GPT only after an explicit terminal GLM error/rate-limit, and never treat a still-running child as timed out merely because one wait window elapsed.
+
+
+
+
+
+
+
+
 
 ### Phase 2F — Orchestration and Phase 2 verification
 

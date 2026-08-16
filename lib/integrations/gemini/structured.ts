@@ -51,6 +51,7 @@ export async function runGeminiStructuredTask(
   const thinkingLevel = mode === "quality" ? "low" : "minimal";
   return runProviderTransport({
     provider: "gemini",
+    stage: input.stage ?? input.kind ?? "extraction",
     endpoint: GEMINI_INTERACTIONS_ENDPOINT,
     requestedModel: model,
     headers: {

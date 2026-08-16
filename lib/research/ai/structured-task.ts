@@ -13,11 +13,12 @@ import {
 } from "@/lib/security/research-limits";
 import { readBoundedJson } from "@/lib/integrations/read-bounded-response";
 import type {
-  ExtractionBudget,
+  StructuredAiBudget,
+  StructuredTaskKind,
   StructuredProviderOptions,
   StructuredProviderResult,
 } from "./types";
-import { assertValidExtractionBudget, createExtractionBudget } from "./types";
+import { assertValidAiBudget, createStructuredAiBudget } from "./types";
 
 type ProviderResponseParse =
   | { ok: true; payload: unknown; model?: string }
@@ -25,6 +26,7 @@ type ProviderResponseParse =
 
 export type ProviderTransportSpec = {
   provider: ResearchExtractionProvider;
+  stage?: StructuredTaskKind;
   endpoint: string;
   requestedModel: string;
   headers: Record<string, string>;
@@ -87,9 +89,10 @@ function attemptRecord(
   now: () => number,
   failureKind?: ResearchProviderAttemptFailureKind,
   model?: string,
+  stage: StructuredTaskKind = spec.stage ?? "extraction",
 ): ResearchProviderAttempt {
   return researchProviderAttemptSchema.parse({
-    stage: "extraction",
+    stage,
     provider: spec.provider,
     outcome,
     retryCount,
@@ -157,7 +160,7 @@ function defaultBackoffMs(retryCount: number): number {
 type AttemptReservation = "reserved" | "provider-budget" | "total-budget" | "aborted";
 
 function reserveAttempt(
-  budget: ExtractionBudget,
+  budget: StructuredAiBudget,
   provider: ResearchExtractionProvider,
   signal?: AbortSignal,
 ): AttemptReservation {
@@ -343,16 +346,18 @@ export async function runProviderTransport(
     now: inputOptions.now ?? Date.now,
     sleep: inputOptions.sleep ?? defaultSleep,
   };
-  const budget = options.budget ?? createExtractionBudget();
-  assertValidExtractionBudget(budget);
+  const stage = inputOptions.stage ?? inputOptions.kind ?? spec.stage ?? "extraction";
+  const budget = options.budget ?? createStructuredAiBudget(stage);
+  assertValidAiBudget(budget, stage);
   const attempts: ResearchProviderAttempt[] = [];
+  const stagedSpec = spec.stage === stage ? spec : { ...spec, stage };
 
   if (options.signal?.aborted) {
     return { ok: false, provider: spec.provider, failureKind: "upstream", attempts, aborted: true };
   }
   if (typeof options.apiKey !== "string" || options.apiKey.trim() === "") {
     attempts.push(researchProviderAttemptSchema.parse({
-      stage: "extraction",
+      stage,
       provider: spec.provider,
       model: spec.requestedModel,
       outcome: "skipped",
@@ -374,7 +379,7 @@ export async function runProviderTransport(
     }
     if (reservation !== "reserved") {
       attempts.push(researchProviderAttemptSchema.parse({
-        stage: "extraction",
+        stage,
         provider: spec.provider,
         model: spec.requestedModel,
         outcome: "skipped",
@@ -391,7 +396,7 @@ export async function runProviderTransport(
       };
     }
 
-    const dispatched = await dispatchOnce(spec, options, retryCount);
+    const dispatched = await dispatchOnce(stagedSpec, options, retryCount);
     attempts.push(dispatched.attempt);
     if (dispatched.outcome.kind === "aborted") {
       return { ok: false, provider: spec.provider, failureKind: "upstream", attempts, aborted: true };

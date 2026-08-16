@@ -42,6 +42,7 @@ export async function runOpenRouterStructuredTask(
   if (input.requireOpenRouterZdr === true) provider.zdr = true;
   return runProviderTransport({
     provider: "openrouter",
+    stage: input.stage ?? input.kind ?? "extraction",
     endpoint: OPENROUTER_STRUCTURED_ENDPOINT,
     requestedModel: OPENROUTER_FREE_MODEL,
     requireConcreteModel: true,
@@ -56,7 +57,7 @@ export async function runOpenRouterStructuredTask(
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "uniproof_extraction",
+          name: `uniproof_${input.stage ?? input.kind ?? "extraction"}`,
           strict: true,
           schema: input.schema,
         },

@@ -30,6 +30,7 @@ export async function runGroqStructuredTask(
 ): Promise<StructuredProviderResult> {
   return runProviderTransport({
     provider: "groq",
+    stage: input.stage ?? input.kind ?? "extraction",
     endpoint: GROQ_STRUCTURED_ENDPOINT,
     requestedModel: GROQ_STRUCTURED_MODEL,
     headers: {
@@ -43,7 +44,7 @@ export async function runGroqStructuredTask(
       response_format: {
         type: "json_schema",
         json_schema: {
-          name: "uniproof_extraction",
+          name: `uniproof_${input.stage ?? input.kind ?? "extraction"}`,
           strict: true,
           schema: input.schema,
         },

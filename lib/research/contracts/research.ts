@@ -19,6 +19,15 @@ import {
   RESEARCH_MAX_RESPONSE_BYTES,
   RESEARCH_MAX_SOURCES_PER_RUN,
 } from "@/lib/security/research-limits";
+import { normalizeResearchIdentity } from "@/lib/research/identity";
+import {
+  normalizeAcademicYear,
+  normalizeComparisonText,
+  normalizeCurrency,
+  normalizeEffectiveDate,
+  normalizeIntake,
+  normalizeUnit,
+} from "@/lib/research/reconciliation/normalize";
 
 const boundedId = z.string().trim().min(1).max(120);
 const boundedName = z.string().trim().min(1).max(200);
@@ -33,6 +42,58 @@ const boundedUnit = z.string().trim().min(1).max(40);
 const boundedAcademicYear = z.string().trim().min(1).max(40);
 const boundedIntake = z.string().trim().min(1).max(40);
 const boundedWarning = z.string().min(1).max(500);
+
+function sameIdentityValue(left: string | undefined, right: string | undefined): boolean {
+  if (left === undefined || right === undefined) return true;
+  const normalizedLeft = normalizeResearchIdentity(left);
+  const normalizedRight = normalizeResearchIdentity(right);
+  return normalizedLeft.length > 0 && normalizedLeft === normalizedRight;
+}
+
+function sameRequiredIdentityReference(
+  leftId: string | undefined,
+  leftName: string | undefined,
+  rightId: string | undefined,
+  rightName: string | undefined,
+): boolean {
+  if (leftId !== undefined && rightId !== undefined && leftId !== rightId) return false;
+  if (leftName !== undefined && rightName !== undefined && !sameIdentityValue(leftName, rightName)) return false;
+  return (leftId !== undefined && rightId !== undefined) || (leftName !== undefined && rightName !== undefined);
+}
+
+function sameOptionalIdentityReference(
+  leftId: string | undefined,
+  leftName: string | undefined,
+  rightId: string | undefined,
+  rightName: string | undefined,
+): boolean {
+  const leftPresent = leftId !== undefined || leftName !== undefined;
+  const rightPresent = rightId !== undefined || rightName !== undefined;
+  if (!leftPresent && !rightPresent) return true;
+  if (!leftPresent || !rightPresent) return false;
+  return sameRequiredIdentityReference(leftId, leftName, rightId, rightName);
+}
+
+function normalizedPropertyValue(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/gu, " ");
+}
+
+function sameTypedScalar(left: string | number | boolean, right: string | number | boolean): boolean {
+  if (typeof left !== typeof right) return false;
+  if (typeof left === "string" && typeof right === "string") {
+    return normalizeComparisonText(left) === normalizeComparisonText(right);
+  }
+  return left === right;
+}
+
+
+
+
 
 const researchHttpUrlSchema = z.url().refine((value) => {
   const parsed = new URL(value);
@@ -498,24 +559,52 @@ export const claimCandidateSchema = claimCandidateBaseSchema.superRefine(
   },
 );
 
-export const verifiedClaimSchema = claimSchema
-  .omit({ sourceId: true })
-  .extend({
+/**
+ * Final evidence claims are application-owned. Every final claim requires
+ * candidate-backed provenance; the result contract applies the complete
+ * cross-record identity, value, and provenance checks.
+ */
+export const verifiedClaimSchema = z
+  .object({
     id: boundedId,
-    universityId: boundedId,
-    programId: boundedId.nullable().optional(),
+    universityId: boundedId.optional(),
+    universityName: boundedName.optional(),
+    programId: boundedId.optional(),
+    programName: boundedName.optional(),
     category: researchCategorySchema,
     property: boundedClaimProperty,
     value: boundedClaimValue,
     unit: boundedUnit.optional(),
+    currency: z.string().trim().length(3).transform((value) => value.toUpperCase()).optional(),
     academicYear: boundedAcademicYear.optional(),
-    supportingText: boundedSupportingText,
+    effectiveDate: z.iso.date().optional(),
+    intake: boundedIntake.optional(),
     sourceId: boundedId.optional(),
+    supportingText: boundedSupportingText,
+    verificationStatus: evidenceStatusSchema.refine((value) => value !== "unknown", {
+      message: "claim-level unknown is a category outcome, not a final claim status",
+    }),
     sourceIds: z.array(boundedId).min(1).max(RESEARCH_MAX_SOURCES_PER_RUN),
     documentIds: z.array(boundedId).min(1).max(RESEARCH_MAX_SOURCES_PER_RUN),
+    candidateIds: z.array(boundedId).min(1).max(RESEARCH_MAX_CLAIMS_PER_RUN),
   })
   .strict()
   .superRefine((claim, context) => {
+    if (claim.universityId === undefined && claim.universityName === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "a university ID or name is required",
+        path: ["universityId"],
+      });
+    }
+    if (claim.programId !== undefined && claim.programName !== undefined &&
+      normalizeResearchIdentity(claim.programId) === "") {
+      context.addIssue({
+        code: "custom",
+        message: "program identity cannot be empty",
+        path: ["programId"],
+      });
+    }
     if (new Set(claim.sourceIds).size !== claim.sourceIds.length) {
       context.addIssue({
         code: "custom",
@@ -535,6 +624,36 @@ export const verifiedClaimSchema = claimSchema
         code: "custom",
         message: "sourceId must also appear in sourceIds",
         path: ["sourceId"],
+      });
+    }
+    if (JSON.stringify([...claim.sourceIds].sort()) !== JSON.stringify(claim.sourceIds)) {
+      context.addIssue({
+        code: "custom",
+        message: "verified claim source IDs must be deterministically ordered",
+        path: ["sourceIds"],
+      });
+    }
+    if (JSON.stringify([...claim.documentIds].sort()) !== JSON.stringify(claim.documentIds)) {
+      context.addIssue({
+        code: "custom",
+        message: "verified claim document IDs must be deterministically ordered",
+        path: ["documentIds"],
+      });
+    }
+    if (claim.candidateIds !== undefined && new Set(claim.candidateIds).size !== claim.candidateIds.length) {
+      context.addIssue({
+        code: "custom",
+        message: "verified claim candidate IDs must be unique",
+        path: ["candidateIds"],
+      });
+    }
+    const candidateIds = claim.candidateIds;
+    if (candidateIds !== undefined &&
+      candidateIds.some((candidateId, index) => index > 0 && candidateId < candidateIds[index - 1]!)) {
+      context.addIssue({
+        code: "custom",
+        message: "verified claim candidate IDs must be deterministically ordered",
+        path: ["candidateIds"],
       });
     }
   });
@@ -607,12 +726,26 @@ export const evidenceSummarySchema = z
         path: ["categoryCoverage"],
       });
     }
+    if (summary.statusCounts.unknown !== 0) {
+      context.addIssue({
+        code: "custom",
+        message: "final Phase 2E evidence summaries cannot count claim-level unknown status",
+        path: ["statusCounts", "unknown"],
+      });
+    }
     for (const [index, coverage] of summary.categoryCoverage.entries()) {
       if (coverage.claimCount === 0 && coverage.statuses.length > 0) {
         context.addIssue({
           code: "custom",
           message: "zero-claim category coverage cannot report claim statuses",
           path: ["categoryCoverage", index, "statuses"],
+        });
+      }
+      if (coverage.hasEvidence !== (coverage.claimCount > 0)) {
+        context.addIssue({
+          code: "custom",
+          message: "category coverage hasEvidence must equal claimCount > 0",
+          path: ["categoryCoverage", index, "hasEvidence"],
         });
       }
     }
@@ -624,6 +757,41 @@ export const evidenceSummarySchema = z
         message: "processed and unprocessed categories must be disjoint",
         path: ["categoriesUnprocessed"],
       });
+    }
+    const processed = new Set(summary.categoriesProcessed);
+    const unknown = new Set(summary.categoriesUnknown);
+    for (const category of summary.categoriesUnknown) {
+      if (!processed.has(category)) {
+        context.addIssue({
+          code: "custom",
+          message: "unknown categories must be processed categories",
+          path: ["categoriesUnknown"],
+        });
+      }
+      const matching = summary.categoryCoverage.filter((coverage) => coverage.category === category);
+      if (matching.length !== 1 || matching[0]?.claimCount !== 0 || matching[0]?.hasEvidence !== false || matching[0]?.statuses.length !== 0) {
+        context.addIssue({
+          code: "custom",
+          message: "unknown categories require one zero-claim coverage row",
+          path: ["categoryCoverage"],
+        });
+      }
+    }
+    for (const coverage of summary.categoryCoverage) {
+      if (processed.has(coverage.category) && coverage.claimCount === 0 && !unknown.has(coverage.category)) {
+        context.addIssue({
+          code: "custom",
+          message: "processed zero-claim categories must be reported as unknown",
+          path: ["categoriesUnknown"],
+        });
+      }
+      if (!processed.has(coverage.category)) {
+        context.addIssue({
+          code: "custom",
+          message: "category coverage cannot report an unprocessed category",
+          path: ["categoryCoverage"],
+        });
+      }
     }
   });
 
@@ -684,6 +852,7 @@ export const researchResultSchema = z
 
     const sourceIds = new Set(result.sources.map((source) => source.id));
     const documents = new Map(result.documents.map((document) => [document.id, document]));
+    const candidates = new Map(result.candidates.map((candidate) => [candidate.id, candidate]));
 
     for (const [index, document] of result.documents.entries()) {
       if (!sourceIds.has(document.sourceId)) {
@@ -703,7 +872,166 @@ export const researchResultSchema = z
       }
     }
 
+    const claimedCandidateIds = new Map<string, number>();
     for (const [index, claim] of result.claims.entries()) {
+      if (claim.candidateIds !== undefined) {
+        let hasSupportingValue = false;
+        for (const candidateId of claim.candidateIds) {
+          const candidate = candidates.get(candidateId);
+          if (candidate === undefined) {
+            context.addIssue({
+              code: "custom",
+              message: "claim candidateIds must reference result candidates",
+              path: ["claims", index, "candidateIds"],
+            });
+            continue;
+          }
+          const candidateProgramId = candidate.programId ?? undefined;
+          const supportsIdentity =
+            sameRequiredIdentityReference(
+              claim.universityId,
+              claim.universityName,
+              candidate.universityId,
+              candidate.universityName,
+            ) &&
+            sameOptionalIdentityReference(
+              claim.programId,
+              claim.programName,
+              candidateProgramId,
+              candidate.programName,
+            );
+          const supportsValue = supportsIdentity && candidate.category === claim.category &&
+            normalizedPropertyValue(candidate.property) === normalizedPropertyValue(claim.property) &&
+            sameTypedScalar(candidate.value, claim.value) &&
+            normalizeUnit(candidate.unit) === normalizeUnit(claim.unit) &&
+            normalizeCurrency(candidate.currency) === normalizeCurrency(claim.currency) &&
+            normalizeAcademicYear(candidate.academicYear) === normalizeAcademicYear(claim.academicYear) &&
+            normalizeIntake(candidate.intake) === normalizeIntake(claim.intake) &&
+            normalizeEffectiveDate(candidate.effectiveDate) === normalizeEffectiveDate(claim.effectiveDate);
+          if (supportsValue) {
+            hasSupportingValue = true;
+          } else {
+            context.addIssue({
+              code: "custom",
+              message: "every referenced candidate must mechanically support the final claim value",
+              path: ["claims", index, "candidateIds"],
+            });
+          }
+          const previous = claimedCandidateIds.get(candidateId);
+          if (previous !== undefined) {
+            context.addIssue({
+              code: "custom",
+              message: "one candidate may back at most one final factual claim",
+              path: ["claims", index, "candidateIds"],
+            });
+          } else {
+            claimedCandidateIds.set(candidateId, index);
+          }
+        }
+        if (!hasSupportingValue) {
+          context.addIssue({
+            code: "custom",
+            message: "final claim value must originate from a referenced candidate",
+            path: ["claims", index, "value"],
+          });
+        }
+        const sortedCandidateIds = [...claim.candidateIds].sort();
+        if (JSON.stringify(sortedCandidateIds) !== JSON.stringify(claim.candidateIds)) {
+          context.addIssue({
+            code: "custom",
+            message: "claim candidateIds must be deterministically ordered",
+            path: ["claims", index, "candidateIds"],
+          });
+        }
+        const derivedSourceIds = [...new Set(claim.candidateIds.map((candidateId) => candidates.get(candidateId)?.sourceId).filter((id): id is string => id !== undefined))].sort();
+        const derivedDocumentIds = [...new Set(claim.candidateIds.map((candidateId) => candidates.get(candidateId)?.documentId).filter((id): id is string => id !== undefined))].sort();
+        if (JSON.stringify(derivedSourceIds) !== JSON.stringify([...claim.sourceIds].sort())) {
+          context.addIssue({
+            code: "custom",
+            message: "claim sourceIds must equal candidate-derived provenance",
+            path: ["claims", index, "sourceIds"],
+          });
+        }
+        if (JSON.stringify([...claim.sourceIds].sort()) !== JSON.stringify(claim.sourceIds)) {
+          context.addIssue({
+            code: "custom",
+            message: "claim sourceIds must be deterministically ordered",
+            path: ["claims", index, "sourceIds"],
+          });
+        }
+        if (JSON.stringify(derivedDocumentIds) !== JSON.stringify([...claim.documentIds].sort())) {
+          context.addIssue({
+            code: "custom",
+            message: "claim documentIds must equal candidate-derived provenance",
+            path: ["claims", index, "documentIds"],
+          });
+        }
+        if (JSON.stringify([...claim.documentIds].sort()) !== JSON.stringify(claim.documentIds)) {
+          context.addIssue({
+            code: "custom",
+            message: "claim documentIds must be deterministically ordered",
+            path: ["claims", index, "documentIds"],
+          });
+        }
+        const representative = claim.candidateIds
+          .map((candidateId) => candidates.get(candidateId))
+          .find((candidate): candidate is NonNullable<typeof candidate> => candidate !== undefined &&
+            (claim.sourceId === undefined || candidate.sourceId === claim.sourceId) &&
+            candidate.supportingText === claim.supportingText);
+        if (representative === undefined) {
+          context.addIssue({
+            code: "custom",
+            message: "claim supporting provenance must match a referenced candidate",
+            path: ["claims", index, "supportingText"],
+          });
+        }
+        const candidateNames = claim.candidateIds
+          .map((candidateId) => candidates.get(candidateId)?.universityName)
+          .filter((name): name is string => name !== undefined);
+        for (const candidateName of candidateNames) {
+          if (!sameIdentityValue(claim.universityName, candidateName)) {
+            context.addIssue({
+              code: "custom",
+              message: "claim university identity must match every referenced candidate",
+              path: ["claims", index, "universityName"],
+            });
+            break;
+          }
+        }
+        const candidateUniversityIds = claim.candidateIds
+          .map((candidateId) => candidates.get(candidateId)?.universityId)
+          .filter((id): id is string => id !== undefined);
+        if (claim.universityId !== undefined && candidateUniversityIds.some((id) => id !== claim.universityId)) {
+          context.addIssue({
+            code: "custom",
+            message: "claim university ID must match every referenced candidate",
+            path: ["claims", index, "universityId"],
+          });
+        }
+        const candidateProgramIds = claim.candidateIds
+          .map((candidateId) => candidates.get(candidateId)?.programId)
+          .filter((id): id is string => id !== undefined && id !== null);
+        if (claim.programId !== undefined && candidateProgramIds.some((id) => id !== claim.programId)) {
+          context.addIssue({
+            code: "custom",
+            message: "claim program ID must match every referenced candidate",
+            path: ["claims", index, "programId"],
+          });
+        }
+        const candidateProgramNames = claim.candidateIds
+          .map((candidateId) => candidates.get(candidateId)?.programName)
+          .filter((name): name is string => name !== undefined);
+        for (const candidateProgramName of candidateProgramNames) {
+          if (!sameIdentityValue(claim.programName, candidateProgramName)) {
+            context.addIssue({
+              code: "custom",
+              message: "claim program identity must match every referenced candidate",
+              path: ["claims", index, "programName"],
+            });
+            break;
+          }
+        }
+      }
       const claimDocumentSourceIds = new Set<string>();
       for (const sourceId of claim.sourceIds) {
         if (!sourceIds.has(sourceId)) {
@@ -813,6 +1141,42 @@ export const researchResultSchema = z
         context.addIssue({
           code: "custom",
           message: "every verified-claim category must have a category coverage entry",
+          path: ["evidenceSummary", "categoryCoverage"],
+        });
+      }
+    }
+
+    const processedCategories = new Set(result.evidenceSummary.categoriesProcessed);
+    const unknownCategories = new Set(result.evidenceSummary.categoriesUnknown);
+    for (const category of unknownCategories) {
+      if (!processedCategories.has(category)) {
+        context.addIssue({
+          code: "custom",
+          message: "categoriesUnknown must be a subset of processed categories",
+          path: ["evidenceSummary", "categoriesUnknown"],
+        });
+      }
+      if (result.claims.some((claim) => claim.category === category)) {
+        context.addIssue({
+          code: "custom",
+          message: "an unknown category cannot contain a final claim",
+          path: ["evidenceSummary", "categoriesUnknown"],
+        });
+      }
+      const coverage = result.evidenceSummary.categoryCoverage.filter((row) => row.category === category);
+      if (coverage.length !== 1 || coverage[0]?.claimCount !== 0 || coverage[0]?.hasEvidence !== false || coverage[0]?.statuses.length !== 0) {
+        context.addIssue({
+          code: "custom",
+          message: "unknown categories require exactly one zero-claim coverage row",
+          path: ["evidenceSummary", "categoryCoverage"],
+        });
+      }
+    }
+    for (const category of processedCategories) {
+      if (!coveredCategories.has(category)) {
+        context.addIssue({
+          code: "custom",
+          message: "every processed category requires one coverage row",
           path: ["evidenceSummary", "categoryCoverage"],
         });
       }

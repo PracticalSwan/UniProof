@@ -5,7 +5,11 @@ import type {
   ResearchProviderAttempt,
   ResearchProviderAttemptFailureKind,
 } from "@/lib/research/contracts";
-import { RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN } from "@/lib/security/research-limits";
+import {
+  RESEARCH_MAX_EXPLANATION_HTTP_ATTEMPTS_PER_RUN,
+  RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN,
+  RESEARCH_MAX_RECONCILIATION_HTTP_ATTEMPTS_PER_RUN,
+} from "@/lib/security/research-limits";
 
 /** A deliberately small JSON-Schema value type shared by the provider adapters. */
 export type JsonSchemaValue =
@@ -18,7 +22,9 @@ export type JsonSchemaValue =
 
 export type JsonSchemaObject = { [key: string]: JsonSchemaValue };
 
-export type StructuredTaskKind = "extraction";
+export type StructuredTaskKind = "extraction" | "reconciliation" | "explanation";
+
+export const structuredTaskKinds = ["extraction", "reconciliation", "explanation"] as const satisfies readonly StructuredTaskKind[];
 
 export type StructuredTaskSegment = {
   id: string;
@@ -36,24 +42,44 @@ export type StructuredTaskTargetContext = {
   degreeLevel?: "bachelor" | "master";
 };
 
-const extractionProviders = ["gemini", "groq", "openrouter"] as const satisfies readonly ResearchExtractionProvider[];
+export const structuredTaskProviders = ["gemini", "groq", "openrouter"] as const satisfies readonly ResearchExtractionProvider[];
 
 type ProviderBudgetMap = Record<ResearchExtractionProvider, number>;
 
-export type ExtractionBudget = {
+export type StructuredAiBudget = {
+  /** The stage whose server-owned ceiling this mutable counter represents. Omitted only for legacy extraction callers. */
+  readonly stage?: StructuredTaskKind;
   readonly limit: number;
   used: number;
   readonly providerLimits: ProviderBudgetMap;
   providerUsed: ProviderBudgetMap;
 };
 
-export function assertValidExtractionBudget(budget: ExtractionBudget): void {
+/** Compatibility type retained for Phase 2D callers. */
+export type ExtractionBudget = StructuredAiBudget & { readonly stage?: "extraction" };
+
+function stageLimit(stage: StructuredTaskKind): number {
+  if (stage === "reconciliation") return RESEARCH_MAX_RECONCILIATION_HTTP_ATTEMPTS_PER_RUN;
+  if (stage === "explanation") return RESEARCH_MAX_EXPLANATION_HTTP_ATTEMPTS_PER_RUN;
+  return RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN;
+}
+
+function invalidBudget(stage: StructuredTaskKind): never {
+  throw new Error(`invalid ${stage} attempt budget`);
+}
+
+export function assertValidAiBudget(
+  budget: StructuredAiBudget,
+  expectedStage: StructuredTaskKind = budget?.stage ?? "extraction",
+): asserts budget is StructuredAiBudget {
+  if (!structuredTaskKinds.includes(expectedStage)) invalidBudget(expectedStage);
   if (
     budget === null ||
     typeof budget !== "object" ||
+    (budget.stage !== expectedStage && !(expectedStage === "extraction" && budget.stage === undefined)) ||
     !Number.isSafeInteger(budget.limit) ||
     budget.limit < 0 ||
-    budget.limit > RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN ||
+    budget.limit > stageLimit(expectedStage) ||
     !Number.isSafeInteger(budget.used) ||
     budget.used < 0 ||
     budget.used > budget.limit ||
@@ -62,10 +88,10 @@ export function assertValidExtractionBudget(budget: ExtractionBudget): void {
     budget.providerUsed === null ||
     typeof budget.providerUsed !== "object"
   ) {
-    throw new Error("invalid extraction attempt budget");
+    invalidBudget(expectedStage);
   }
 
-  for (const provider of extractionProviders) {
+  for (const provider of structuredTaskProviders) {
     const providerLimit = budget.providerLimits[provider];
     const providerUsed = budget.providerUsed[provider];
     if (
@@ -76,29 +102,67 @@ export function assertValidExtractionBudget(budget: ExtractionBudget): void {
       providerUsed < 0 ||
       providerUsed > providerLimit
     ) {
-      throw new Error("invalid extraction attempt budget");
+      invalidBudget(expectedStage);
     }
   }
+}
+
+export function assertValidExtractionBudget(budget: ExtractionBudget): void {
+  try {
+    assertValidAiBudget(budget, "extraction");
+  } catch {
+    // Preserve the exact Phase 2D error contract.
+    throw new Error("invalid extraction attempt budget");
+  }
+}
+
+export function createStructuredAiBudget(
+  stage: StructuredTaskKind,
+  limit = stageLimit(stage),
+  providerLimits: Partial<Record<ResearchExtractionProvider, number>> = {},
+): StructuredAiBudget {
+  const budget: StructuredAiBudget = {
+    stage,
+    limit,
+    used: 0,
+    providerLimits: {
+      gemini: providerLimits.gemini ?? limit,
+      groq: providerLimits.groq ?? limit,
+      openrouter: providerLimits.openrouter ?? limit,
+    },
+    providerUsed: { gemini: 0, groq: 0, openrouter: 0 },
+  };
+  assertValidAiBudget(budget, stage);
+  return budget;
 }
 
 export function createExtractionBudget(
   limit = RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN,
   providerLimits: Partial<Record<ResearchExtractionProvider, number>> = {},
 ): ExtractionBudget {
-  const resolvedProviderLimits: ProviderBudgetMap = {
-    gemini: providerLimits.gemini ?? limit,
-    groq: providerLimits.groq ?? limit,
-    openrouter: providerLimits.openrouter ?? limit,
-  };
-  const budget: ExtractionBudget = {
-    limit,
-    used: 0,
-    providerLimits: resolvedProviderLimits,
-    providerUsed: { gemini: 0, groq: 0, openrouter: 0 },
-  };
-  assertValidExtractionBudget(budget);
-  return budget;
+  try {
+    return createStructuredAiBudget("extraction", limit, providerLimits) as ExtractionBudget;
+  } catch {
+    throw new Error("invalid extraction attempt budget");
+  }
 }
+
+export function createReconciliationBudget(
+  limit = RESEARCH_MAX_RECONCILIATION_HTTP_ATTEMPTS_PER_RUN,
+  providerLimits: Partial<Record<ResearchExtractionProvider, number>> = {},
+): StructuredAiBudget {
+  return createStructuredAiBudget("reconciliation", limit, providerLimits);
+}
+
+export function createExplanationBudget(
+  limit = RESEARCH_MAX_EXPLANATION_HTTP_ATTEMPTS_PER_RUN,
+  providerLimits: Partial<Record<ResearchExtractionProvider, number>> = {},
+): StructuredAiBudget {
+  return createStructuredAiBudget("explanation", limit, providerLimits);
+}
+
+export const createAiBudget = createStructuredAiBudget;
+export const createStageBudget = createStructuredAiBudget;
 
 export type StructuredTaskRequest = {
   kind: StructuredTaskKind;
@@ -110,11 +174,14 @@ export type StructuredTaskRequest = {
 };
 
 export type StructuredAdapterInput = {
+  /** `kind` is the preferred name; `stage` is a compatibility alias. */
+  kind?: StructuredTaskKind;
+  stage?: StructuredTaskKind;
   prompt: string;
   schema: JsonSchemaObject;
   apiKey?: string;
   signal?: AbortSignal;
-  budget?: ExtractionBudget;
+  budget?: StructuredAiBudget;
   fetchImpl?: typeof fetch;
   now?: () => number;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -122,9 +189,11 @@ export type StructuredAdapterInput = {
 };
 
 export type StructuredProviderOptions = {
+  kind?: StructuredTaskKind;
+  stage?: StructuredTaskKind;
   apiKey?: string;
   signal?: AbortSignal;
-  budget?: ExtractionBudget;
+  budget?: StructuredAiBudget;
   fetchImpl?: typeof fetch;
   now?: () => number;
   sleep?: (milliseconds: number) => Promise<void>;

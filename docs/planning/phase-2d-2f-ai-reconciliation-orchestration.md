@@ -1,6 +1,6 @@
 # Phase 2D–2F Execution Runbook — AI Extraction, Reconciliation, and Orchestration
 
-Status: Phase 2D implemented and verified. Deterministic automated coverage remains offline; on 2026-08-16 one explicitly authorized live smoke request succeeded for each configured Tavily, Brave, Gemini, Groq, and OpenRouter connection. Phase 2E–2F remain planned.
+Status: Phase 2D and Phase 2E implemented and verified. Deterministic automated coverage remains offline; on 2026-08-16 one explicitly authorized live smoke request succeeded for each configured Tavily, Brave, Gemini, Groq, and OpenRouter connection. Phase 2F remains planned.
 
 Parent architecture: `docs/planning/phase-2-evidence-research-pipeline.md`.
 
@@ -26,25 +26,27 @@ All Phase 2D–2F schemas, extraction paths, reconciliation groups, evidence gat
 
 ## Live baseline and mandatory contract alignment
 
-The current `main` baseline already implements Phase 2A–2C. Treat these facts as source-of-truth inputs for the remaining phases:
+The current `main` baseline implements Phase 2A–2D. Treat these facts as source-of-truth inputs for the remaining phases:
 
 - discovery has explicit Unicode-safe target resolution, Tavily -> Brave -> direct/ROR sequential fallback, and a built-in credential-free ROR degraded path;
 - canonical-URL deduplication preserves stronger source provenance and discovery coverage independently of candidate deduplication;
 - safe retrieval is DNS-pinned per hop, rejects redirect downgrade/private targets, bounds streamed bytes/time/MIME/encoding, and exposes only allowlisted response headers;
 - normalized HTML/plain-text documents are the only model-ready content; PDF transport without a normalizer is an explicit failure and never produces a fake document;
 - `runDiscoveryRetrieval()` intentionally stops before AI, returns no claims, leaves requested categories operationally unprocessed, and may already record discovery/retrieval failures in `EvidenceSummary.categoriesFailed`;
-- active provider contracts contain Tavily, Brave, ROR, direct, Gemini, Groq, and OpenRouter only. OpenAlex is not an active provider.
+- active provider contracts contain Tavily, Brave, ROR, direct, Gemini, Groq, and OpenRouter only. OpenAlex is not an active provider;
+- Phase 2D already enforces UTF-16-compatible generated ID/model-provenance bounds, provider-specific plus total extraction attempt budgets, provider-local budget fallback versus total-budget termination, non-blocking best-effort rejected-body cancellation, and once-per-run configuration-skip telemetry;
+- the Phase 2D structured AI transport has been generalized for Phase 2E: `StructuredTaskKind` supports extraction/reconciliation/explanation, attempt records carry the actual stage, and compatibility extraction budget wrappers preserve the verified Phase 2D extraction behavior.
 
-Before Phase 2D implementation, add only the contract changes required by the live remaining pipeline:
+The following Phase 2D contract changes are already implemented and must remain compatible while Phase 2E evolves the next boundary:
 
 1. Extend `researchProviderAttemptSchema` with an optional bounded `model` string so AI attempts can record model provenance safely. On a successful AI attempt, prefer the concrete model identifier returned by the provider and require it for OpenRouter because `openrouter/free` is only a router ID. On an attempt that fails before a concrete route/model is known, `model` may contain the server-owned requested model/router ID. Do not add separate requested-model fields, prompts, completions, raw errors, API keys, or arbitrary metadata to attempt telemetry in Phase 2D.
 2. Add bounded optional `intake` to `ClaimCandidate` now because the request already carries intake and later period-aware reconciliation requires it. Provider-facing nullable `intake` is converted to application-owned `undefined` when absent.
 3. Add bounded optional `extractionProvider` to `ClaimCandidate` so promoted model output retains the actual trusted provider alongside `extractionModel`; the provider-facing payload still cannot supply either field.
-4. Do not change `VerifiedClaim` identity semantics in Phase 2D. Phase 2E must resolve the existing mismatch that `ClaimCandidate` supports university-name-only research while `VerifiedClaim` currently requires `universityId`: evolve `VerifiedClaim` to accept a bounded `universityName` alternative and optional `programName` when no application-owned IDs exist, with strict at-least-one identity rules and cross-record regressions. Never fabricate stable IDs from names just to satisfy the current schema.
+4. Phase 2D intentionally did not change `VerifiedClaim` identity semantics. Phase 2E must resolve the existing mismatch that `ClaimCandidate` supports university-name-only research while `VerifiedClaim` currently requires `universityId`. Phase 2E also owns candidate-level provenance for final claims; source/document IDs alone are insufficient to prove which extracted candidate(s) support a reconciled value.
 5. Do not raise the global provider-attempt ceiling speculatively in Phase 2D. Phase 2F must calculate the complete discovery + extraction + reconciliation + explanation worst-case under the actual operational budgets and then raise the bound only if the full orchestrator requires it, with a regression.
 6. Preserve `ResearchRun.discoveryProvider` and `extractionModel` only as compatibility summaries. Ordered `providerAttempts` is the execution-history source of truth.
 
-Phase 2D is the implemented extraction batch. Do not implement Phase 2E or Phase 2F runtime behavior in this batch; their contracts remain documented here so Phase 2D does not paint them into an incompatible corner.
+Phase 2D is the implemented extraction baseline and Phase 2E is now implemented as a standalone in-memory reconciliation/evidence-gate stage. Phase 2F runtime orchestration, persistence, Research UI wiring, and deployment remain outside this batch.
 
 ## Required module ownership
 
@@ -62,6 +64,7 @@ lib/research/reconciliation/types.ts
 lib/research/reconciliation/schema.ts
 lib/research/reconciliation/normalize.ts
 lib/research/reconciliation/semantic.ts
+lib/research/reconciliation/orchestrator.ts
 lib/research/verification/evidence-policy.ts
 lib/research/verification/explanation.ts
 lib/research/orchestration/run-research.ts
@@ -251,13 +254,41 @@ At minimum prove all of these with deterministic mocked HTTP/provider behavior; 
 28. `.env.example` contains placeholders only, all AI keys remain server-only, and no provider key appears in `NEXT_PUBLIC_*`, client code, fixtures, snapshots, build output, or committed documentation;
 29. all pre-existing Phase 2A–2C tests remain green after the additive provider-attempt/intake contract changes.
 
+## Phase 2E.0 — Stage boundary and bounded AI reuse
+
+Implementation status: complete and independently re-reviewed against the live contracts. `tests/phase2e-reconciliation.test.ts` now covers the implementation plus post-implementation regressions for mandatory candidate provenance, stable ID/name enrichment, conservative missing/future/opaque-period handling, bounded overflow diagnostics, truthful invalid-response telemetry, UTF-16-safe explanation fallback, source-authority/independence precedence, stage-total budget termination, canonical question IDs, and the public-only injected semantic seam. The stage remains in-memory and does not emit Phase 2F lifecycle state.
+
+Phase 2E is a standalone in-memory stage. It consumes already validated `ClaimCandidate[]`, `ResearchSource[]`, `ResearchDocument[]`, the one application-owned `ResolvedResearchTarget`, requested period context, and an explicit caller-supplied set of categories that are **operationally eligible for an evidence decision**. It does not rerun discovery/retrieval/extraction and it does not emit the terminal Phase 2F `ResearchResult` lifecycle. This eligibility input is mandatory so Phase 2E cannot turn an extraction/retrieval gap into category-level `unknown` merely because no candidate reached it.
+
+Generalize the existing Phase 2D AI boundary narrowly rather than cloning provider transports:
+
+1. extend `StructuredTaskKind` to `"extraction" | "reconciliation" | "explanation"` and make the transport/attempt builder receive the stage explicitly instead of hard-coding `stage="extraction"`;
+2. generalize the attempt-budget implementation to a stage-neutral AI budget with provider-specific plus total counters, while retaining compatibility wrappers/types for the already-tested extraction API so Phase 2D callers and tests do not need a broad rewrite. Remove or replace the currently misleading unused `RESEARCH_MAX_AI_HTTP_ATTEMPTS_PER_RUN = 24` alias so no generic-looking constant implies that extraction's 24-attempt ceiling also governs reconciliation/explanation;
+3. keep the Phase 2D extraction ceiling exactly 24 actual HTTP attempts per run;
+4. add a server-owned reconciliation ceiling of **12 actual AI HTTP attempts per run**, a server-owned explanation ceiling of **6 actual AI HTTP attempts per run**, provider-specific ceilings defaulting to each stage total, one active AI HTTP request at a time, and the same one-transient-retry/bounded `Retry-After` rules already proved in Phase 2D;
+5. batch at most **12 semantic pair questions per reconciliation request** and create at most **144 semantic pair questions per Phase 2E run**. If deterministic reduction still leaves more than 144 genuinely ambiguous pair questions, do not truncate and pretend completion: preserve resolved work, leave the overflow unresolved, and make every affected category operationally ineligible/incomplete for the final evidence decision;
+6. configuration skips are recorded once per provider **per stage/run**, not once per question/batch; provider-local reconciliation/explanation budget exhaustion may fail over to the next provider, while that stage's total budget exhaustion stops new calls for that stage;
+7. reconciliation failure may block an affected category from reaching an evidence decision; explanation failure never does. Explanation always has a deterministic fallback.
+
+The 12/6 limits are product-owned safety/cost bounds, not claims about mutable vendor free-tier quotas. Phase 2F still owns the integrated discovery + extraction + reconciliation + explanation `providerAttempts` ceiling calculation.
+
+Do not consume live provider quota to accept Phase 2E. Default tests use injected/mocked adapters. The previously authorized one-pass live provider smoke is sufficient unless the user separately authorizes another live call.
+
+The Phase 2E coordinator should expose one project-owned stage result rather than leaking provider wire types. At minimum it returns: final `claims`; validated semantic `relationships` tagged application-side as `deterministic` or `model`; `unresolvedQuestionIds`; `completedCategories` that actually reached an evidence decision; `incompleteCategories` that were decision-eligible but could not finish reconciliation; ordered `providerAttempts`; sanitized `failures`/`warnings`; optional validated/fallback `explanations`; and reconciliation/explanation budget usage. `completedCategories` and `incompleteCategories` are unique/disjoint subsets of the explicit decision-eligible input. Categories outside that input are not silently claimed as completed or unknown. Phase 2F later maps these stage diagnostics into run lifecycle and `EvidenceSummary`.
+
 ## Phase 2E.1 — Claim identity contract and deterministic normalization key
 
-Before Phase 2E emits any `VerifiedClaim`, evolve the live contract so it can truthfully represent the same university/program identities accepted by Phase 2B/2D. `VerifiedClaim` must accept bounded `universityId` and/or bounded `universityName`, with at least one required; `programId` and `programName` remain optional scope identifiers and must be cross-checked when both are present. Add bounded optional `intake` to `VerifiedClaim` so period semantics survive the gate. Never hash, slugify, or otherwise fabricate an application-owned university/program ID from a name just to satisfy a schema.
+Before Phase 2E emits any `VerifiedClaim`, evolve the live contract so it can truthfully represent the same university/program identities accepted by Phase 2B/2D. `VerifiedClaim` must accept bounded `universityId` and/or bounded `universityName`, with at least one required; `programId` and `programName` are optional non-null scope identifiers and must be cross-checked when both are present. Add bounded optional `intake` so period semantics survive the gate. Never hash, slugify, or otherwise fabricate an application-owned university/program ID from a name just to satisfy a schema.
 
-Update `ResearchResult` cross-record validation so a verified claim with IDs must match application-owned identity where available, while a name-only claim remains valid only when its normalized identity is consistent with the promoted candidates/resolved target. Keep Unicode-safe normalization consistent with the Phase 2B identity rules.
+The Phase 2E gate and `verifiedClaimSchema` require a unique `candidateIds` provenance array on every final claim, bounded to **1–`RESEARCH_MAX_CLAIMS_PER_RUN` IDs**. Legacy fixtures that model a final `VerifiedClaim` must therefore provide candidate provenance too. Because the complete run already bounds candidate count, do not add a smaller arbitrary provenance cap that could silently drop decision evidence. A final Phase 2E claim must reference at least one existing candidate, and one candidate ID may belong to at most one final factual claim. Its `sourceIds` and `documentIds` must equal the unique source/document sets derived from those referenced candidates rather than being arbitrary supersets, and its compatibility `sourceId`/representative `supportingText` must correspond to one of those referenced candidates. This makes corroboration/conflict provenance mechanically traceable and keeps total candidate references bounded by the run's candidate ceiling. Keep competing values as separate final claims when a conflict remains; do not attach a contradictory candidate to the provenance list of the opposite value merely to show that a conflict existed.
 
-Before semantic reconciliation, group only claims eligible for comparison. The deterministic comparison key includes:
+Remove inherited final-claim `confidence` from this research boundary; extraction confidence is not calibrated evidence confidence. Keep the evidence-status vocabulary unchanged, but Phase 2E must never emit a claim-level `verificationStatus="unknown"`: processed no-evidence is category-level summary state with zero claims. Strengthen `ResearchResult` cross-record validation accordingly: claim-level `unknown` is rejected; `statusCounts.unknown` is therefore zero; `categoriesUnknown` is a subset of processed categories; every unknown category has exactly one coverage row with `claimCount=0`, `hasEvidence=false`, and `statuses=[]`; no unknown category has a final claim; and for every coverage row `hasEvidence` is exactly `claimCount > 0`. A processed zero-claim category is unknown, while an unprocessed/failed category cannot be unknown. Add contract/result regressions for all of these cases so a fabricated unknown-valued/unknown-status final claim cannot satisfy the Phase 2E/Phase 2F output boundary.
+
+Update `ResearchResult` cross-record validation so a verified claim with IDs must match application-owned identity where available, while a name-only claim remains valid only when its normalized identity is consistent with every referenced candidate. Keep Unicode-safe identity comparison consistent with the implemented Phase 2B rule: NFKC, `toLocaleLowerCase("en-US")`, non-letter/non-number collapse, trim, and whitespace collapse. Do not duplicate a subtly different identity normalizer; export/reuse the application-owned helper or move it to a neutral identity module without changing Phase 2B behavior.
+
+Make reconciliation artifacts deterministic and permutation-stable. Generate `questionId` and final claim IDs application-side from SHA-256 hashes of canonical comparison/provenance keys using bounded hash-only forms such as `question-${digest32}` and `claim-${digest32}`. Sort candidate IDs, source IDs, document IDs, question batches, relationship records, and final claims by stable canonical keys before returning them. Reordering semantically identical input candidates must not change IDs, grouping, evidence states, or output ordering; ordered provider-attempt telemetry remains the exception because it represents actual execution order.
+
+Before semantic reconciliation, build a non-mutating normalized comparison view; never rewrite candidate evidence strings or IDs in place. Group only claims eligible for comparison. The deterministic comparison key includes:
 
 - normalized university identity (stable ID when available, otherwise Unicode-normalized trusted name);
 - optional program identity (stable ID when available, otherwise normalized program name);
@@ -267,14 +298,29 @@ Before semantic reconciliation, group only claims eligible for comparison. The d
 
 The live claim contracts do **not** currently contain a trusted campus field. Do not pretend the pipeline is campus-aware by stuffing campus names into property strings or IDs. If supporting evidence is visibly campus-specific and no trusted campus scope exists, classify it as different/insufficient scope and prevent it from verifying another scope. Add a first-class campus field only through a deliberate contract change with regressions if a later MVP requirement truly needs campus-scoped claims.
 
-Do not merge different programs, degree levels, periods, or known incompatible scopes merely because values look alike. Normalize exact representations in code: dates, booleans, known categorical values, currencies/units without exchange-rate invention, whitespace/case where semantics permit it, canonical source/document identity, and exact duplicate values.
+Do not merge different programs, degree levels, periods, or known incompatible scopes merely because values look alike. Normalize exact representations in code with conservative rules:
 
-Freshness is category/scope/period-aware. Do not invent one global "stale after N days" rule. When currentness cannot be determined truthfully from effective/academic/intake context, retain the evidence without fabricating a freshness date and let the gate classify only what the available period evidence supports.
+- identities use the shared Phase 2B identity normalizer;
+- property comparison keys use NFKC plus stable case/whitespace/punctuation normalization while preserving the original property for output;
+- booleans remain booleans and finite numbers remain numbers; do not coerce arbitrary numeric-looking strings into numbers;
+- currencies uppercase to the existing three-letter code and may compare only like-for-like; never perform exchange-rate conversion;
+- units may use a small explicit alias table only when the unit is semantically identical (`month`/`months`, etc.); do not perform dimensional conversion unless an exact project-owned conversion is explicitly added and tested;
+- academic-year/intake normalization accepts only unambiguous recognized forms and otherwise preserves a normalized opaque token; never infer a missing year/intake from the current date;
+- ISO effective dates compare as dates only after successful parsing; unknown/missing dates remain unknown rather than receiving fabricated currentness;
+- typed value equality includes the scalar type so string `"0"`, number `0`, and boolean `false` never collapse together.
+
+An exact-equivalence bypass is allowed only when identity/property/value/period/scope keys match **and** the supporting passages are equivalent under minimal NFKC/whitespace normalization. If differently worded passages could hide an unmodeled qualifier such as campus, modality, residency, cohort, exception, or conditional scope, route that pair to semantic reconciliation even when the scalar values happen to match. This prevents same-looking values from silently crossing an unmodeled scope.
+
+Freshness is category/scope/period-aware. Do not invent one global "stale after N days" rule. `retrievedAt` proves when UniProof observed a page, not the period for which its claim is valid. When the request specifies academic year/intake/effective-period context, evidence lacking a compatible period cannot satisfy that requested period merely because it was retrieved recently; if all otherwise relevant evidence lacks the required period, the category may become category-level unknown only after operational work completed. Emit `outdated` only when the available period evidence is explicitly older/inapplicable to the requested period; unknown freshness is not the same as outdated. When the request itself is period-unconstrained, an undated currently retrieved official page is not automatically stale or excluded, but the final claim must not invent an academic year/intake/effective date that the evidence did not provide.
 ## Phase 2E.2 — Semantic reconciliation schema
 
-AI receives only the candidate claims and exact supporting passages already accepted for one deterministic comparison group. It never receives unrelated documents or candidates merely for additional context.
+AI receives only the candidate claims and exact supporting passages already accepted for one deterministic comparison group. It never receives unrelated documents or candidates merely for additional context. Treat every candidate property/value/supporting passage as untrusted quoted data: delimit it explicitly, instruct the model never to follow commands embedded in evidence text, and never interpolate evidence into system/developer-like instruction positions.
 
-Use the same project-owned structured-task/provider chain from Phase 2D and a strict portable schema. Relationship output references only application-supplied candidate IDs and classifies a pair/group through the bounded vocabulary:
+Use the generalized project-owned structured-task/provider chain from Phase 2D and a strict portable schema. Do not send source authority, publisher ranking, evidence state, URLs, or provider/discovery metadata to the semantic model; semantic comparison sees only the minimum public claim text/value/scope context needed to compare meaning.
+
+The application constructs deterministic pair questions before dispatch. A question has a deterministic bounded `questionId` and exactly two distinct candidate IDs ordered lexicographically. Deduplicate repeated pairs before quota accounting. Retain at most 144 ambiguous questions. Once overflow is proven, retain only one bounded overflow sentinel question ID per affected category while continuing the canonical scan only far enough to preserve later deterministic relationships; do not retain the full O(n²) ambiguous overflow set. Any affected category remains operationally incomplete. A provider request contains a unique candidate dictionary plus at most 12 supplied pair questions so the same passage is not duplicated for every pair. The strict provider output is exactly `{ relationships: [...] }`; each relationship contains only `questionId`, `leftCandidateId`, `rightCandidateId`, and one relationship enum value. All objects are closed and every declared JSON-schema property is required.
+
+The bounded relationship vocabulary is:
 
 - `equivalent`;
 - `contradictory`;
@@ -285,15 +331,19 @@ Use the same project-owned structured-task/provider chain from Phase 2D and a st
 - `broader-narrower-compatible`;
 - `insufficient-evidence`.
 
-Require explicit candidate-ID references in a deterministic order. Reject unknown, duplicate, self-referential, or out-of-group IDs. Reject any model-created factual value, source/document ID, evidence state, authority judgment, normalized entity ID, or candidate. Keep free-form reasoning out of the trusted relationship object; if a bounded rationale is retained for debugging/explanation, it is untrusted presentation text and never gates status.
+Require exact question/candidate-ID references in the supplied deterministic order. Reject unknown, duplicate, self-referential, reversed/mismatched, or out-of-batch IDs. A valid relationship must answer one supplied question and cannot create a new question. Preserve independently valid sibling answers, but leave missing/invalid questions unresolved and send only those unresolved questions through the next eligible fallback batch. If the envelope is malformed or no relationship is usable, classify the logical response as `invalid-response`; do not free-form repair it.
 
-Resolve exact-equivalent normalized values and provable different-period/different-scope cases deterministically without an AI call. Use AI only when natural-language semantics are materially necessary. A model's `equivalent` proposal still passes deterministic identity/period/source gates before it can affect evidence status.
+Reject any model-created factual value, source/document ID, evidence state, authority judgment, normalized entity ID, candidate, URL, or arbitrary metadata. Keep free-form reasoning out of the trusted relationship object.
 
-If the AI chain is exhausted or the semantic output is invalid, leave the ambiguous relationship unresolved/`insufficient-evidence` at the semantic layer. Do not guess equivalence or contradiction to simplify downstream gating, and do not turn semantic-provider exhaustion into an `unknown` evidence value when operational work is actually incomplete.
+Resolve safe exact-equivalent normalized evidence and structurally provable different-period/different-program/different-degree cases deterministically without an AI call. Use AI only when natural-language semantics are materially necessary. Because there is no trusted campus/modality/residency field yet, differently worded evidence that might carry such qualifiers is not eligible for a blind exact-value bypass. A model's `equivalent` proposal still passes deterministic identity/period/scope/source gates before it can affect evidence status.
+
+Reconciliation uses Gemini `gemini-3.5-flash-lite` first, then the existing one-step `gemini-3.5-flash` quality path only when the primary response is schema/provenance-invalid, then Groq, then OpenRouter Free. A valid `insufficient-evidence` relationship is a successful semantic answer and must not trigger quality escalation. Availability/authentication/rate-limit/timeout/upstream/capability/policy failures follow the existing bounded retry/fallback rules and never trigger the stronger Gemini model merely for availability.
+
+If the AI chain is exhausted or the semantic output is invalid, leave the affected ambiguous questions unresolved. Do not guess equivalence or contradiction to simplify downstream gating, and do not turn semantic-provider exhaustion into an `unknown` evidence value when operational work is actually incomplete.
 
 ## Phase 2E.3 — Deterministic evidence-policy gate
 
-Evidence-state assignment is application code with explicit source/scope rules. AI may classify semantic relationships but cannot promote or override evidence state.
+Evidence-state assignment is application code with explicit source/scope rules. AI may classify semantic relationships but cannot promote or override evidence state. The gate receives only application-owned source/document/candidate records plus validated reconciliation relationships; it never reads raw provider responses.
 
 Apply scope and period compatibility before authority/status rules. A highly authoritative source for another program/year cannot verify the requested claim.
 
@@ -309,20 +359,37 @@ Use the following minimum semantics:
 - `unknown`: the category completed its required pipeline but no eligible factual evidence supports a value.
 A university page that directly publishes a normative admissions/fee requirement can be `verified`; the `university-reported` state is primarily for university-originated self-reported claims such as institutional outcomes/marketing facts that are not independently corroborated. This specialization resolves the intentional overlap in the general evidence vocabulary without changing that vocabulary.
 
-Source independence is based on distinct owning organizations **and underlying evidence origin**, not URL count. Build a deterministic source-origin/ownership assessment from trusted source metadata where possible. Two university pages, mirrors, press-release copies, syndication feeds, pages derived from the same government dataset, or multiple interfaces over one originating dataset do not become independent merely because URLs/publishers differ. If independence cannot be established safely, do not count the source toward `corroborated`.
+For Phase 2E, use a conservative deterministic authority table rather than asking AI whether a source is authoritative:
+
+- `government` and `accreditation` may directly satisfy authoritative/normative support when the claim is current and in scope;
+- a `university` source may directly satisfy authoritative/normative support for `admissions`, `tuition`, `scholarships`, `program-structure`, and direct official `support` facts only when current/in scope **and ownership by the resolved university is established** from the resolved official host or normalized publisher identity; a generic university source type alone is insufficient;
+- university-only `outcomes` and university-only performance/marketing-style `research` claims default to `university-reported` unless a future explicit property policy proves a narrower normative case;
+- `dataset` and `independent` may contribute reliable corroboration but do not become `verified` merely from their source type;
+- `ranking` does not verify ordinary institutional facts by default;
+- `anecdotal` can produce only anecdotal support and never upgrades an institutional fact.
+
+If a property falls outside an explicit normative rule, fail conservatively to `university-reported`/corroboration logic rather than upgrading it to `verified` by guesswork.
+
+Source independence is based on distinct owning organizations **and underlying evidence origin**, not URL count. Build a deterministic source-origin/ownership assessment from application-owned source metadata where possible. Treat identical content/source IDs as one origin and the same normalized publisher as one owner. Once university ownership is established for the resolved target, all of its official pages remain one owner even when departmental labels, hosts, or subdomains differ. A distinct hostname or generic `university` source type alone does not establish target ownership or independence. Mirrors, press-release copies, syndication feeds, pages derived from the same dataset, or multiple interfaces over one originating dataset do not become independent merely because URLs/publishers differ. If target ownership or distinct evidence origin cannot be established safely from the available metadata, do not use that source to verify/corroborate the target fact.
+
+Translate semantic relationships conservatively before status assignment. Only validated `equivalent` relationships may merge differently worded candidates into one factual value cluster, and only after hard identity/property/period/scope compatibility passes. `contradictory` keeps separate competing value clusters. `different-period` and `different-scope` never corroborate the requested fact; an explicitly older period may become `outdated`. `general-specific-compatible` and `broader-narrower-compatible` are relationship/explanation edges but do not by themselves merge distinct scalar values or count as independent corroboration unless deterministic scope rules prove that both statements assert the same requested fact. `conditional-exception` must preserve the condition/exception boundary; without a trusted structured condition proving applicability, do not flatten it into the general rule. `insufficient-evidence`, missing relationships, or overflow remain unresolved whenever that relationship is required for a decision.
+
+Treat `inferred` conservatively: a final value is `inferred` when keeping it depends on a semantic interpretation that application code cannot prove is directly stated by its exact supporting passage. A project-owned direct-support predicate may prove obvious literal/normalized cases, but failure to prove directness must not be upgraded to `verified`/`corroborated` merely because the source is authoritative. The inferred scalar must still be an existing referenced candidate value; Phase 2E performs no new calculation or factual synthesis.
 
 Apply deterministic precedence per exact claim/scope/period rather than choosing the most flattering state:
 
-1. incompatible identity/scope/period evidence cannot verify the claim;
+1. incompatible identity/scope evidence cannot verify the requested claim; explicit older-period evidence is handled as `outdated` rather than silently dropped;
 2. current credible material contradiction produces `conflicting` for the disputed value set even when multiple sources support one side;
-3. authoritative current normative evidence may produce `verified` when it directly states the fact;
-4. equivalent independent reliable current evidence may produce `corroborated` when no current contradiction remains;
-5. university-only self-reported non-normative evidence remains `university-reported` without independent support;
-6. old-period support is `outdated` for a newer requested/current period and does not corroborate the newer period;
-7. anecdotal/community support remains `anecdotal` and cannot promote an institutional claim;
-8. `inferred` is permitted only for a documented deterministic/semantic interpretation derived from identified evidence; the inferred value must remain traceable to those sources and may not introduce an unsupported factual value.
+3. evidence that applies only to an explicitly older/inapplicable period is `outdated` for the newer requested period and does not corroborate it;
+4. anecdotal/community-only support remains `anecdotal` and cannot promote an institutional claim;
+5. a source-traceable value whose direct statement cannot be proven and whose retention depends on semantic interpretation is `inferred`, regardless of source authority; inference cannot be promoted to verified/corroborated merely by source rank;
+6. authoritative current normative evidence may produce `verified` only when it directly states the requested fact;
+7. equivalent independent reliable current evidence may produce `corroborated` only when the supported fact is direct/current/in-scope and no current contradiction remains;
+8. university-only current direct self-reported non-normative evidence remains `university-reported` without independent support.
 
-A completed category with no eligible factual evidence does **not** get a fabricated `VerifiedClaim`. Represent evidence absence through `EvidenceSummary`: the category is processed, appears in `categoriesUnknown`, has exactly one processed-category coverage entry with `claimCount=0`, `hasEvidence=false`, and `statuses=[]`. `unknown` is therefore a category/evidence outcome here, not a sentinel scalar value such as `0`, `false`, `"unknown"`, or empty string.
+Every emitted `VerifiedClaim.value` must correspond to at least one referenced candidate value after only the explicitly allowed deterministic normalization. Phase 2E does not synthesize a new numeric/date/boolean/string fact during reconciliation. For an unresolved current credible contradiction, emit one `conflicting` final claim per distinct competing value cluster, each with only the candidates that support that value; do not choose a majority winner and do not mix the opposing candidate IDs into the same value's provenance.
+
+A completed category with no eligible factual evidence does **not** get a fabricated `VerifiedClaim`. Only a category explicitly included in Phase 2E's caller-supplied decision-eligible set may reach this outcome. Phase 2F will represent evidence absence through `EvidenceSummary`: the category is processed, appears in `categoriesUnknown`, has exactly one processed-category coverage entry with `claimCount=0`, `hasEvidence=false`, and `statuses=[]`. `unknown` is therefore a category/evidence outcome here, not a claim-level status/sentinel scalar value such as `0`, `false`, `"unknown"`, or empty string.
 
 Operational provider/retrieval/extraction/reconciliation exhaustion is different: if the category did not reach an evidence-policy decision, keep it unprocessed/failed as applicable rather than calling it `unknown`.
 
@@ -330,34 +397,67 @@ Operational provider/retrieval/extraction/reconciliation exhaustion is different
 
 Explanations are optional derived presentation content, never evidence. Generate them only after the deterministic gate. The model may receive only the gated claim/relationship records needed for the explanation and may reference only application-supplied claim/candidate IDs.
 
-Use a strict portable schema such as `{ referencedClaimIds: string[], summary: string }` with bounded text and no model-created structured facts, numbers, dates, URLs, source IDs, evidence states, or recommendations. Application code validates that every referenced ID belongs to the exact explanation input. The summary remains untrusted presentation text and is never reparsed into claims or used to change evidence state.
+Use one bounded batch schema such as `{ explanations: [{ category, referencedClaimIds, summary }] }` with at most one explanation per supplied processed category and **600 UTF-16 code units maximum per summary**. Every object is strict; referenced IDs must belong to the exact gated claim set for that category. No model-created structured facts, URLs, source IDs, evidence states, or recommendations are allowed. Reject any URL-like token. For number/date/currency-like tokens in free text, require that the token already appears in the rendered value/metadata of a referenced gated claim; otherwise fall back deterministically for that category. The summary remains untrusted presentation text and is never reparsed into claims or used to change evidence state.
 
-Prefer a deterministic non-AI fallback that renders relationship/evidence labels and existing values directly. Provider exhaustion in the explanation stage must never turn an otherwise succeeded evidence pipeline into an operational failure; omit the AI explanation and use the deterministic fallback.
+Prefer a deterministic non-AI fallback that renders relationship/evidence labels and existing values directly. Explanation uses Gemini Flash-Lite -> Groq -> OpenRouter Free with no Gemini quality escalation; its six-attempt stage budget is presentation-only. Provider/budget/schema exhaustion in the explanation stage must never turn an otherwise succeeded evidence pipeline into an operational failure; omit the rejected AI explanation and use the deterministic fallback.
 
 ## Phase 2E.5 — Required reconciliation/gate tests
+
+Implementation status: complete. The focused suite covers the deterministic normalization, semantic validation, provider-budget/abort, evidence-policy, explanation, privacy, and permutation invariants below; all Phase 2A–2D regressions remain green.
 
 At minimum prove:
 
 1. name-only university research can produce a valid `VerifiedClaim` without a fabricated ID, while ID-backed claims retain/cross-check stable IDs and contradictory ID/name pairs fail;
-2. intake survives candidate -> verified-claim promotion and separates incompatible periods;
-3. exact-equivalent candidates bypass AI, and provable different-period/different-scope cases bypass AI too;
-4. differently worded equivalent evidence can be classified by AI and then independently gated;
-5. different university/program/degree/academic-year/intake/effective-period scopes cannot be reconciled as the same claim merely because values match;
-6. campus-specific evidence is not promoted across campuses/scopes while no trusted campus contract exists; no pseudo-campus ID/property convention is invented;
-7. reconciliation output with unknown/duplicate/self/out-of-group candidate IDs or model-created values/source/evidence fields is rejected;
-8. AI-proposed equivalence cannot override deterministic identity/period incompatibility;
-9. two mirrors/pages/interfaces of one underlying evidence origin do not become corroborated;
-10. two truly independent reliable equivalent sources can become corroborated;
-11. a current authoritative normative source can become verified;
-12. university-only self-reported non-normative evidence follows university-reported semantics;
-13. a current credible contradiction remains conflicting even when multiple sources support one side;
-14. old-period evidence remains outdated for a newer requested period and does not corroborate it;
-15. anecdotal-only evidence remains anecdotal and cannot elevate institutional fact;
-16. inferred evidence remains source-traceable and cannot introduce a factual value absent from the supported interpretation;
-17. no eligible evidence after a **completed** category becomes category-level unknown with zero fabricated claims;
-18. operational extraction/reconciliation exhaustion leaves the category unprocessed/failed as appropriate rather than relabeling it unknown;
-19. AI-provider exhaustion leaves ambiguous relationships unresolved without fabricated semantic resolution;
-20. explanation schema rejects unknown IDs/structured new facts, and explanation-provider failure uses deterministic fallback without changing evidence status/run success.
+2. final claims require unique existing `candidateIds` bounded by `RESEARCH_MAX_CLAIMS_PER_RUN`; one candidate cannot back two final factual claims, `sourceIds`/`documentIds` equal the referenced candidates' provenance, representative `sourceId`/`supportingText` matches one referenced candidate, and unrelated/contradictory candidates cannot be attached to another value's provenance;
+3. final claims reject inherited uncalibrated `confidence` and claim-level `verificationStatus="unknown"`; processed unknown remains a zero-claim category outcome;
+4. intake survives candidate -> verified-claim promotion and separates incompatible periods;
+5. shared Phase 2B identity normalization is reused exactly, including astral, combining-mark, compatibility-Unicode, and UTF-16 contract-bound cases;
+6. comparison normalization preserves original evidence, preserves scalar types, performs no currency exchange or unsafe unit/numeric-string coercion, and does not infer missing periods;
+7. safe exact-equivalent evidence bypasses AI, while differently worded same-value evidence with possible scope qualifiers does not blindly bypass semantic reconciliation; provable structured different-period/different-program/different-degree cases bypass AI as incompatible;
+8. differently worded equivalent evidence can be classified by AI and then independently gated;
+9. deterministic pair generation is stable, lexicographically ordered, deduplicated, self-pair-free, capped at 12 questions/batch and 144/run, and overflow remains unresolved/incomplete rather than silently truncated;
+10. reconciliation output with unknown/duplicate/self/reversed/out-of-batch question/candidate IDs or model-created values/source/evidence fields is rejected; valid siblings survive and only unresolved questions fall through;
+11. reconciliation attempt telemetry uses `stage="reconciliation"`, configuration skips occur once/provider/stage, provider-local budget exhaustion fails over, total 12-attempt reconciliation exhaustion stops new reconciliation calls, and no 13th request occurs;
+12. reconciliation valid `insufficient-evidence` does not quality-escalate; schema/provenance-invalid Gemini output may use exactly one bounded Flash quality path; availability failures do not quality-escalate;
+13. different university/program/degree/academic-year/intake/effective-period scopes cannot be reconciled as the same claim merely because values match;
+14. campus/modality/residency-specific evidence is not promoted across incompatible/unknown scopes while no trusted field exists; no pseudo-scope ID/property convention is invented;
+15. AI-proposed equivalence cannot override deterministic identity/period/scope incompatibility;
+16. two mirrors/pages/interfaces of one underlying evidence origin do not become corroborated, same-publisher/same-university ownership does not become independent, and host difference alone is insufficient;
+17. two truly independent reliable equivalent sources can become corroborated;
+18. a current authoritative normative government/accreditation or eligible university source can become verified;
+19. university-only self-reported/non-normative outcomes/research evidence follows `university-reported` semantics, and an unknown property is not guessed upward to verified;
+20. a current credible contradiction emits separate conflicting value clusters and remains conflicting even when multiple sources support one side;
+21. old-period evidence remains outdated for a newer requested period and does not corroborate it; retrieval recency alone does not make it current; unknown freshness is not mislabeled outdated;
+22. anecdotal-only evidence remains anecdotal and cannot elevate institutional fact;
+23. inferred evidence remains candidate/source-traceable, cannot introduce a factual value absent from referenced candidates, and never becomes an unsupported new calculation;
+24. no eligible evidence after an explicitly decision-eligible/completed category becomes category-level unknown with zero fabricated claims;
+25. a category not marked decision-eligible by the caller cannot become unknown, even with zero candidates;
+26. operational reconciliation/provider/question-overflow exhaustion leaves affected categories unresolved/incomplete rather than relabeling them unknown;
+27. caller abort before dispatch consumes no semantic attempt; in-flight abort prevents retry/escalation/fallback and preserves already resolved relationships/claims;
+28. prompts contain only public candidate passages plus minimum public scope context and contain no applicant/private-document data, source authority ranking, API secrets, or raw provider errors;
+29. explanation attempt telemetry uses `stage="explanation"`, no Gemini quality escalation occurs, the six-attempt ceiling cannot be exceeded, and explanation budget/provider exhaustion always uses deterministic fallback without changing evidence status;
+30. explanation output rejects wrong-category/unknown claim IDs, URLs, or novel numeric/date/currency-like tokens and falls back deterministically without reparsing prose into facts;
+31. deterministic IDs/output are permutation-stable: shuffling equivalent candidate input does not change question/final-claim IDs, grouping, provenance arrays, evidence states, or returned ordering (excluding actual-execution provider-attempt order);
+32. all Phase 2A–2D tests remain green after the additive contract/AI-transport generalization.
+
+## Phase 2E implementation and final-review policy
+
+For the Phase 2E implementation batch, the main Codex agent performs implementation, testing, documentation, security/requirements checks, and fixes inline. Do **not** dispatch implementation, research, testing, security, documentation, or specialist subagents during the work.
+
+The only permitted subagent role is one read-only **looping final code reviewer** after the implementation is complete and all local verification gates pass:
+
+1. use the exact invocable GLM-variant review agent first;
+2. a bounded parent-side wait ending with **no child result and no child error is not failure and is not a timeout**. Inspect the child/task status first. If the GLM child is still running/ongoing, leave it alive and continue checking/waiting; do not close it and do not dispatch GPT concurrently;
+3. for this policy, the user's reviewer "timeout" fallback means an explicit HTTP 429 / API rate-limit response. Do not infer timeout from elapsed wall-clock time or a still-thinking child;
+4. if GLM returns an explicit HTTP 429/rate-limit response or another explicit terminal child error/failure state (dispatch/model/provider failure, unavailable capacity, malformed terminal result, etc.), treat GLM as terminal for this task, close it, do not retry it, and switch to the exact invocable GPT-variant review agent;
+5. apply the same liveness rule to GPT: no result/error plus a running child means keep checking/waiting, not failure. If GPT returns an explicit terminal error/failure once, stop all subagent use and finish the review/fix cycle inline with the main agent;
+6. run only one reviewer child at a time and one child per review iteration; never fan out, parallelize, or create a reviewer swarm;
+7. terminate/close a child only after a completed result or explicit terminal error/failure; do not close a healthy running reviewer merely because one wait window elapsed;
+8. the main agent evaluates every actionable finding, fixes valid defects itself, reruns the relevant focused tests plus required gates, then may run the next review iteration with the still-healthy selected variant;
+9. stop when the reviewer returns `No findings.`; cap the loop at three successful reviewer iterations, after which any remaining review/fix work is completed inline rather than spawning more children.
+
+This batch-specific policy overrides normal specialist-agent routing for Phase 2E. It does not authorize commit, push, deployment, publication, live provider calls, destructive cleanup, or any other external action.
+
 ## Phase 2F.1 — Deterministic orchestrator
 
 Implement one new small in-memory coordinator under `lib/research/orchestration/`; it is not a multi-agent runtime. Reuse the implemented Phase 2B/C modules, but do not overload `runDiscoveryRetrieval()` with Phase 2E/F lifecycle semantics. That function remains a tested discovery/retrieval boundary and compatibility helper.

@@ -268,6 +268,7 @@ describe("Phase 2A research contracts", () => {
           value: "2027-01-01",
           sourceIds: ["source-1"],
           documentIds: ["document-1"],
+          candidateIds: ["candidate-1"],
           supportingText: "Applications close on 1 January 2027.",
           verificationStatus: "verified",
         },

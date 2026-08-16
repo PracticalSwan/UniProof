@@ -1,11 +1,11 @@
 # Phase 2 — Evidence and Research Pipeline
 
-Status: Phase 2A–2D implemented; deterministic offline verification is complete, and the configured Tavily, Brave, Gemini, Groq, and OpenRouter connections each passed one authorized live smoke request on 2026-08-16. Phase 2E–2F remain planned.
+Status: Phase 2A–2E implemented; deterministic offline verification is complete, and the configured Tavily, Brave, Gemini, Groq, and OpenRouter connections each passed one authorized live smoke request on 2026-08-16. Phase 2F remains planned.
 
 Implementation runbooks:
 
 - Phase 2B–2C: `docs/planning/phase-2b-2c-discovery-retrieval.md` is the completed-batch implementation and acceptance record.
-- Phase 2D–2F: docs/planning/phase-2d-2f-ai-reconciliation-orchestration.md records the implemented Phase 2D extraction boundary and the remaining Phase 2E–2F execution specification.
+- Phase 2D–2F: docs/planning/phase-2d-2f-ai-reconciliation-orchestration.md records the implemented Phase 2D extraction and Phase 2E reconciliation/evidence-gate boundaries plus the remaining Phase 2F execution specification.
 
 The parent plan owns Phase 2 architecture and cross-phase invariants. A batch runbook may specialize file paths and execution order but may not weaken this plan, `AGENTS.md`, Phase 2A contracts, or the security model.
 
@@ -435,9 +435,17 @@ The Phase 2D implementor owns REST wiring, environment-schema changes, model/fal
 
 ## Phase 2E — AI-assisted reconciliation with deterministic evidence gates
 
+Status: implemented as a standalone in-memory stage. Phase 2F terminal orchestration remains deferred.
+
 Purpose: make AI a core reasoning component for semantic evidence comparison while keeping source authority, provenance, and final evidence-policy constraints deterministic and testable.
 
-Phase 2E intentionally separates tasks that require exact computation from tasks that require semantic interpretation.
+Phase 2E intentionally separates tasks that require exact computation from tasks that require semantic interpretation. The detailed source of truth is `docs/planning/phase-2d-2f-ai-reconciliation-orchestration.md`; this parent plan records the same hard boundaries at architecture level.
+
+Phase 2E remains a standalone in-memory stage rather than the Phase 2F terminal orchestrator. It consumes validated Phase 2D candidates plus application-owned source/document/target context and an explicit caller-supplied set of categories that are operationally eligible for an evidence decision. Only that eligible set may become category-level `unknown`; a retrieval/extraction/reconciliation gap must remain operationally incomplete instead of being mislabeled as missing evidence.
+
+The Phase 2D provider transport is generalized, not duplicated, so telemetry can use `extraction`, `reconciliation`, and `explanation` stages while preserving the verified extraction behavior. Extraction remains capped at 24 actual AI HTTP attempts/run. Phase 2E adds product-owned ceilings of 12 reconciliation attempts/run and 6 explanation attempts/run, with provider-specific counters, one active request at a time, the existing bounded retry/backoff behavior, at most 12 semantic pair questions/request, and at most 144 ambiguous semantic questions/run. Pair overflow is unresolved/incomplete, never silently truncated. These are application safety/cost bounds, not mutable vendor-quota promises; Phase 2F still calculates the integrated provider-attempt result-contract ceiling.
+
+Final claims must be mechanically traceable to extracted candidates. `VerifiedClaim` evolves to truthful university ID-or-name identity, optional program ID/name/intake, and required bounded unique `candidateIds`; its source/document/supporting provenance is derived exactly from those candidates. Final claims do not carry uncalibrated extraction confidence and do not use claim-level `verificationStatus="unknown"`. No reconciled factual scalar may be synthesized from thin air: every emitted value must correspond to at least one referenced candidate after only allowed deterministic normalization.
 
 ### Step 1 — Deterministic normalization
 
@@ -499,7 +507,7 @@ Explanations must reference only gated claims and evidence, must not introduce n
 
 If AI reconciliation becomes unavailable after the full Gemini -> Groq -> OpenRouter Free chain, deterministic rules still resolve exact/obvious cases. A category that cannot reach its required evidence-policy decision because semantic reconciliation was operationally required remains unprocessed/failed as applicable; do not relabel provider exhaustion as evidence `unknown`. Only a category that completed the required pipeline with no eligible factual evidence becomes category-level unknown.
 
-`EvidenceSummary` should expose state counts, category coverage, unresolved semantic cases, conflicts, stale categories, and unprocessed/failed categories separately.
+`EvidenceSummary` exposes state counts, category coverage, conflicts, stale categories, and unprocessed/failed categories. Unresolved semantic questions remain bounded Phase 2E stage diagnostics and make affected categories operationally incomplete; do not invent an `EvidenceSummary` field that the live contract does not contain.
 
 This design keeps AI central to extraction, semantic interpretation, reconciliation, and explanation while keeping the product's evidence guarantees outside model control.
 

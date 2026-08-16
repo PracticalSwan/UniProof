@@ -76,6 +76,14 @@ For bugs, prove the root cause before fixing it. For multi-stage work, write or 
 
 Use the installed agents in `C:\Users\LOQ\.codex\agents` by reference; do not copy them into this repository.
 
+### Subagent liveness and fallback
+
+- A bounded parent-side review wait ending without a child result or child error is **not** a timeout or failure. It means the child may still be working.
+- Before closing a child or switching models/providers, inspect the child/task status. If it is still running/ongoing, keep that child alive and continue checking/waiting; do not spawn a fallback reviewer merely because one wait window elapsed.
+- For reviewer fallback policies that name a timeout/rate-limit trigger, treat the user's timeout trigger as an explicit HTTP 429 / API rate-limit response, not elapsed wall-clock time while a child remains active.
+- An explicit child error/failure state may trigger whatever fallback the active task plan permits. Never infer failure solely from lack of a completed result.
+- Do not run a fallback reviewer concurrently with a still-running primary reviewer unless the user explicitly authorizes parallel review.
+
 | Task | Preferred global agent |
 | --- | --- |
 | UI/UX, React, responsive implementation | `ui-designer` |

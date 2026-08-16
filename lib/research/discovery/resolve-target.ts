@@ -4,22 +4,7 @@ import type {
   ResearchTargetResolver,
   TargetResolutionResult,
 } from "./types";
-
-function normalizeIdentity(value: string): string {
-  return value
-    .normalize("NFKC")
-    .toLocaleLowerCase("en-US")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .replace(/\s+/gu, " ");
-}
-
-function sameIdentity(left: string | undefined, right: string | undefined): boolean {
-  if (left === undefined || right === undefined) return true;
-  const normalizedLeft = normalizeIdentity(left);
-  const normalizedRight = normalizeIdentity(right);
-  return normalizedLeft.length > 0 && normalizedRight.length > 0 && normalizedLeft === normalizedRight;
-}
+import { sameResearchIdentity } from "@/lib/research/identity";
 
 function safeHost(url: string | undefined): string | undefined {
   if (url === undefined) return undefined;
@@ -109,7 +94,7 @@ export async function resolveResearchTarget(
         warnings: ["university ID was not found in the application identity store"],
       };
     }
-    if (!sameIdentity(suppliedUniversity.name, resolvedUniversity.name)) {
+    if (!sameResearchIdentity(suppliedUniversity.name, resolvedUniversity.name)) {
       return {
         resolved: false,
         reason: "identity-conflict",
@@ -142,7 +127,7 @@ export async function resolveResearchTarget(
         warnings: ["program ID was not found in the application identity store"],
       };
     }
-    if (!sameIdentity(suppliedProgram.name, resolvedProgram.name)) {
+    if (!sameResearchIdentity(suppliedProgram.name, resolvedProgram.name)) {
       return {
         resolved: false,
         reason: "identity-conflict",
@@ -173,7 +158,7 @@ export async function resolveResearchTarget(
             warnings: ["program resolved but its university ID was not found"],
           };
         }
-        if (!sameIdentity(target.universityName, resolvedUniversity.name)) {
+        if (!sameResearchIdentity(target.universityName, resolvedUniversity.name)) {
           return {
             resolved: false,
             reason: "identity-conflict",
@@ -222,7 +207,7 @@ export async function resolveResearchTarget(
         warnings: ["program university ID was not found in the application identity store"],
       };
     }
-    if (!sameIdentity(target.universityName, resolvedUniversity.name)) {
+    if (!sameResearchIdentity(target.universityName, resolvedUniversity.name)) {
       return {
         resolved: false,
         reason: "identity-conflict",

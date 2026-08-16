@@ -1,6 +1,6 @@
 # Phase 2B–2C Execution Runbook — Discovery, Retrieval, and Normalization
 
-Status: planned. This is the implementation-grade runbook for the next Phase 2 batch.
+Status: implemented and verified. This runbook records the completed Phase 2B–2C batch and its verification boundary.
 
 Parent architecture: `docs/planning/phase-2-evidence-research-pipeline.md`.
 
@@ -43,6 +43,7 @@ Use these paths unless the live repository has an established narrower conventio
 
 ```text
 lib/research/discovery/types.ts
+lib/research/discovery/resolve-target.ts
 lib/research/discovery/query-plan.ts
 lib/research/discovery/dedupe.ts
 lib/research/discovery/orchestrator.ts
@@ -55,7 +56,6 @@ lib/research/normalization/document.ts
 lib/integrations/tavily/search.ts
 lib/integrations/brave/search.ts
 lib/integrations/ror/search.ts
-lib/integrations/openalex/search.ts
 scripts/setup-providers.mjs
 tests/phase2b-discovery.test.ts
 tests/phase2c-retrieval.test.ts
@@ -66,15 +66,40 @@ Provider wire types stop inside `lib/integrations/*`. Research modules consume p
 
 Create small internal types rather than passing provider payloads through the pipeline.
 
-`DiscoveryQuery` should contain a stable query ID, requested category, query text, target identity context, optional locale/country hint, and bounded result count.
+`ResolvedResearchTarget` is the project-owned identity used by query planning. It should contain the request's canonical university/program IDs when known, resolved names, optional campus/degree/country context, and an optional trusted official URL/host only when that value came from approved local identity data or a confidently disambiguated structured identity source. Never fabricate an official URL from a university name.
 
-`DiscoveryAttempt` should contain provider, category/query ID when applicable, outcome, retry count, safe duration metadata, and an optional bounded failure kind. Use a bounded vocabulary such as `configuration`, `authentication`, `rate-limit`, `timeout`, `upstream`, `invalid-response`, `policy`, and `empty`.
+Target resolution must return a project-owned discriminated result rather than throwing vendor-shaped errors: either `{ resolved: true, target: ResolvedResearchTarget, warnings: [...] }` or `{ resolved: false, reason, warnings: [...] }`. Use a bounded reason vocabulary at least covering `unresolved-id`, `identity-conflict`, `ambiguous-identity`, and `insufficient-institutional-identity`. These are discovery/identity outcomes, not provider failures. If a later `ResearchResult` needs to surface one, map it to the existing bounded `source-discovery` operational failure while preserving the more specific internal reason in bounded safe metadata; do not broaden public failure vocabularies merely to expose an implementation detail.
+
+`DiscoveryQuery` should contain a stable query ID, requested category, query text, resolved target identity context, optional locale/country hint, and bounded result count.
+
+`DiscoveryAttempt` should contain provider, category/query ID when applicable, outcome, retry count, safe duration metadata, and an optional bounded failure kind. `outcome` uses `success`, `empty`, `skipped`, or `failed`. Failure kind is separate and uses the shared bounded vocabulary `configuration`, `authentication`, `rate-limit`, `timeout`, `upstream`, `invalid-response`, `capability`, `policy`, or `budget`. Do not encode `empty` as a failure kind.
 
 `DiscoveryResult` should contain normalized candidate sources, attempt records, covered/uncovered categories, and bounded warnings. It must not contain raw Tavily/Brave payloads.
 
+`coveredCategories` / `uncoveredCategories` describe discovery candidate coverage only. They must never be copied directly into `EvidenceSummary.categoriesProcessed`, `categoriesUnprocessed`, or `hasEvidence`; those later fields describe pipeline/evidence outcomes after retrieval, extraction, and gating.
+
 `RetrievedResponse` is an internal transient object containing final canonical URL, redirect chain, safe response headers, validated/pinned address metadata, retrieved bytes, content type, and retrieval timestamp. It must never be exposed to the browser or persisted as raw provider/network data.
 
-If provider-attempt telemetry is added to the public `ResearchRun`, add a strict bounded Zod schema and keep existing fields for backward compatibility. Do not remove Phase 2A fields as part of this batch.
+For this batch, make provider-attempt telemetry explicit: add a bounded ordered `providerAttempts` array to `ResearchRun` with a strict Zod schema and reuse the same project-owned attempt shape in later phases. Keep `discoveryProvider` and `extractionModel` for backward-compatible summary fields; do not make them the fallback-history source of truth.
+
+Before query planning, add `program-structure` to `researchCategorySchema`, increase the server-owned category ceiling from six to seven, and add Phase 2A regression coverage proving the new category is accepted while unsupported categories remain rejected. This is required to satisfy the MVP Research Mode requirement for program-structure information; do not hide program structure inside an unrelated category.
+
+## Phase 2B.0 — Resolve research target identity
+
+Query planning must not assume a `ResearchRequest` contains a university/program name or official URL. Phase 2A intentionally permits name-based, ID-based, structured-target, and focused-question requests.
+
+Implement an injected project-owned `ResearchTargetResolver` used before query planning:
+
+- if a request already supplies a university/program name, normalize and retain it without inventing missing IDs;
+- if a request supplies application-owned university/program IDs, including `target.program.universityId`, resolve them through the injected resolver backed by approved local/fixture identity data and cross-check all supplied names/IDs against the resolved record; contradictory identity data is `identity-conflict`, not a tie to be guessed through;
+- Phase 2B–2C must not require Supabase persistence or invent a seed catalog merely to make ID resolution pass. If no application identity store exists yet, the runtime resolver may legitimately return `unresolved-id`; deterministic tests should inject a small in-memory resolver fixture;
+- if an ID cannot be resolved, return an explicit bounded identity/source-discovery failure rather than searching opaque IDs as though they were names;
+- a subject-area-only structured target is a topical target, not a university identity. It may drive bounded category-aware web queries but has no institutional direct/ROR fallback;
+- a program-name-only target may drive bounded program/category web queries, but the program name must not be treated as a university name for ROR matching; institutional direct/ROR fallback requires resolved university identity;
+- a question-only request may use the bounded question plus category intent, but it has no institutional direct/ROR fallback unless a concrete university identity is resolved through an approved project-owned path;
+- an official URL/host becomes trusted identity metadata only from approved local data or a confidently matched structured identity result, never from string guessing or search snippets.
+
+For automatic name-to-ROR matching, use the ROR v2 affiliation matching semantics rather than selecting by rank/score. Accept an automatic ROR identity only when the response supplies one active `chosen:true` organization and all application-supplied stable context is compatible. Require exact Unicode-normalized equality against one returned canonical name or alias and, when available, cross-check country and trusted domain. For current ROR v2.1 organization records, select the canonical institution name from the name entry whose `types` contains `ror_display`, and accept an official-site candidate only from a link whose `type` is `website`; do not trust array order and never promote a `wikipedia` link as the official university URL. If ROR supplies no `chosen:true` result, or the chosen result conflicts with trusted country/domain context, leave the identity unresolved/ambiguous; never select the first result or invent a confidence threshold. A known ROR ID may be resolved directly and then cross-checked against supplied context. The built-in credential-free ROR degraded fallback is enabled by default in the runtime discovery orchestrator; deterministic/offline tests may explicitly disable it or inject a mock adapter, but production callers must not need a hidden opt-in flag to receive the documented fallback.
 
 ## Phase 2B.1 — Discovery configuration and setup CLI
 
@@ -91,18 +116,22 @@ Keep all provider keys server-only. Do not add any `NEXT_PUBLIC_*` provider cred
 
 Add `npm run setup:providers` backed by `scripts/setup-providers.mjs`. During this batch it configures discovery credentials only; Phase 2D extends the same command for AI credentials rather than creating a second setup mechanism.
 
-The setup script must preserve unrelated `.env.local` lines, replace only exact managed keys, hide key input when stdin is an interactive TTY, restore terminal state in `finally`, never print key values, and keep `.env.local` ignored. If stdin is non-interactive, accept already-set environment variables rather than attempting a visible prompt.
+The setup script must preserve unrelated `.env.local` lines, replace only exact managed keys, hide key input when stdin is an interactive TTY (neutral mask characters may provide typing feedback), restore terminal state in `finally`, never print key values, and keep `.env.local` ignored. If stdin is non-interactive, accept already-set environment variables rather than attempting a visible prompt.
 Do not automatically enable full live research mode after only discovery keys are configured, because Phase 2D extraction is not implemented yet. Report which discovery providers are configured and which fallback path is available.
 
 Connectivity checks must be explicit opt-in because they consume provider quota/credits. A default setup run validates file/env configuration only.
+
+This batch deliberately does not configure or prompt for any provider beyond Tavily and Brave. An interactive TTY run prompts for those two discovery keys with terminal echo disabled; submitting a blank line preserves an existing managed value. Non-interactive setup skips prompting and validates only already-present environment values. AI-provider key entry remains deferred to Phase 2D.
 
 ## Phase 2B.2 — Deterministic query planning
 
 Query planning is deterministic in this batch; do not spend AI calls to formulate search queries.
 
-Create one focused general-web query per requested category, plus at most one identity/official-site query when the target has no trusted official URL. Bound the total with server-owned constants. A practical initial ceiling is one query per category and no more than 7 planned queries before provider fallback.
+Create one focused general-web query per requested category, plus at most one identity/official-site query when the target has no trusted official URL. Bound the total with server-owned constants. With seven supported categories, a practical initial ceiling is one query per category plus at most one identity query, for no more than 8 planned queries before provider fallback.
 
-Keep each general-web query under 350 characters so it remains below Brave's current 400-character limit with margin for later formatting. Never place applicant profile data, GPA, citizenship, contact details, or sensitive document content in a search query.
+Keep each general-web query at or below 350 characters and 45 whitespace-delimited words so it remains below Brave's current 400-character / 50-word request limits with margin for later formatting. Query construction must truncate or reject deterministically before an adapter call. Never place applicant profile data, GPA, citizenship, contact details, or sensitive document content in a search query.
+
+The implementation applies a deterministic private-data guard to free-text questions: public questions remain usable, detected personal values or sensitive document references are omitted from provider queries, and a sensitive question with no other public target fails closed with an explicit warning.
 
 Use target university/program names, requested category, intake/academic year when supplied, and category-specific keywords. Do not add unsupported facts to make a query more specific.
 
@@ -111,6 +140,7 @@ Example category intents:
 - `admissions`: admissions requirements, entry requirements, English language, application deadline;
 - `tuition`: tuition, fees, cost, academic year;
 - `scholarships`: scholarships, funding, eligibility, deadline;
+- `program-structure`: curriculum, modules/courses, credits, duration, core/elective structure;
 - `research`: research groups, labs, faculty/research areas;
 - `outcomes`: graduate outcomes/employment only when a source can support it;
 - `support`: international student support, academic/student services.
@@ -123,10 +153,12 @@ Use the Tavily Search endpoint only. Do not use Tavily Crawl/Map/Research as an 
 
 Use basic search depth, `include_answer=false`, `include_raw_content=false`, and a small bounded result count. Search-provider snippets are discovery hints only and must not become evidence/supporting text.
 
+Authenticate the Tavily REST call only with the server-side API key in the `Authorization: Bearer ...` header. Explicitly keep `search_depth=basic` and do not enable automatic parameter selection that can silently increase search depth/credit use. Never place the key in the query string, normalized candidate metadata, attempt telemetry, or errors.
+
 Normalize only URL, title, provider provenance, rank/relevance when available, requested category, and safe publisher/domain metadata into `CandidateSource`. Reject malformed/non-HTTP(S) candidates before they reach retrieval.
 ## Phase 2B.4 — Brave Search fallback
 
-Use Brave Web Search, not Brave Answers. Send the API key only in the required server-side subscription-token header. Keep the query/result bounds aligned with the deterministic query plan.
+Use Brave Web Search, not Brave Answers. Send the API key only in the required server-side `X-Subscription-Token` header. Keep the query/result bounds aligned with the deterministic query plan.
 
 Invoke Brave only for a query/category that Tavily did not satisfy because Tavily is unconfigured, authentication/configuration failed, timed out, exhausted bounded retry/rate-limit handling, returned an upstream failure, returned an invalid response, or returned no usable HTTP(S) candidates.
 
@@ -136,15 +168,14 @@ Normalize the result into the same `CandidateSource` shape. Do not persist Brave
 
 ## Phase 2B.5 — Direct and structured degraded discovery
 
-After general-web discovery is exhausted for a category, use no-key/direct authoritative mechanisms that can still produce useful candidates.
+After general-web discovery is exhausted for a query/category, use direct or structured mechanisms that can still produce useful candidates. Do not invoke structured fallback merely to compare providers after web discovery has already satisfied that query.
 
 Required baseline for this batch:
 
-- trusted official URL already present in the target or a resolved canonical university identity;
-- ROR organization lookup for identity/homepage/domain candidates;
-- OpenAlex institution lookup for institution identity and research-related candidates.
+- trusted official URL from the resolved target identity when one is actually known;
+- ROR v2 organization lookup for identity/homepage/domain candidates, with deterministic disambiguation rather than first-result selection.
 
-Treat ROR/OpenAlex as structured datasets and preserve their provider identity. They may improve identity/research coverage but must not be treated as proof of admissions, tuition, scholarships, or other facts they do not contain.
+Treat ROR API records as structured identity provenance. They may improve identity coverage but must not be treated as proof of admissions, tuition, scholarships, or other facts they do not contain. When a confidently matched ROR record yields an official university homepage URL, the discovered page candidate represents the university publisher (`sourceType=university`, `discoveryProvider=ror`); do not mislabel the eventual university webpage as a dataset merely because ROR helped locate it.
 
 College Scorecard and Discover Uni remain approved planned sources, but they are not blockers for this batch's fallback proof. Add them only when their country/category mapping and current official API/license requirements are implemented deliberately. Do not require another secret merely to make the baseline degraded path pass.
 
@@ -157,6 +188,11 @@ Canonicalize candidate URLs with the existing outbound canonicalizer for duplica
 Deduplicate by canonical URL first. Then enforce `RESEARCH_MAX_SOURCES_PER_DOMAIN` and `RESEARCH_MAX_SOURCES_PER_RUN`. Prefer stronger known source types, exact target/program relevance, category relevance, and earlier provider rank without inventing a universal numeric authority score.
 
 Do not discard an already-valid candidate merely because a later fallback provider fails.
+
+For Phase 2B, a query is **discovery-satisfied** when at least one normalized, in-policy HTTP(S) candidate survives adapter validation for that query. This is intentionally a discovery-only condition: it says nothing about whether retrieval or evidence extraction will later succeed.
+
+Discovery category coverage is computed from category-scoped queries only. An identity-only query can enrich `ResolvedResearchTarget` or produce an identity/homepage candidate, but it must not by itself mark every requested category covered. When a direct/ROR candidate is used as degraded fallback for a particular category query, retain that category association explicitly so coverage remains deterministic.
+
 ## Phase 2B.7 — Discovery retry and fallback algorithm
 
 For each planned query/category, execute providers sequentially.
@@ -164,22 +200,23 @@ For each planned query/category, execute providers sequentially.
 ```text
 Tavily configured?
   yes -> call Tavily
-          success with usable candidates -> keep them; do not call Brave for that query
+          >=1 usable candidate -> keep them; query is discovery-satisfied; do not call Brave for that query
           empty/transient exhausted/config/auth/invalid response -> record attempt and continue
   no  -> record skipped/configuration state
 
 Brave configured?
-  yes -> call Brave only if Tavily did not yield usable candidates
-          success -> keep candidates
+  yes -> call Brave only if query is still discovery-unsatisfied
+          >=1 usable candidate -> keep candidates; query is discovery-satisfied
           empty/failure -> record attempt and continue
   no  -> record skipped/configuration state
 
-run direct/ROR/OpenAlex degraded discovery when category/identity context supports it
+if query is still discovery-unsatisfied:
+  use trusted direct URL / disambiguated ROR when identity/category context supports it
 keep all validated candidates
 mark uncovered categories explicitly
 ```
 
-Transient provider failures may receive at most one retry in this batch, honoring a bounded `Retry-After` when safe. Do not retry authentication/configuration errors. Do not retry malformed requests. All waits must fit inside a server-owned per-call/per-run budget.
+Transient provider failures may receive at most one retry in this batch, honoring a bounded `Retry-After` when safe. Do not retry authentication/configuration errors. Do not retry malformed requests. All waits must fit inside a server-owned per-call/per-run budget; discovery also stops after `RESEARCH_MAX_PROVIDER_ATTEMPTS_PER_RUN` (32) attempts or `RESEARCH_MAX_RUN_TIMEOUT_MS` (60 seconds), whichever comes first.
 
 A provider returning zero results is `empty`, not a fabricated success. An uncovered category after all eligible discovery mechanisms is not a fatal run by itself; it becomes explicit partial/unprocessed state later in orchestration.
 
@@ -187,7 +224,9 @@ A provider returning zero results is `empty`, not a fabricated success. An uncov
 
 Do not implement arbitrary-source retrieval with ordinary `fetch(url)` after resolution-time validation. That would re-resolve DNS and leave the Phase 2A rebinding gap open.
 
-Use Node's server-only `node:http` / `node:https` request path with a custom `lookup` that returns only an address from the already validated `resolvedAddresses`. Keep the original hostname for the HTTP `Host` header and TLS SNI/certificate verification. Never replace the URL hostname with the IP string.
+Use Node's server-only `node:http` / `node:https` request path with a custom `lookup` that returns only an address from the already validated `resolvedAddresses`. The lookup callback must never call system DNS. Keep the original URL hostname for the HTTP `Host` header and certificate identity verification. For HTTPS with a DNS hostname, set TLS `servername` to that original hostname. For an HTTPS URL whose original host is an IP literal, do not send the IP as SNI (`servername` must remain empty/disabled), but keep normal CA validation and verify the certificate identity against the original IP host; never set `rejectUnauthorized=false`. Never replace the URL hostname with the selected transport IP string.
+
+Keep the first implementation transport-simple and auditable: GET only, no proxy/environment-proxy routing, and no cross-request socket pooling/keep-alive reuse. Pass `agent: false` for this batch so each request gets an isolated one-use connection rather than a reusable global-agent socket. A request socket belongs to one validated URL/hop. If a later implementation adds proxying or pooled connection reuse, it needs a separate security review proving the validated-address invariant still holds.
 
 For each URL:
 
@@ -199,6 +238,10 @@ For each URL:
 6. repeat pinning for the validated redirect target;
 7. abort on any policy/timeout/size/content failure.
 Request headers must be minimal: a UniProof research user agent, `Accept` limited to supported research types, and `Accept-Encoding: identity`. Never forward browser cookies, authorization headers, client IP headers, session headers, or provider credentials to arbitrary source hosts.
+
+Fail closed on HTTPS -> HTTP redirect downgrade in this batch even when direct HTTP retrieval is otherwise explicitly permitted. HTTP -> HTTPS may proceed after normal redirect revalidation. Destroy/discard the redirect response body before opening the next hop, and never replay `Set-Cookie` or any response-derived credential header.
+
+Retain only a small response-header allowlist needed for diagnostics/normalization (for example `content-type`, `content-length`, `content-encoding`, `last-modified`, and `etag`). Do not retain or forward `set-cookie`, authentication, proxy-authentication, or hop-by-hop credential/session headers.
 
 If a server ignores `Accept-Encoding: identity` and returns a non-identity content encoding, fail closed in this batch rather than decoding an unbounded compressed stream. A later explicit decompression feature must enforce both compressed and decompressed byte ceilings.
 
@@ -253,7 +296,7 @@ Deduplicate successfully normalized documents by canonical URL and then normaliz
 
 Before implementation uses new orchestration state, resolve these currently deferred semantics explicitly in code/tests:
 
-- add bounded provider-attempt telemetry rather than relying on the single `discoveryProvider` string;
+- add the bounded ordered `ResearchRun.providerAttempts` telemetry defined above rather than relying on the single `discoveryProvider` string;
 - keep provider configuration/auth failures distinguishable from source-discovery coverage failures;
 - do not broaden `CandidateSource` to accept unsafe protocols in adapters even though the Phase 2A base schema is intentionally discovery-oriented;
 - keep raw retrieval bytes and provider payloads outside `ResearchResult`;
@@ -265,18 +308,22 @@ Any change to `research.ts`, `outbound-url.ts`, or `research-limits.ts` requires
 
 At minimum test:
 
-1. deterministic category-aware query planning and query-length bounds;
-2. Tavily success means Brave is not called for that query;
-3. Tavily timeout/429/5xx/invalid response falls through after bounded handling;
-4. missing/invalid Tavily configuration falls through without leaking the key;
-5. Brave success after Tavily failure returns normalized candidates;
-6. Tavily and Brave empty/failure retains direct/ROR/OpenAlex candidates;
-7. duplicate URL/fragments collapse deterministically;
-8. per-domain and total-source budgets are enforced;
-9. malformed/non-HTTP(S) provider URLs are discarded before retrieval;
-10. uncovered categories remain explicit and do not erase covered categories;
-11. logs/attempt records contain no API keys or full provider payloads;
-12. setup script preserves unrelated `.env.local` content and never writes provider keys to `.env.example`.
+1. deterministic category-aware query planning and query character/word bounds;
+2. program-structure is a first-class research category and query intent;
+3. name-based, program-name-only, ID-only, unresolved-ID, subject-area-only, and question-only target resolution behave deterministically without invented identity metadata;
+4. ROR automatic matching accepts only a compatible active `chosen:true` result; absent/contradictory matches remain unresolved/ambiguous and never fall back to first-result or score selection;
+5. Tavily success means Brave and structured fallback are not called for that satisfied query;
+6. Tavily timeout/429/5xx/invalid response falls through after bounded handling;
+7. missing/invalid Tavily configuration falls through without leaking the key;
+8. Brave success after Tavily failure returns normalized candidates;
+9. Tavily and Brave empty/failure retains trusted-direct/ROR candidates;
+10. duplicate URL/fragments collapse deterministically;
+11. per-domain and total-source budgets are enforced;
+12. malformed/non-HTTP(S) provider URLs are discarded before retrieval;
+13. uncovered categories remain explicit and do not erase covered categories;
+14. discovery coverage is not mistaken for evidence/processed coverage;
+15. logs/attempt records contain no API keys or full provider payloads;
+16. setup script preserves unrelated `.env.local` content and never writes provider keys to `.env.example`.
 ## Required Phase 2C deterministic tests
 
 Use local/mock HTTP servers and injected DNS resolvers. Default automated tests must not depend on the public internet.
@@ -284,32 +331,39 @@ Use local/mock HTTP servers and injected DNS resolvers. Default automated tests 
 At minimum test:
 
 1. validated public hostname connects through the pinned validated address rather than a second uncontrolled DNS lookup;
-2. direct loopback/private/link-local/metadata targets remain blocked;
-3. a public first URL redirecting to localhost/private IP is blocked before the second connection;
-4. redirect limit and redirect loop are enforced;
-5. connect timeout aborts before the overall request timeout;
-6. overall request timeout aborts a stalled body;
-7. streamed body aborts immediately above `RESEARCH_MAX_RESPONSE_BYTES`;
-8. unsupported/missing MIME and non-identity content encoding fail closed;
-9. HTML normalization removes executable/noise elements while preserving headings, lists, tables, and factual text;
-10. plain-text normalization handles line endings/whitespace and deterministic truncation;
-11. normalized text/section aggregates remain inside Phase 2A limits;
-12. canonical URL and normalized content-hash deduplication work;
-13. PDF retrieval does not fabricate a `ResearchDocument` when no PDF normalizer exists;
-14. retrieval never forwards cookies, authorization, browser/session headers, or provider credentials;
-15. arbitrary-source errors contain sanitized origin-level URL information only.
+2. the custom lookup never performs system DNS and the connected socket's remote address/family matches the selected validated address for each hop;
+3. direct loopback/private/link-local/metadata targets remain blocked;
+4. a public first URL redirecting to localhost/private IP is blocked before the second connection;
+5. HTTPS -> HTTP redirect downgrade is rejected and HTTP -> HTTPS is independently revalidated;
+6. redirect limit and redirect loop are enforced;
+7. connect timeout aborts before the overall request timeout;
+8. overall request timeout aborts a stalled body;
+9. streamed body aborts immediately above `RESEARCH_MAX_RESPONSE_BYTES`;
+10. unsupported/missing MIME and non-identity content encoding fail closed;
+11. no proxy or pooled socket can bypass per-hop validated-address pinning;
+12. HTML normalization removes executable/noise elements while preserving headings, lists, tables, and factual text;
+13. plain-text normalization handles line endings/whitespace and deterministic truncation;
+14. normalized text/section aggregates remain inside Phase 2A limits;
+15. canonical URL and normalized content-hash deduplication work;
+16. PDF retrieval does not fabricate a `ResearchDocument` when no PDF normalizer exists;
+17. retrieval never forwards cookies, authorization, browser/session headers, provider credentials, or response `Set-Cookie` data;
+18. retained response headers are allowlisted and secret/session headers are absent;
+19. arbitrary-source errors contain sanitized origin-level URL information only.
+20. HTTPS DNS-host requests use the original hostname for SNI/certificate identity, while HTTPS IP-literal requests send no IP SNI, keep normal CA verification, and verify certificate identity against the original IP host without disabling `rejectUnauthorized`.
+
+Keep the actual-socket pinning test offline without weakening the production policy. It is acceptable to test the low-level already-validated transport primitive against a loopback-bound local server using a test-only constructed validated-target fixture, while separate public-fetch integration tests prove the real Phase 2A validator rejects loopback/private addresses before that primitive can be reached. Do not add a runtime `allowPrivate`, `skipValidation`, or similar bypass flag solely for tests.
 
 ## Implementation order
 
 Follow this order so each layer has a testable consumer before the next one is added:
 
 1. inspect live contracts/limits/env/package state and run the existing Phase 2A tests;
-2. add provider-attempt/discovery internal types and any narrowly required contract extension with tests;
+2. add the `program-structure` research category/category-limit regression, `providerAttempts` contract, resolved-target/discovery internal types, and identity-resolution tests;
 3. add discovery constants/budgets if the existing limits module does not cover them;
 4. implement deterministic query planning and candidate deduplication;
 5. implement Tavily adapter with mocked tests;
 6. implement Brave adapter with mocked tests;
-7. implement direct/ROR/OpenAlex degraded discovery;
+7. implement trusted-direct/ROR degraded discovery;
 8. implement sequential discovery orchestrator and failover tests;
 9. implement/verify the discovery-key setup CLI and environment schema/example changes;
 10. implement the DNS-pinned retrieval transport and security tests;
@@ -324,6 +378,8 @@ Do not start a later numbered step while an earlier layer has unresolved determi
 This batch is complete only when all of the following are true:
 
 - a validated `ResearchRequest` produces deterministic discovery queries;
+- all seven MVP research categories, including `program-structure`, are representable and covered by deterministic query planning;
+- ID-only/name-based/program-name-only/subject-area-only/question-only requests pass through explicit target-resolution semantics without invented identities;
 - Tavily -> Brave -> direct/structured fallback is proven without parallel fan-out;
 - discovery provider failure never deletes already-valid candidates;
 - arbitrary URLs cannot bypass Phase 2A policy or DNS pinning at the actual connection;
@@ -346,7 +402,7 @@ npm test
 npx tsc --noEmit
 npm run lint
 npm run build
-npm audit
+npm audit --omit=dev
 powershell -ExecutionPolicy Bypass -File scripts/verify-workspace.ps1
 git diff --check
 ```

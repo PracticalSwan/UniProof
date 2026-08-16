@@ -37,28 +37,31 @@ Implementation runbooks:
 
 ### Phase 2B — Discovery and discovery-provider setup
 
-Next-batch scope; implement together with Phase 2C.
+Completed in the current Phase 2B–2C batch; retain the runbook below as the acceptance record.
 
-- [ ] Add bounded deterministic category-aware query planning; do not use AI for query generation.
-- [ ] Add project-owned discovery result/attempt types and bounded provider-attempt telemetry without replacing existing Phase 2A compatibility fields.
-- [ ] Implement Tavily Search as primary general-web discovery with small/basic requests and no answer/raw-content evidence use.
-- [ ] Implement Brave Web Search as sequential fallback only when Tavily yields no usable candidates after bounded handling.
-- [ ] Implement direct/structured degraded discovery using trusted official targets plus ROR/OpenAlex baseline adapters.
-- [ ] Canonicalize/deduplicate candidates and enforce per-domain/total source budgets before retrieval.
-- [ ] Add/extend `npm run setup:providers` so discovery setup requires only Tavily/Brave keys, preserves `.env.local`, and never exposes secrets.
-- [ ] Add deterministic tests for provider success, empty/config/auth/429/timeout/5xx/invalid-response fallback, deduplication, budgets, partial coverage, and secret-safe telemetry.
+- [x] Add bounded deterministic category-aware query planning; do not use AI for query generation.
+- [x] Extend the Phase 2A category contract with first-class `program-structure`, raise the category ceiling to seven, and add a regression before downstream use.
+- [x] Add explicit target identity resolution for name-based, program-name-only, subject-area-only, ID-only, unresolved-ID, and question-only requests; never invent official URLs or blindly accept the first/score-ranked ROR match.
+- [x] Add project-owned discovery result/attempt types and bounded ordered `ResearchRun.providerAttempts` telemetry without replacing existing Phase 2A compatibility fields.
+- [x] Implement Tavily Search as primary general-web discovery with small/basic requests and no answer/raw-content evidence use.
+- [x] Implement Brave Web Search as sequential fallback only when Tavily yields no usable candidates after bounded handling.
+- [x] Implement degraded discovery using trusted resolved official targets plus disambiguated ROR.
+- [x] Canonicalize/deduplicate candidates and enforce per-domain/total source budgets before retrieval.
+- [x] Add/extend `npm run setup:providers` so discovery setup requires only Tavily/Brave keys, preserves `.env.local`, and never exposes secrets.
+- [x] Add deterministic tests for provider success, empty/config/auth/429/timeout/5xx/invalid-response fallback, Unicode-safe target/ROR identity matching, current ROR display-name/website semantics, provenance-aware deduplication, budgets, partial coverage, and secret-safe telemetry.
 
 ### Phase 2C — DNS-pinned retrieval and normalization
 
-Next-batch scope; implement together with Phase 2B.
+Completed in the current Phase 2B–2C batch; retain the runbook below as the acceptance record.
 
-- [ ] Implement actual HTTP(S) transport that connects through the Phase 2A validated address set; do not validate and then call ordinary `fetch(url)` with an uncontrolled second DNS lookup.
-- [ ] Revalidate and re-pin every redirect; enforce connect/request timeouts, redirect limit, streamed byte cutoff, supported MIME types, minimal headers, and no credential/cookie forwarding.
-- [ ] Fail closed on unsupported content encoding in the initial transport unless bounded decompression is deliberately implemented/tested.
-- [ ] Normalize `text/html` and `text/plain` deterministically into provenance-preserving ResearchDocument records; preserve headings/tables/supporting text and truncate within Phase 2A bounds.- [ ] Promote discovery candidates to Source/ResearchDocument only after safe retrieval/usable normalization; deduplicate by canonical URL and normalized-content SHA-256.
-- [ ] Keep PDF retrieval explicitly bounded but do not fabricate a ResearchDocument when no PDF normalizer exists.
-- [ ] Add local/mock transport tests for DNS pinning, redirect-to-private rejection, timeout, oversize, MIME/encoding rejection, header isolation, normalization, and duplicate content.
-- [ ] Add one offline integration fixture from ResearchRequest -> discovery -> safe retrieval -> normalized sources/documents with no AI dependency.
+- [x] Implement actual HTTP(S) transport that connects through the Phase 2A validated address set; do not validate and then call ordinary `fetch(url)` with an uncontrolled second DNS lookup.
+- [x] Revalidate and re-pin every redirect; enforce connect/request timeouts, redirect limit, streamed byte cutoff, supported MIME types, minimal headers, and no credential/cookie forwarding.
+- [x] Fail closed on unsupported content encoding in the initial transport unless bounded decompression is deliberately implemented/tested.
+- [x] Normalize `text/html` and `text/plain` deterministically into provenance-preserving ResearchDocument records; preserve headings/tables/supporting text and truncate within Phase 2A bounds.
+- [x] Promote discovery candidates to Source/ResearchDocument only after safe retrieval/usable normalization; deduplicate by canonical URL and normalized-content SHA-256.
+- [x] Keep PDF retrieval explicitly bounded but do not fabricate a ResearchDocument when no PDF normalizer exists.
+- [x] Add local/mock transport tests for DNS pinning, redirect-to-private rejection, stalled-body timeout, declared and streamed oversize responses, MIME/encoding rejection, response-header isolation, sanitized failures, normalization, and duplicate content.
+- [x] Add one offline integration fixture from ResearchRequest -> discovery -> safe retrieval -> normalized sources/documents with no AI dependency.
 
 ### Phase 2D — Multi-provider structured extraction
 
@@ -80,7 +83,9 @@ Implement only after Phase 2B–2C passes its acceptance gate.
 - [ ] Use AI reconciliation only for genuinely semantic ambiguity; exact cases remain deterministic and provider output can reference only supplied candidate IDs.
 - [ ] Implement deterministic source/scope/freshness/independence gates for verified, university-reported, corroborated, conflicting, outdated, anecdotal, inferred, and unknown states.
 - [ ] Ensure mirrored/shared-origin sources do not count as independent corroboration and current contradictions are not promoted away.
-- [ ] Add optional evidence-bounded explanation with deterministic fallback and no new factual values.- [ ] Add deterministic gate tests for source independence, scope/year separation, verified/university-reported distinction, conflicts, stale/unknown/anecdotal states, AI exhaustion, and rejected model proposals.
+- [ ] Represent a processed category with no eligible evidence through EvidenceSummary coverage/categoriesUnknown rather than fabricating a sentinel-valued unknown claim.
+- [ ] Add optional evidence-bounded explanation with deterministic fallback and no new factual values.
+- [ ] Add deterministic gate tests for source independence, scope/year separation, verified/university-reported distinction, conflicts, stale/unknown/anecdotal states, AI exhaustion, and rejected model proposals.
 
 ### Phase 2F — Orchestration and Phase 2 verification
 
@@ -95,7 +100,7 @@ Implement only after Phase 2B–2C passes its acceptance gate.
 ## Phase 3 — Research Mode
 
 - [ ] Build university/program discovery and filters.
-- [ ] Build evidence-first dossier sections for admissions, tuition, scholarships, research, outcomes, and support.
+- [ ] Build evidence-first dossier sections for admissions, tuition, scholarships, program structure, research, outcomes, and support.
 - [ ] Build claim/source drawer with freshness and evidence-state badges.
 - [ ] Implement loading, partial, conflict, stale, empty, and failure states.
 - [ ] Verify desktop and narrow/mobile layouts with keyboard navigation.

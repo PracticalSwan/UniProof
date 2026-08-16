@@ -21,6 +21,8 @@ Do not combine Phase 2D with unfinished Phase 2B–2C networking work. Provider/
 Before implementation, read the live Phase 2A contracts, completed Phase 2B–2C modules, environment schema, provider setup command, package manifest/lockfile, security model, and source policy.
 
 Keep the default test suite offline and deterministic. Real provider calls are optional explicit smoke tests only.
+
+All Phase 2D–2F schemas, extraction paths, reconciliation groups, evidence gates, summaries, fixtures, and terminal orchestration must continue to support all seven `researchCategorySchema` values established in Phase 2B: `admissions`, `tuition`, `scholarships`, `program-structure`, `research`, `outcomes`, and `support`. No later phase may silently collapse `program-structure` into another category.
 ## Required module ownership
 
 Use these paths unless the live repository has already established a narrower equivalent:
@@ -94,14 +96,14 @@ Use the official `@google/genai` SDK and current Interactions API. Set `store: f
 
 Normal model: `gemini-3.5-flash-lite`. Quality escalation: `gemini-3.6-flash` only for an explicitly recorded quality condition while Gemini remains available.
 
-Use structured JSON/schema output supported by the current API and validate again with the project Zod schema. Do not send deprecated Gemini 3 sampling controls merely because older examples contain them; use only parameters supported by the current model/API documentation.
+Use the current Interactions API top-level `response_format` structured JSON/schema shape and validate again with the project Zod schema. Set `store: false` explicitly on every request; do not use `background` or `previous_interaction_id` in this stateless public-research path. Do not send removed legacy `response_mime_type` output configuration or deprecated Gemini 3 sampling controls merely because older examples contain them; use only parameters supported by the current model/API documentation.
 Gemini quality escalation is not availability fallback. Quota exhaustion, authentication failure, timeout exhaustion, or service unavailability goes to Groq instead of repeatedly escalating within Gemini.
 
 ## Phase 2D.4 — Groq adapter
 
 Use Groq's OpenAI-compatible endpoint with `openai/gpt-oss-120b`.
 
-Require strict JSON-schema Structured Outputs (`strict: true`) for structured extraction/reconciliation tasks where supported by the current endpoint. Validate the parsed result again with the same project Zod schema.
+Require strict JSON-schema Structured Outputs (`strict: true`) for `openai/gpt-oss-120b` structured extraction/reconciliation tasks and validate the parsed result again with the same project Zod schema. Current Groq strict Structured Outputs for this model do not support streaming or tool use, so keep these calls non-streaming and tool-free unless current official documentation is reverified and the runbook is deliberately updated.
 
 Do not copy OpenAI-compatible wire types into domain code. Record `provider=groq` and the actual model returned when available.
 
@@ -111,11 +113,11 @@ Stay within free-plan capacity. Do not enable billable capacity, purchase credit
 
 Use `openrouter/free` as the final availability fallback.
 
-Require structured-output-compatible routed providers by using the current parameter-support routing control. Apply the strictest compatible privacy routing, including denial of provider data collection when the current API supports that policy. Do not relax the privacy requirement to get a response.
+Require structured-output-compatible routed providers with JSON-schema `response_format`, `strict: true`, and `provider.require_parameters=true`. Require `provider.data_collection="deny"`; if project policy is configured to require zero data retention, also require the current ZDR routing control and fail closed when no eligible free route exists. Do not relax capability or privacy requirements to get a response.
 
 Record the concrete model ID returned by OpenRouter, not just `openrouter/free`. Never automatically select a paid model or paid provider route.
 
-If no eligible free route supports the required schema/parameters/privacy policy, classify the attempt as unavailable/capability-policy failure and preserve a partial result.
+If no eligible free route supports the required schema/parameters/privacy policy, record `outcome=failed` with `failureKind=capability` or `policy` as applicable; if an otherwise eligible route is only temporarily unavailable, use `upstream`/`timeout` as appropriate. Preserve the partial result and do not invent a new failure vocabulary.
 
 ## Phase 2D.6 — Setup CLI extension
 
@@ -199,7 +201,7 @@ Source independence is based on distinct owning organizations/publishers and und
 
 When multiple states could appear plausible, preserve the information rather than forcing a promotion. Current contradiction wins over corroboration for the disputed property/scope; older evidence does not corroborate a newer period; anecdotal evidence cannot elevate an institutional claim.
 
-An `unknown` record must never use zero, `false`, empty string, or a guessed sentinel as the factual value. Use the contract representation explicitly designed for missing evidence when Phase 2E finalizes the claim shape; if the current `VerifiedClaim.value` contract cannot represent an unknown without fabrication, evolve the contract with a regression before emitting unknown claims.
+A completed category with no eligible factual evidence does **not** need a fabricated `VerifiedClaim`. Represent evidence absence through `EvidenceSummary`: the category is processed, appears in `categoriesUnknown`, has a coverage entry with `claimCount=0`, `hasEvidence=false`, and `statuses=[]`. The current scalar `VerifiedClaim.value` contract therefore does not need to be weakened or given a sentinel merely to represent absence. If a later feature needs a claim-level `unknown` object, evolve the contract explicitly with a truthful non-value representation and a regression first.
 
 ## Phase 2E.4 — Evidence-bounded explanations
 
@@ -263,7 +265,7 @@ For orchestrator output, `run.partial` equals `status === "partial"`. Terminal r
 
 `categoriesProcessed` contains categories that reached an evidence-policy decision. `categoriesUnprocessed` is operational and disjoint. `categoriesFailed` identifies attempted categories with operational failure and is not a synonym for `unknown`.
 
-`hasEvidence=true` only when the category has at least one non-`unknown` gated claim. Outdated/conflicting/anecdotal/inferred claims are evidence-bearing; an unknown-only category is processed but has no evidence.
+`hasEvidence=true` only when the category has at least one non-`unknown` gated claim. Outdated/conflicting/anecdotal/inferred claims are evidence-bearing. A processed category with no eligible factual evidence has zero claims, appears in `categoriesUnknown`, and has `hasEvidence=false`; do not manufacture an unknown-valued claim just to populate the category.
 ## Phase 2F.3 — End-to-end fixture matrix
 
 Retain deterministic fixtures for at least:
@@ -275,6 +277,7 @@ Retain deterministic fixtures for at least:
 - different year/campus/program scope;
 - outdated evidence;
 - unknown after a completed pipeline;
+- first-class `program-structure` extraction/reconciliation/summary coverage;
 - anecdotal-only evidence;
 - Tavily -> Brave discovery failover;
 - general-web failure -> direct/structured degraded discovery;

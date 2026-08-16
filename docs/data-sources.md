@@ -7,7 +7,7 @@ Use the strongest available source for the exact claim and period.
 | Tier | Source class | Examples |
 | --- | --- | --- |
 | 1 | Primary authoritative | Official university/program pages, official fee schedules, government education agencies, accreditation bodies, immigration authorities |
-| 2 | Open authoritative datasets | OpenAlex, ROR, College Scorecard, Discover Uni, government statistics |
+| 2 | Open authoritative datasets | ROR, College Scorecard, Discover Uni, government statistics |
 | 3 | Reputable independent sources | Established education publications, professional associations, major reporting used only when primary evidence is insufficient |
 | 4 | Rankings | QS, THE, ARWU, or other providers, subject to licensing and methodology constraints |
 | 5 | Student opinion | Review platforms, forums, public community discussions, alumni/student accounts |
@@ -32,8 +32,7 @@ Store, when available:
 ## Initial Provider Roles
 
 - **Official university and government pages:** admissions, deadlines, tuition, scholarships, program rules, application links, and country-specific requirements.
-- **OpenAlex:** research works, topics, authors, and institution-level research activity.
-- **ROR:** canonical research-organization identities and identifiers.
+- **ROR:** canonical research-organization identities and identifiers. The Phase 2 discovery adapter uses current v2 affiliation matching, accepts only an active compatible `chosen:true` organization, takes the canonical institution name from the `ror_display` name, and trusts only `links.type=website` as an official-site candidate; Wikipedia links are never promoted as official university URLs.
 - **College Scorecard:** US institution-level public education/outcome data where applicable.
 - **Discover Uni:** UK course and outcome information where applicable.
 - **Tavily:** primary bounded general-web source discovery, not an authority by itself.

@@ -337,6 +337,16 @@ describe("Phase 2A CodexPro follow-up regressions", () => {
         { dnsResolver: publicResolver },
       ),
     ).toMatchObject({ valid: false, reason: "invalid-redirect-location" });
+    for (const malformed of ["/has space", "/has\ttab", "/has\nline", "/has\rreturn"]) {
+      expect(
+        await validateRedirectTarget(
+          "https://public.example/start",
+          malformed,
+          0,
+          { dnsResolver: publicResolver },
+        ),
+      ).toMatchObject({ valid: false, reason: "invalid-redirect-location" });
+    }
   });
 
   it("normalizes candidate domains and rejects URL/domain contradictions", () => {

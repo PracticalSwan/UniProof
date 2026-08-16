@@ -1,10 +1,10 @@
 # Phase 2 — Evidence and Research Pipeline
 
-Status: Phase 2A implemented; Phase 2B–2F remain planned.
+Status: Phase 2A–2C implemented and verified; Phase 2D–2F remain planned.
 
 Implementation runbooks:
 
-- Phase 2B–2C: `docs/planning/phase-2b-2c-discovery-retrieval.md` is the exact next-batch execution specification.
+- Phase 2B–2C: `docs/planning/phase-2b-2c-discovery-retrieval.md` is the completed-batch implementation and acceptance record.
 - Phase 2D–2F: docs/planning/phase-2d-2f-ai-reconciliation-orchestration.md is the implementation-grade execution specification after Phase 2B–2C passes.
 
 The parent plan owns Phase 2 architecture and cross-phase invariants. A batch runbook may specialize file paths and execution order but may not weaken this plan, `AGENTS.md`, Phase 2A contracts, or the security model.
@@ -140,10 +140,11 @@ Exact numeric quotas must be checked against the active provider accounts before
 
 ```text
 ResearchRequest
-  -> discovery query planning
+  -> project-owned target identity resolution
+  -> deterministic discovery query planning
   -> Tavily discovery
-       -> Brave Search fallback when Tavily is unavailable
-       -> direct/structured-provider fallback when web discovery is unavailable
+       -> Brave Search fallback for still-unsatisfied queries after bounded Tavily empty/config/auth/rate-limit/timeout/upstream/invalid-response handling
+       -> trusted direct/ROR degraded fallback for still-unsatisfied institutional queries
   -> outbound URL policy
   -> bounded retrieval
   -> document normalization
@@ -220,6 +221,8 @@ The following rules remove ambiguity for Phase 2B–2F implementations.
 
 Phase 2A contracts and security primitives are implemented source-of-truth code, not illustrative pseudocode. Before changing `lib/research/contracts/research.ts`, `lib/security/outbound-url.ts`, or `lib/security/research-limits.ts`, identify the exact downstream requirement, add a regression that fails under the old behavior, and preserve all existing Phase 2A regression coverage.
 
+Phase 2B must make one required additive contract change before query planning: add first-class `program-structure` to the research category vocabulary, raise the server-owned category ceiling from six to seven, and regression-test the change. The MVP requirements explicitly include program-structure information; do not silently fold it into admissions or research.
+
 Provider payloads must never become domain contracts. Each adapter converts vendor data into project-owned internal types before orchestration sees it.
 
 When a model/provider needs a narrower schema than the final domain object, define a provider-facing schema instead of asking the provider to manufacture trusted IDs, source authority, evidence states, or application-owned metadata.
@@ -276,7 +279,7 @@ For orchestrator-produced runs, `partial` must equal `status === "partial"`. `co
 
 A category is `processed` when deterministic/AI stages required for that category ran to an evidence-policy decision, even if the final result is `unknown`.
 
-`hasEvidence` means the category has at least one non-`unknown` gated claim. `outdated`, `conflicting`, `anecdotal`, and `inferred` are still evidence-bearing states; a category containing only an `unknown` placeholder has `hasEvidence=false`.
+`hasEvidence` means the category has at least one non-`unknown` gated claim. `outdated`, `conflicting`, `anecdotal`, and `inferred` are still evidence-bearing states. When a completed category has no eligible factual evidence, represent that absence in `EvidenceSummary` with zero claims, `hasEvidence=false`, and membership in `categoriesUnknown`; do not fabricate an `unknown` claim value merely to populate the category.
 
 `categoriesUnprocessed` is operational and must remain disjoint from `categoriesProcessed`. `categoriesFailed` may identify attempted categories with operational failure but must not be used as a synonym for `unknown`.
 
@@ -293,7 +296,7 @@ Prefer sources in this order when the claim category allows it:
 
 1. official university/program/admissions pages;
 2. government, accreditation, or regulator sources;
-3. authoritative structured datasets such as ROR/OpenAlex/College Scorecard/Discover Uni;
+3. authoritative structured datasets such as ROR/College Scorecard/Discover Uni;
 4. high-quality independent sources;
 5. rankings or community sources only for categories where those sources are semantically appropriate.
 
@@ -310,7 +313,7 @@ Tavily unavailable
   -> partial ResearchResult when coverage remains incomplete
 ```
 
-Tavily remains the primary general-web discovery adapter. Brave Search is the independent-index fallback and must use its Search API/free monthly credits rather than its answer-generation product. If both general-web providers are unavailable, continue with known official URLs and configured structured providers such as ROR, OpenAlex, College Scorecard, Discover Uni, and applicable government datasets.
+Tavily remains the primary general-web discovery adapter. Brave Search is the independent-index fallback and must use its Search API/free monthly credits rather than its answer-generation product. If both general-web providers are unavailable, continue with trusted resolved official URLs and ROR. College Scorecard, Discover Uni, and other national datasets remain deliberate later additions rather than baseline blockers.
 
 Provider failure must be recorded by provider and reason. A discovery outage must not erase candidates already found by another provider. If provider/transport exhaustion prevents the category from completing the required research path, mark it operationally unprocessed/failed and preserve an explicit partial result. If every required discovery mechanism completes successfully but no usable evidence exists, that is evidence absence and may later become a processed `unknown`, not a provider failure.
 
@@ -322,7 +325,7 @@ Every discovery adapter returns normalized `CandidateSource` records and hides p
 
 - Tavily general-web discovery;
 - Brave Search fallback;
-- ROR/OpenAlex and selected national/open authoritative datasets;
+- ROR as the baseline structured identity adapter, plus selected national/open authoritative datasets when separately implemented;
 - direct known-source candidates where the university/program identity already supplies an authoritative URL.
 
 Discovery must support category-aware queries, deduplicate equivalent URLs, avoid repeatedly selecting many pages from one domain, retain provider provenance, and enforce a source-count budget before retrieval.
@@ -357,7 +360,7 @@ Normalization rules:
 
 The MVP should use focused page retrieval, not recursive crawling. A research run has a hard source/page budget.
 
-pplication/pdf remains transport-allowed by the Phase 2A MIME contract, but PDF text normalization is not required in the Phase 2B–2C batch. A safely retrieved PDF without an implemented bounded normalizer must produce an explicit normalization/unsupported-normalizer failure, never a fabricated empty ResearchDocument. Broad document-upload support remains outside Phase 2.
+`application/pdf` remains transport-allowed by the Phase 2A MIME contract, but PDF text normalization is not required in the Phase 2B–2C batch. A safely retrieved PDF without an implemented bounded normalizer must produce an explicit normalization/unsupported-normalizer failure, never a fabricated empty ResearchDocument. Broad document-upload support remains outside Phase 2.
 
 ## Phase 2D — Multi-provider structured claim extraction
 
@@ -553,7 +556,6 @@ lib/
     tavily/
     brave/
     ror/
-    openalex/
   security/
     outbound-url.ts
     research-limits.ts
@@ -639,6 +641,12 @@ Brave:
 
 Tavily:
 
+- Search API/authentication/parameters: https://docs.tavily.com/documentation/api-reference/endpoint/search
 - Rate limits: https://docs.tavily.com/documentation/rate-limits
+
+ROR:
+
+- ROR REST API: https://ror.readme.io/docs/rest-api
+- Automatic affiliation matching: https://ror.readme.io/docs/api-affiliation
 
 Re-check provider models, free quotas/credits, privacy controls, and API behavior immediately before implementing or materially changing an adapter because these are mutable external facts.

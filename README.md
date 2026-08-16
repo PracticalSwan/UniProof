@@ -15,7 +15,7 @@ UniProof is an evidence-first AI platform for international students researching
 - Supabase PostgreSQL + Supabase Auth
 - Provider-neutral AI with Gemini free primary (`gemini-3.5-flash-lite`, bounded `gemini-3.6-flash` quality escalation), Groq Free `openai/gpt-oss-120b` fallback, and OpenRouter `openrouter/free` final fallback
 - Tavily primary source discovery with Brave Search fallback, then direct/structured-source degraded discovery
-- OpenAlex, ROR, College Scorecard, Discover Uni, and official university/government sources
+- ROR, College Scorecard, Discover Uni, and official university/government sources
 - Zod for runtime contracts
 - Vitest for unit/integration tests
 - Playwright for browser/E2E verification
@@ -23,7 +23,7 @@ UniProof is an evidence-first AI platform for international students researching
 
 ## Current State
 
-Phase 2A is complete and independently hardened: the Next.js application foundation includes Zod-first research contracts, centralized server-owned retrieval bounds, deterministic SSRF/DNS/redirect policy primitives, conservative IPv6 public-address classification reviewed against current IANA allocations, and offline security regression tests. Live source discovery, Brave fallback, retrieval transport, multi-provider AI calls/reconciliation, database migrations, Row Level Security, seed data, and persistence remain intentionally deferred to later phases.
+Phase 2B and 2C now include deterministic source discovery with Tavily -> Brave -> direct/ROR fallback, DNS-pinned bounded retrieval, HTML/plain-text normalization, and offline source/document integration coverage. Multi-provider AI calls/reconciliation, database migrations, Row Level Security, seed data, and persistence remain intentionally deferred to later phases.
 
 Open-source repository: <https://github.com/PracticalSwan/UniProof>
 

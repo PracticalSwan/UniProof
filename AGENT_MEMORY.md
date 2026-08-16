@@ -169,3 +169,71 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - Verified: Current provider assumptions were re-checked against official Tavily, Brave Search, Gemini, Groq, and OpenRouter documentation on 2026-08-16. `npm test` passed 39/39; `npx tsc --noEmit`, `npm run lint`, `npm run build`, `npm audit --omit=dev` (0 vulnerabilities), workspace verification, UTF-8 replacement scan, secret-pattern scan, targeted contradiction search, and `git diff --check` passed.
 - Tooling: CodexPro opened/read the correct workspace initially, then became unreliable with connection failures and a later connector `404`; Windows-native Remote Desktop Commander evidence was used for final inspection and verification rather than assuming failed CodexPro calls changed repository state.
 - Deferred: No Phase 2B–2F runtime code, provider dependency, live provider call, environment-schema/provider-key change, persistence, deployment, or paid-provider action was introduced by this planning review.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — CodexPro Phase 2 planning re-review
+
+**Summary:** Independently falsified the Phase 2 implementation runbooks with CodexPro, fixed remaining small-model ambiguities and provider/security inconsistencies, and kept runtime implementation deferred.
+
+- Changed: Added first-class planned `program-structure` research coverage, explicit request-target identity resolution/ROR disambiguation, ordered provider-attempt semantics, deterministic discovery-satisfaction rules, current keyed-OpenAlex optionality, and tighter DNS-pinned transport/redirect/header requirements for Phase 2B–2C.
+- Changed: Defined evidence absence as a processed zero-claim `EvidenceSummary` unknown state rather than a fabricated sentinel-valued claim; repaired fused Phase 2 checklist items and a control-character corruption in the PDF planning text.
+- Decided: Phase 2B + Phase 2C remain the next implementation batch; OpenAlex is not a required Phase 2B–2C operator key, and discovery coverage must not be confused with processed/evidence coverage.
+- Deferred: No Phase 2B/2C runtime implementation, provider call, persistence, deployment, commit, or push was performed in this review.
+- Verified: Canonical Windows `npm.cmd test` passed 39/39 and `npm.cmd run build` passed; direct CodexPro Vitest, TypeScript, ESLint, production build, and production dependency audit passed; workspace verification and `git diff --check` passed; changed Markdown contains no control/replacement characters or fused checklist markers.
+
+## 2026-08-16 - ChatGPT / GPT-5.6 Sol - Phase 2 planning review continuation addendum
+
+**Summary:** Finalized the interrupted Phase 2 planning falsification pass, closed additional small-model identity/provider/transport ambiguities, and kept Phase 2B-2C runtime implementation deferred.
+
+- Changed: Explicitly specified subject-area-only and program-name-only target behavior, project-owned bounded identity-resolution outcomes, application-ID cross-checks, and ROR v2 automatic matching via a compatible active `chosen:true` result rather than first-result/score selection.
+- Changed: Defined optional `OPENALEX_API_KEY` handling without adding a Phase 2B-2C setup prompt, pinned Tavily Search authentication/basic-depth behavior, Brave header/query constraints, isolated Phase 2C sockets with `agent: false`, and an offline socket-pinning test strategy that does not introduce a runtime private-network bypass.
+- Changed: Reconciled Phase 2D-2F with all seven research categories and current Gemini/Groq/OpenRouter structured-output/privacy semantics; synchronized the architecture/security docs and restored program-structure coverage in the Phase 3 task list.
+- Verified: Windows `npm.cmd test` passed 39/39, `npm.cmd run lint` passed, and `npm.cmd run build` passed. CodexPro direct Vitest passed 39/39, `npx tsc --noEmit`, direct ESLint, direct Next.js production build, and `npm audit --omit=dev` passed with 0 vulnerabilities. Workspace verification, `git diff --check`, tracked-file secret-pattern scan, and changed-Markdown control/replacement/mojibake/fused-checklist scans passed.
+- Tooling: CodexPro ordinary repository reads/searches/status/direct verification remained reliable. Its npm-script wrapper intermittently returned exit code 1 with only the script banner for test/lint/build, while equivalent direct CodexPro commands and canonical Windows npm commands passed; this was treated as a wrapper/reporting anomaly, not a CodexPro connector failure.
+- Deferred: No Phase 2B/2C runtime code, live provider request, dependency or environment-schema change, persistence, deployment, commit, or push was performed.
+- Changed: Clarified HTTPS SNI behavior so DNS-host requests preserve the original hostname for SNI/certificate identity while IP-literal requests send no IP SNI and never disable certificate verification.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Phase 2B–2C implementation closure
+
+**Summary:** Implemented and verified the authorized Phase 2B discovery plus Phase 2C retrieval/normalization batch, removed OpenAlex from active UniProof architecture, and preserved the deferred API-key boundary.
+
+- Changed: Added project-owned target resolution, seven-category deterministic query planning, bounded Tavily -> Brave -> direct/ROR sequential discovery, ordered provider-attempt telemetry, provider exception/timeout budgets, known-ROR identity cross-checking, candidate deduplication/source budgets, and a deterministic private-data guard that never sends detected applicant values or sensitive document references to search providers.
+- Changed: Added server-only Tavily, Brave, and ROR adapters with bounded response parsing, safe retry handling, no raw payload/snippet promotion, no credential-bearing telemetry, and noninteractive `npm run setup:providers` behavior. Setup validates already-present values only; no API-key prompt or connectivity check was requested in this batch.
+- Changed: Added DNS-pinned Node HTTP(S) retrieval with per-hop redirect validation, public-address pinning, isolated connections, SNI/certificate safeguards, timeout/byte/MIME/encoding bounds, allowlisted response headers, parse5-based HTML normalization, plain-text normalization, PDF explicit unsupported-normalizer behavior, provenance-preserving Source/ResearchDocument promotion, and normalized-content SHA-256 deduplication.
+- Changed: Removed OpenAlex from active provider contracts, adapters, environment/setup docs, source policy, architecture docs, runbooks, and task planning. Historical OpenAlex references in this append-only memory remain intact as provenance and are not active runtime configuration.
+- Changed: Preserved the user-requested context references to CodexPro Full 2.0 and Remote Desktop Commander; no external ChatGPT usage connector or API-key input was needed to complete this local batch.
+- Verified: `npm.cmd test -- --run` passed 63/63; `npx.cmd tsc --noEmit`, `npm.cmd run lint`, and `npm.cmd run build` passed; `npm.cmd audit --omit=dev` reported 0 vulnerabilities; `scripts/verify-workspace.ps1` passed; `git diff --check` passed with only expected Windows LF-to-CRLF warnings; targeted secret-pattern scanning found no non-empty provider/server-key assignments or public credential assignments; active OpenAlex scanning found no references outside append-only `AGENT_MEMORY.md`.
+- Verified: `npm.cmd run setup:providers` reported Tavily and Brave as not configured, ran no connectivity checks, and requested no API-key prompt. No live provider request, persistence, deployment, commit, or push was performed.
+- Deferred: Phase 2D–2F AI extraction/reconciliation/orchestration, provider-key entry, persistence/RLS, UI wiring, live provider smoke tests, deployment, and publication remain later authorized phases.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Interactive discovery-key setup
+
+**Summary:** Completed the deferred interactive entry path for Tavily and Brave discovery keys without exposing values in chat, logs, or project memory.
+
+- Changed: `scripts/setup-providers.mjs` now prompts only when stdin and stdout are interactive TTYs, reads printable key characters with terminal echo disabled, restores terminal state during cleanup, preserves an existing managed value when a blank line is submitted, and never prints key values. `--non-interactive` and `UNIPROOF_NON_INTERACTIVE=1` retain the no-prompt behavior.
+- Changed: The interactive prompt now prints one neutral `*` mask character per accepted printable keystroke and erases it on backspace, so terminal input is visibly active without revealing the key.
+- Verified: A PTY run accepted blank input for both prompts and completed without writing credentials; `npm.cmd run setup:providers -- --non-interactive` and `node --check scripts/setup-providers.mjs` passed. No real key value was entered or stored during verification.
+- Verified: A separate PTY run accepted synthetic test values, displayed only mask characters, reported both providers as configured, and the temporary `.env.local` was removed immediately afterward. No real credential was used.
+- Verified: After the setup change, the full relevant gate remained green: `npm.cmd test -- --run` passed 63/63, `npx.cmd tsc --noEmit`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd audit --omit=dev`, workspace verification, `git diff --check`, the active OpenAlex scan, and the targeted secret-assignment scan all passed.
+- Decided: This setup command configures only `TAVILY_API_KEY` and `BRAVE_SEARCH_API_KEY`; Gemini, Groq, and OpenRouter entry remains deferred to Phase 2D, and OpenAlex remains removed from active configuration.
+- Tooling: CodexPro Full 2.0 and Remote Desktop Commander remain the project context references; no external ChatGPT usage connector or API-key input was needed for this local setup change.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Configured discovery-key review
+
+**Summary:** Reviewed the completed Tavily and Brave key entry without exposing credential values and confirmed the configured environment is safe for local use.
+
+- Verified: `.env.local` contains only the two intended server-side discovery keys, both nonempty and free of control or surrounding-whitespace characters; the file remains ignored by Git. Noninteractive setup reports both providers as configured.
+- Verified: The configured key values were not found outside `.env.local`, including source files and the generated `.next` output. `npm.cmd test -- --run` passed 63/63; TypeScript, lint, production build, audit (0 vulnerabilities), workspace verification, diff check, and the active OpenAlex scan passed.
+- Decided: No live Tavily or Brave request was made because provider smoke tests consume external quota and were not explicitly authorized; actual credential validity and provider quota remain unverified until that separate check is requested.
+- Deferred: `UNIPROOF_RESEARCH_MODE` remains at the safe default `seed`, and AI-provider key entry/orchestration remains deferred to Phase 2D.
+
+## 2026-08-16 — ChatGPT / GPT-5.6 Sol — Phase 2B–2C post-implementation review
+
+**Summary:** Independently reviewed the completed Phase 2B–2C implementation, fixed identity/discovery/provenance and ROR adapter defects, expanded the security regression matrix, and reconciled the Phase 2 documentation before the authorized Git publication.
+
+- Fixed: Made application-owned university identity comparison Unicode-safe and failed closed when a resolved program's parent university cannot be cross-checked against a supplied university name.
+- Fixed: Preserved per-query discovery coverage across canonical-URL deduplication, reused a confidently resolved ROR identity for later direct fallback, enabled the documented built-in ROR degraded fallback by default, and preferred stronger trusted provenance when duplicate canonical URLs disagree on source type.
+- Fixed: Updated ROR v2.1 handling to use the `ror_display` name and `website` link type rather than array order, reject conflicting Unicode identity, preserve returned country context, and classify ROR timeout/rate-limit outcomes through the shared bounded attempt vocabulary.
+- Fixed: Included discovery-uncovered categories in `EvidenceSummary.categoriesFailed` while keeping all categories operationally unprocessed until later evidence-policy phases.
+- Tested: Added regressions for the above defects plus streamed response-byte cutoff, stalled-body timeout, private redirect revalidation, response-header allowlisting, and origin-only sanitized retrieval failures. The full suite passed 76/76.
+- Verified: `npx.cmd tsc --noEmit`, `npm.cmd run lint`, `npm.cmd run build`, `npm.cmd audit --omit=dev` (0 vulnerabilities), workspace verification, and `git diff --check` passed. Changed-file encoding/control scans and publication-set secret-prefix/nonempty-credential-assignment scans passed; `.env.local` remains ignored and outside the publication set.
+- Deferred: No live Tavily, Brave, ROR, or arbitrary public-site smoke request was made during this review. Phase 2D–2F AI extraction/reconciliation/orchestration, persistence/RLS, and UI wiring remain deferred.

@@ -14,7 +14,7 @@ Use a single Next.js application for the hackathon MVP. Keep interactive UI in R
 | Database/auth | Supabase PostgreSQL + Supabase Auth |
 | AI | Provider-neutral structured AI: Gemini primary, Groq `openai/gpt-oss-120b` fallback, OpenRouter `openrouter/free` final fallback |
 | Web research | Tavily primary discovery -> Brave Search fallback -> direct/structured approved sources |
-| Research datasets | OpenAlex, ROR, College Scorecard, Discover Uni |
+| Research datasets | ROR, College Scorecard, Discover Uni |
 | Tests | Vitest + Playwright |
 | Hosting | Vercel + Supabase |
 
@@ -42,7 +42,8 @@ The Phase 2B/2D implementation must provide a cross-platform setup command such 
 
 ```text
 ResearchRequest
-        -> query/research planner
+        -> project-owned target identity resolution
+        -> deterministic query/research planner
         -> Tavily discovery -> Brave fallback -> direct/structured degraded discovery
         -> bounded source retrieval and cleaning
         -> Gemini -> Groq -> OpenRouter structured claim extraction
@@ -62,7 +63,7 @@ ResearchRequest
 - `claims`: structured extraction, deterministic normalization, AI semantic reconciliation, evidence-policy gating, freshness, conflict handling, and evidence-bounded explanation.
 - `comparison`: deterministic category normalization and weighted user-fit calculation.
 - `guide`: applicant-to-requirement assessment, risk warnings, and task generation.
-- `integrations`: Gemini, Groq, OpenRouter, Tavily, Brave, Supabase, OpenAlex, ROR, College Scorecard, and other approved providers behind project-owned adapters.
+- `integrations`: Gemini, Groq, OpenRouter, Tavily, Brave, Supabase, ROR, College Scorecard, and other approved providers behind project-owned adapters.
 - `security`: outbound URL policy, rate limits, input bounds, and safe logging.
 
 ## Initial Domain Entities

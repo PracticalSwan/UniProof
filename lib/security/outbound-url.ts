@@ -732,6 +732,9 @@ export async function validateRedirectTarget(
   if (location.length === 0 || location.length > RESEARCH_MAX_REDIRECT_LOCATION_CHARS) {
     return outboundFailure(currentUrl, "invalid-redirect-location");
   }
+  if (/[\u0000-\u0020\u007f-\u009f]/.test(location)) {
+    return outboundFailure(currentUrl, "invalid-redirect-location");
+  }
 
   const currentSyntax = validateOutboundUrlSyntax(currentUrl, options);
   if (!currentSyntax.valid) {

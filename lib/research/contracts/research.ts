@@ -12,7 +12,9 @@ import {
   RESEARCH_MAX_CATEGORIES,
   RESEARCH_MAX_CLAIMS_PER_RUN,
   RESEARCH_MAX_EXTRACTION_CALLS_PER_RUN,
+  RESEARCH_MAX_FAILURES_PER_RUN,
   RESEARCH_MAX_NORMALIZED_TEXT_CHARACTERS,
+  RESEARCH_MAX_PROVIDER_ATTEMPTS_PER_RUN,
   RESEARCH_MAX_QUERY_CHARACTERS,
   RESEARCH_MAX_RESPONSE_BYTES,
   RESEARCH_MAX_SOURCES_PER_RUN,
@@ -75,6 +77,7 @@ export const researchCategorySchema = z.enum([
   "admissions",
   "tuition",
   "scholarships",
+  "program-structure",
   "research",
   "outcomes",
   "support",
@@ -215,6 +218,86 @@ export const researchRunStatusSchema = z.enum([
   "failed",
 ]);
 
+export const researchProviderSchema = z.enum([
+  "tavily",
+  "brave",
+  "ror",
+  "direct",
+  "gemini",
+  "groq",
+  "openrouter",
+]);
+
+export const researchProviderAttemptOutcomeSchema = z.enum([
+  "success",
+  "empty",
+  "skipped",
+  "failed",
+]);
+
+export const researchProviderAttemptStageSchema = z.enum([
+  "discovery",
+  "retrieval",
+  "extraction",
+  "reconciliation",
+  "explanation",
+]);
+
+export const researchProviderAttemptFailureKindSchema = z.enum([
+  "configuration",
+  "authentication",
+  "rate-limit",
+  "timeout",
+  "upstream",
+  "invalid-response",
+  "capability",
+  "policy",
+  "budget",
+]);
+
+/**
+ * Ordered, safe provider history for a run. The array order is execution
+ * order; raw requests/responses and credentials never belong here.
+ */
+export const researchProviderAttemptSchema = z
+  .object({
+    stage: researchProviderAttemptStageSchema.default("discovery"),
+    provider: researchProviderSchema,
+    queryId: boundedId.optional(),
+    category: researchCategorySchema.optional(),
+    outcome: researchProviderAttemptOutcomeSchema,
+    retryCount: z.number().int().min(0).max(1).default(0),
+    durationMs: z.number().int().min(0).max(120_000).optional(),
+    failureKind: researchProviderAttemptFailureKindSchema.optional(),
+  })
+  .strict()
+  .superRefine((attempt, context) => {
+    if (attempt.outcome === "success" && attempt.failureKind !== undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "successful provider attempts cannot report a failure kind",
+        path: ["failureKind"],
+      });
+    }
+    if (
+      (attempt.outcome === "failed" || attempt.outcome === "skipped") &&
+      attempt.failureKind === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "failed or skipped provider attempts require a failure kind",
+        path: ["failureKind"],
+      });
+    }
+    if (attempt.outcome === "empty" && attempt.failureKind !== undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "empty provider attempts cannot report a failure kind",
+        path: ["failureKind"],
+      });
+    }
+  });
+
 export const researchRunSchema = z
   .object({
     id: boundedId,
@@ -224,6 +307,10 @@ export const researchRunSchema = z
     startedAt: z.iso.datetime().optional(),
     completedAt: z.iso.datetime().optional(),
     discoveryProvider: z.string().min(1).max(80).optional(),
+    providerAttempts: z
+      .array(researchProviderAttemptSchema)
+      .max(RESEARCH_MAX_PROVIDER_ATTEMPTS_PER_RUN)
+      .default([]),
     extractionModel: z.string().min(1).max(80).optional(),
     maxExtractionCalls: z.number().int().min(0).max(RESEARCH_MAX_EXTRACTION_CALLS_PER_RUN).optional(),
     extractionCallsUsed: z.number().int().min(0).max(RESEARCH_MAX_EXTRACTION_CALLS_PER_RUN).optional(),
@@ -289,6 +376,7 @@ const candidateSourceBaseSchema = z
     domain: candidateDomainSchema.optional(),
     sourceType: sourceTypeSchema,
     discoveryProvider: z.string().min(1).max(80),
+    discoveryQueryId: boundedId.optional(),
     requestedCategory: researchCategorySchema.optional(),
     discoveredAt: z.iso.datetime().optional(),
     relevanceScore: z.number().min(0).max(1).optional(),
@@ -528,13 +616,15 @@ export const evidenceSummarySchema = z
     }
   });
 
-const researchSourceSchema = sourceSchema
+export const researchSourceSchema = sourceSchema
   .extend({
     id: boundedId,
     url: researchHttpUrlSchema,
     title: z.string().min(1).max(300),
     publisher: z.string().min(1).max(200),
     academicYear: z.string().trim().min(1).max(40).optional(),
+    discoveryProvider: researchProviderSchema.optional(),
+    discoveryQueryId: boundedId.optional(),
   })
   .strict();
 
@@ -564,7 +654,7 @@ export const researchResultSchema = z
     candidates: z.array(claimCandidateSchema).max(RESEARCH_MAX_CLAIMS_PER_RUN).default([]),
     claims: z.array(verifiedClaimSchema).max(RESEARCH_MAX_CLAIMS_PER_RUN).default([]),
     evidenceSummary: evidenceSummarySchema,
-    failures: z.array(researchFailureSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
+    failures: z.array(researchFailureSchema).max(RESEARCH_MAX_FAILURES_PER_RUN).default([]),
     warnings: z.array(boundedWarning).max(50).default([]),
   })
   .strict()
@@ -741,10 +831,13 @@ export const researchResultSchema = z
 export type ResearchRequest = z.infer<typeof researchRequestSchema>;
 export type ResearchTarget = z.infer<typeof researchTargetSchema>;
 export type ResearchRunStatus = z.infer<typeof researchRunStatusSchema>;
+export type ResearchProvider = z.infer<typeof researchProviderSchema>;
+export type ResearchProviderAttempt = z.infer<typeof researchProviderAttemptSchema>;
 export type ResearchRun = z.infer<typeof researchRunSchema>;
 export type CandidateSource = z.infer<typeof candidateSourceSchema>;
 export type ResearchDocumentSection = z.infer<typeof researchDocumentSectionSchema>;
 export type ResearchDocument = z.infer<typeof researchDocumentSchema>;
+export type ResearchSource = z.infer<typeof researchSourceSchema>;
 export type ClaimCandidate = z.infer<typeof claimCandidateSchema>;
 export type VerifiedClaim = z.infer<typeof verifiedClaimSchema>;
 export type EvidenceSummary = z.infer<typeof evidenceSummarySchema>;

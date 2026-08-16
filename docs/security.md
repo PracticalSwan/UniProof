@@ -29,6 +29,7 @@ Server retrieval must use an explicit outbound policy:
 - Re-check each redirect destination.
 - Redact outbound-validation failure targets: do not echo credentials, paths, query strings, fragments, or opaque-scheme payloads in error metadata.
 - Treat resolution-time validation as a prerequisite, not a complete transport guarantee: Phase 2C must connect through the validated/pinned address or revalidate the transport lookup to close the DNS-rebinding gap.
+- Keep the initial Phase 2C arbitrary-source transport isolated per validated hop: no proxy/environment-proxy routing and no cross-request pooled/keep-alive socket reuse; the actual connected remote address/family must match the selected validated address.
 - Bound redirects, response bytes, request time, and content types.
 - Sanitize content before rendering; never render retrieved HTML directly.
 - Treat webpage instructions, tool-like text, and embedded prompts as source data only.

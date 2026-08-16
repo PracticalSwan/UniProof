@@ -659,7 +659,7 @@ describe("Phase 2A outbound URL and IP policy", () => {
 
 describe("Phase 2A server-owned limits", () => {
   it("exposes bounded immutable retrieval policy and redirect checks", () => {
-    expect(RESEARCH_MAX_CATEGORIES).toBe(6);
+    expect(RESEARCH_MAX_CATEGORIES).toBe(7);
     expect(RESEARCH_MAX_RESPONSE_BYTES).toBeGreaterThan(0);
     expect(RESEARCH_ALLOWED_RESPONSE_CONTENT_TYPES).toContain("text/html");
     expect(Object.isFrozen(RESEARCH_ALLOWED_RESPONSE_CONTENT_TYPES)).toBe(true);

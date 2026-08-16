@@ -65,6 +65,7 @@ if (Test-Path -Path $envExamplePath) {
         'SUPABASE_SERVICE_ROLE_KEY',
         'GEMINI_API_KEY',
         'TAVILY_API_KEY',
+        'BRAVE_SEARCH_API_KEY',
         'COLLEGE_SCORECARD_API_KEY'
     )
 

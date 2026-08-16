@@ -15,9 +15,11 @@ import {
   RESEARCH_MAX_FAILURES_PER_RUN,
   RESEARCH_MAX_NORMALIZED_TEXT_CHARACTERS,
   RESEARCH_MAX_PROVIDER_ATTEMPTS_PER_RUN,
+  RESEARCH_MAX_EXPLANATION_SUMMARY_UTF16,
   RESEARCH_MAX_QUERY_CHARACTERS,
   RESEARCH_MAX_RESPONSE_BYTES,
   RESEARCH_MAX_SOURCES_PER_RUN,
+  RESEARCH_MAX_WARNINGS_PER_RUN,
 } from "@/lib/security/research-limits";
 import { normalizeResearchIdentity } from "@/lib/research/identity";
 import {
@@ -280,6 +282,23 @@ export const researchRunStatusSchema = z.enum([
   "failed",
 ]);
 
+export const researchCategoryOrder = [
+  "admissions",
+  "tuition",
+  "scholarships",
+  "program-structure",
+  "research",
+  "outcomes",
+  "support",
+] as const satisfies readonly [ResearchCategory, ...ResearchCategory[]];
+
+export function canonicalizeResearchCategories(
+  categories: readonly ResearchCategory[],
+): ResearchCategory[] {
+  const unique = new Set(categories);
+  return researchCategoryOrder.filter((category) => unique.has(category));
+}
+
 export const researchProviderSchema = z.enum([
   "tavily",
   "brave",
@@ -339,6 +358,7 @@ export const researchProviderAttemptSchema = z
     durationMs: z.number().int().min(0).max(120_000).optional(),
     model: z.string().trim().min(1).max(80).optional(),
     failureKind: researchProviderAttemptFailureKindSchema.optional(),
+    budgetScope: z.enum(["provider", "total"]).optional(),
   })
   .strict()
   .superRefine((attempt, context) => {
@@ -366,6 +386,13 @@ export const researchProviderAttemptSchema = z
         path: ["failureKind"],
       });
     }
+    if (attempt.budgetScope !== undefined && (attempt.failureKind !== "budget" || attempt.outcome !== "skipped")) {
+      context.addIssue({
+        code: "custom",
+        message: "budgetScope is valid only for skipped budget attempts",
+        path: ["budgetScope"],
+      });
+    }
   });
 
 export const researchRunSchema = z
@@ -389,9 +416,11 @@ export const researchRunSchema = z
     unprocessedCategories: uniqueCategoriesSchema.default([]),
     failureCode: z
       .enum([
+        "cancelled",
         "validation",
         "source-discovery",
         "retrieval",
+        "normalization",
         "provider-rate-limit",
         "provider-error",
         "timeout",
@@ -414,19 +443,60 @@ export const researchRunSchema = z
         path: ["extractionCallsUsed"],
       });
     }
-    if (run.status === "partial" && !run.partial) {
+    if (run.partial !== (run.status === "partial")) {
       context.addIssue({
         code: "custom",
-        message: "partial run status requires partial=true",
+        message: "partial must be true exactly for partial run status",
         path: ["partial"],
       });
     }
-    if (run.status === "succeeded" && run.partial) {
+    const createdAt = Date.parse(run.createdAt);
+    const startedAt = run.startedAt === undefined ? undefined : Date.parse(run.startedAt);
+    const updatedAt = Date.parse(run.updatedAt);
+    const completedAt = run.completedAt === undefined ? undefined : Date.parse(run.completedAt);
+    if (startedAt !== undefined && (createdAt > startedAt || startedAt > updatedAt)) {
       context.addIssue({
         code: "custom",
-        message: "succeeded run status cannot be partial",
-        path: ["partial"],
+        message: "run timestamps must be chronologically ordered",
+        path: ["startedAt"],
       });
+    }
+    if (completedAt !== undefined && updatedAt > completedAt) {
+      context.addIssue({
+        code: "custom",
+        message: "run timestamps must be chronologically ordered",
+        path: ["completedAt"],
+      });
+    }
+    if (run.status === "succeeded" || run.status === "partial" || run.status === "failed") {
+      if (run.startedAt === undefined || run.completedAt === undefined) {
+        context.addIssue({
+          code: "custom",
+          message: "terminal runs require startedAt and completedAt",
+          path: ["completedAt"],
+        });
+      }
+      if (run.status === "succeeded" && (run.processedCategories.length === 0 || run.unprocessedCategories.length > 0)) {
+        context.addIssue({
+          code: "custom",
+          message: "succeeded runs must process every requested category",
+          path: ["processedCategories"],
+        });
+      }
+      if (run.status === "partial" && (run.processedCategories.length === 0 || run.unprocessedCategories.length === 0)) {
+        context.addIssue({
+          code: "custom",
+          message: "partial runs must contain processed and unprocessed categories",
+          path: ["processedCategories"],
+        });
+      }
+      if (run.status === "failed" && run.processedCategories.length > 0) {
+        context.addIssue({
+          code: "custom",
+          message: "failed runs cannot contain processed categories",
+          path: ["processedCategories"],
+        });
+      }
     }
     const unprocessed = new Set(run.unprocessedCategories);
     if (run.processedCategories.some((category) => unprocessed.has(category))) {
@@ -658,6 +728,34 @@ export const verifiedClaimSchema = z
     }
   });
 
+export const evidenceExplanationSchema = z
+  .object({
+    category: researchCategorySchema,
+    referencedClaimIds: z
+      .array(boundedId)
+      .max(RESEARCH_MAX_CLAIMS_PER_RUN)
+      .default([])
+      .superRefine((ids, context) => {
+        if (new Set(ids).size !== ids.length) {
+          context.addIssue({
+            code: "custom",
+            message: "explanation claim references must be unique",
+          });
+        }
+        if (JSON.stringify([...ids].sort()) !== JSON.stringify(ids)) {
+          context.addIssue({
+            code: "custom",
+            message: "explanation claim references must be deterministically ordered",
+          });
+        }
+      }),
+    summary: z.string().min(1).max(RESEARCH_MAX_EXPLANATION_SUMMARY_UTF16),
+    fallback: z.boolean().optional(),
+  })
+  .strict();
+
+const evidenceStatusOrder = evidenceStatusSchema.options;
+
 const categoryCoverageSchema = z
   .object({
     category: researchCategorySchema,
@@ -748,6 +846,14 @@ export const evidenceSummarySchema = z
           path: ["categoryCoverage", index, "hasEvidence"],
         });
       }
+      const expectedStatuses = evidenceStatusOrder.filter((status) => coverage.statuses.includes(status));
+      if (JSON.stringify(coverage.statuses) !== JSON.stringify(expectedStatuses)) {
+        context.addIssue({
+          code: "custom",
+          message: "category coverage statuses must use deterministic evidence-status order",
+          path: ["categoryCoverage", index, "statuses"],
+        });
+      }
     }
 
     const unprocessed = new Set(summary.categoriesUnprocessed);
@@ -760,6 +866,22 @@ export const evidenceSummarySchema = z
     }
     const processed = new Set(summary.categoriesProcessed);
     const unknown = new Set(summary.categoriesUnknown);
+    const failed = new Set(summary.categoriesFailed);
+    if (summary.categoriesFailed.some((category) => !failed.has(category) || !unprocessed.has(category))) {
+      context.addIssue({
+        code: "custom",
+        message: "categoriesFailed must be a subset of unprocessed categories",
+        path: ["categoriesFailed"],
+      });
+    }
+    const expectedCoverageOrder = canonicalizeResearchCategories(summary.categoriesProcessed);
+    if (JSON.stringify(summary.categoryCoverage.map((coverage) => coverage.category)) !== JSON.stringify(expectedCoverageOrder)) {
+      context.addIssue({
+        code: "custom",
+        message: "category coverage must follow canonical category order",
+        path: ["categoryCoverage"],
+      });
+    }
     for (const category of summary.categoriesUnknown) {
       if (!processed.has(category)) {
         context.addIssue({
@@ -811,6 +933,8 @@ const researchFailureSchema = z
   .object({
     category: researchCategorySchema.optional(),
     code: z.enum([
+      "cancelled",
+      "validation",
       "source-discovery",
       "retrieval",
       "normalization",
@@ -832,9 +956,10 @@ export const researchResultSchema = z
     documents: z.array(researchDocumentSchema).max(RESEARCH_MAX_SOURCES_PER_RUN).default([]),
     candidates: z.array(claimCandidateSchema).max(RESEARCH_MAX_CLAIMS_PER_RUN).default([]),
     claims: z.array(verifiedClaimSchema).max(RESEARCH_MAX_CLAIMS_PER_RUN).default([]),
+    explanations: z.array(evidenceExplanationSchema).max(RESEARCH_MAX_CATEGORIES).default([]),
     evidenceSummary: evidenceSummarySchema,
     failures: z.array(researchFailureSchema).max(RESEARCH_MAX_FAILURES_PER_RUN).default([]),
-    warnings: z.array(boundedWarning).max(50).default([]),
+    warnings: z.array(boundedWarning).max(RESEARCH_MAX_WARNINGS_PER_RUN).default([]),
   })
   .strict()
   .superRefine((result, context) => {
@@ -1060,6 +1185,70 @@ export const researchResultSchema = z
       }
     }
 
+    const finalClaimsById = new Map(result.claims.map((claim) => [claim.id, claim]));
+    const explanationCategories = new Set<ResearchCategory>();
+    for (const [index, explanation] of result.explanations.entries()) {
+      if (explanationCategories.has(explanation.category)) {
+        context.addIssue({
+          code: "custom",
+          message: "final explanations must be unique by category",
+          path: ["explanations", index, "category"],
+        });
+      }
+      explanationCategories.add(explanation.category);
+      if (!result.evidenceSummary.categoriesProcessed.includes(explanation.category)) {
+        context.addIssue({
+          code: "custom",
+          message: "final explanations may reference processed categories only",
+          path: ["explanations", index, "category"],
+        });
+      }
+      const categoryClaims = result.claims.filter((claim) => claim.category === explanation.category);
+      if (categoryClaims.length > 0 && explanation.referencedClaimIds.length === 0) {
+        context.addIssue({
+          code: "custom",
+          message: "claim-bearing category explanations must reference a final claim",
+          path: ["explanations", index, "referencedClaimIds"],
+        });
+      }
+      if (result.evidenceSummary.categoriesUnknown.includes(explanation.category)) {
+        if (explanation.referencedClaimIds.length > 0) {
+          context.addIssue({
+            code: "custom",
+            message: "unknown category explanations cannot reference factual claims",
+            path: ["explanations", index, "referencedClaimIds"],
+          });
+        }
+        if (explanation.fallback !== true) {
+          context.addIssue({
+            code: "custom",
+            message: "unknown category explanations must be deterministic fallbacks",
+            path: ["explanations", index, "fallback"],
+          });
+        }
+      }
+      for (const claimId of explanation.referencedClaimIds) {
+        const claim = finalClaimsById.get(claimId);
+        if (claim === undefined || claim.category !== explanation.category) {
+          context.addIssue({
+            code: "custom",
+            message: "explanation claim references must resolve to same-category final claims",
+            path: ["explanations", index, "referencedClaimIds"],
+          });
+          break;
+        }
+      }
+    }
+    for (const category of result.evidenceSummary.categoriesProcessed) {
+      if (!explanationCategories.has(category)) {
+        context.addIssue({
+          code: "custom",
+          message: "every processed category requires exactly one final explanation",
+          path: ["explanations"],
+        });
+      }
+    }
+
     if (result.evidenceSummary.totalClaims !== result.claims.length) {
       context.addIssue({
         code: "custom",
@@ -1105,6 +1294,17 @@ export const researchResultSchema = z
             message: `evidence summary ${path} must include claim-level ${status} categories`,
             path: ["evidenceSummary", path],
           });
+        }
+      }
+      if (status !== "unknown") {
+        for (const category of reported) {
+          if (!actual.has(category)) {
+            context.addIssue({
+              code: "custom",
+              message: `evidence summary ${path} cannot report a category without a ${status} claim`,
+              path: ["evidenceSummary", path],
+            });
+          }
         }
       }
     }
@@ -1217,6 +1417,7 @@ export type ResearchDocument = z.infer<typeof researchDocumentSchema>;
 export type ResearchSource = z.infer<typeof researchSourceSchema>;
 export type ClaimCandidate = z.infer<typeof claimCandidateSchema>;
 export type VerifiedClaim = z.infer<typeof verifiedClaimSchema>;
+export type EvidenceExplanation = z.infer<typeof evidenceExplanationSchema>;
 export type EvidenceSummary = z.infer<typeof evidenceSummarySchema>;
 export type ResearchFailure = z.infer<typeof researchFailureSchema>;
 export type ResearchResult = z.infer<typeof researchResultSchema>;

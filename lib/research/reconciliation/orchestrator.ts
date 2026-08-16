@@ -7,10 +7,10 @@ import {
 import { GROQ_STRUCTURED_MODEL, runGroqStructuredTask } from "@/lib/integrations/groq/structured";
 import { OPENROUTER_FREE_MODEL, runOpenRouterStructuredTask } from "@/lib/integrations/openrouter/structured";
 import {
+  accountInjectedStructuredAttempts,
   assertValidAiBudget,
   createReconciliationBudget,
   type StructuredAdapterInput,
-  type StructuredAiBudget,
 } from "@/lib/research/ai/types";
 import {
   researchProviderAttemptSchema,
@@ -81,48 +81,6 @@ function recordConfigurationSkip(
 
 function failure(value: string | undefined): ReconciliationFailure["kind"] {
   return (value as ReconciliationFailure["kind"] | undefined) ?? "upstream";
-}
-
-function accountInjectedAttempts(
-  budget: StructuredAiBudget,
-  attempts: readonly ResearchProviderAttempt[],
-  provider: ResearchExtractionProvider | undefined,
-  hasPayload: boolean,
-): void {
-  const actualAttempts = attempts.filter((attempt) => attempt.outcome !== "skipped").length || (hasPayload ? 1 : 0);
-  const available = Math.max(0, budget.limit - budget.used);
-  const consumed = Math.min(available, actualAttempts);
-  budget.used += consumed;
-  if (consumed === 0) return;
-  const attemptProviders = attempts
-    .filter((attempt) => attempt.outcome !== "skipped")
-    .map((attempt) => attempt.provider)
-    .filter((value): value is ResearchExtractionProvider => value === "gemini" || value === "groq" || value === "openrouter");
-  if (attemptProviders.length > 0) {
-    const counts = new Map<ResearchExtractionProvider, number>();
-    for (const attemptProvider of attemptProviders) counts.set(attemptProvider, (counts.get(attemptProvider) ?? 0) + 1);
-    let remaining = consumed;
-    for (const [attemptProvider, count] of counts) {
-      if (remaining <= 0) break;
-      const applied = Math.min(remaining, count);
-      budget.providerUsed[attemptProvider] = Math.min(
-        budget.providerLimits[attemptProvider],
-        budget.providerUsed[attemptProvider] + applied,
-      );
-      remaining -= applied;
-    }
-    if (remaining > 0 && provider !== undefined) {
-      budget.providerUsed[provider] = Math.min(
-        budget.providerLimits[provider],
-        budget.providerUsed[provider] + remaining,
-      );
-    }
-  } else if (provider !== undefined) {
-    budget.providerUsed[provider] = Math.min(
-      budget.providerLimits[provider],
-      budget.providerUsed[provider] + consumed,
-    );
-  }
 }
 
 type ProviderCallResult = Awaited<ReturnType<typeof runGeminiStructuredTask>>;
@@ -203,7 +161,13 @@ export async function reconcileResearchClaims(options: ReconciliationOptions): P
 
     if (options.runTask !== undefined) {
       const injected = await options.runTask(task);
-      accountInjectedAttempts(budget, injected.attempts, injected.provider, injected.payload !== undefined);
+      accountInjectedStructuredAttempts({
+        budget,
+        attempts: injected.attempts,
+        provider: injected.provider,
+        hasPayload: injected.payload !== undefined,
+        stage: "reconciliation",
+      });
       appendAttempts(providerAttempts, injected.attempts);
       if (injected.aborted) {
         warnings.push("reconciliation stopped because the caller cancelled the run");

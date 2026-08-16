@@ -98,6 +98,21 @@ export type ProviderSearchResult = {
   warning?: string;
 };
 
+export type DiscoveryCategoryStatus = "covered" | "empty" | "degraded" | "failed";
+
+export type DiscoveryCategoryOutcome = {
+  category: ResearchCategory;
+  status: DiscoveryCategoryStatus;
+  reason?: "source-limit" | "provider-failure" | "attempt-budget" | "cancelled" | "timeout";
+};
+
+export type DiscoveryCategoryAssociation = {
+  url: string;
+  categories: readonly ResearchCategory[];
+};
+
+export type DiscoveryTermination = "completed" | "caller-cancelled" | "discovery-timeout" | "attempt-budget";
+
 export type DiscoveryOptions = {
   targetResolver?: ResearchTargetResolver;
   tavilyApiKey?: string;
@@ -125,6 +140,7 @@ export type DiscoveryOptions = {
     durationMs?: number;
   }>;
   now?: () => string;
+  signal?: AbortSignal;
 };
 
 export type DiscoveryResult = {
@@ -134,6 +150,9 @@ export type DiscoveryResult = {
   providerAttempts: readonly DiscoveryAttempt[];
   coveredCategories: readonly ResearchCategory[];
   uncoveredCategories: readonly ResearchCategory[];
+  categoryOutcomes: readonly DiscoveryCategoryOutcome[];
+  categoryAssociations: readonly DiscoveryCategoryAssociation[];
+  termination: DiscoveryTermination;
   warnings: readonly string[];
 };
 

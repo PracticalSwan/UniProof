@@ -7,6 +7,7 @@ import {
 import { GROQ_STRUCTURED_MODEL, runGroqStructuredTask } from "@/lib/integrations/groq/structured";
 import { OPENROUTER_FREE_MODEL, runOpenRouterStructuredTask } from "@/lib/integrations/openrouter/structured";
 import {
+  accountInjectedStructuredAttempts,
   assertValidAiBudget,
   createExplanationBudget,
   type StructuredAiBudget,
@@ -15,6 +16,7 @@ import {
 import {
   researchCategorySchema,
   researchProviderAttemptSchema,
+  type EvidenceExplanation,
   type ResearchCategory,
   type ResearchProviderAttempt,
   type VerifiedClaim,
@@ -23,7 +25,7 @@ import {
   explanationEnvelopeSchema,
   portableExplanationJsonSchema,
 } from "@/lib/research/reconciliation/schema";
-import type { EvidenceExplanation, ReconciliationFailure } from "@/lib/research/reconciliation/types";
+import type { ReconciliationFailure } from "@/lib/research/reconciliation/types";
 import { RESEARCH_MAX_EXPLANATION_SUMMARY_UTF16 } from "@/lib/security/research-limits";
 
 export type ExplanationValidationResult = {
@@ -249,10 +251,13 @@ export async function generateEvidenceExplanations(options: ExplanationOptions):
   if (options.runTask !== undefined) {
     if (!options.signal?.aborted) {
       const result = await options.runTask({ claims: modelClaims, categories: modelCategories });
-      const actualAttempts = result.attempts.filter((attempt) => attempt.outcome !== "skipped").length || (result.payload === undefined ? 0 : 1);
-      const consumed = Math.min(Math.max(0, budget.limit - budget.used), actualAttempts);
-      budget.used += consumed;
-      if (result.provider !== undefined) budget.providerUsed[result.provider] = Math.min(budget.providerLimits[result.provider], budget.providerUsed[result.provider] + consumed);
+      accountInjectedStructuredAttempts({
+        budget,
+        attempts: result.attempts,
+        provider: result.provider,
+        hasPayload: result.payload !== undefined,
+        stage: "explanation",
+      });
       providerAttempts.push(...result.attempts.map((attempt) => researchProviderAttemptSchema.parse({ ...attempt, stage: "explanation" })));
       if (!result.aborted && result.payload !== undefined) {
         const validation = validateExplanationPayload(result.payload, modelClaims, modelCategories);

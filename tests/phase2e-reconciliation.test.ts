@@ -715,11 +715,12 @@ describe("Phase 2E permutation and result invariants", () => {
     const gate = evaluateEvidenceGate({ candidates: [value], sources, documents, target: resolvedTarget, decisionEligibleCategories: ["admissions"] });
     expect(gate.claims[0]).toMatchObject({ universityId: "university-1", programId: "program-1" });
     const parsed = researchResultSchema.safeParse({
-      run: { id: "run-enriched", status: "succeeded", createdAt: timestamp, updatedAt: timestamp, completedAt: timestamp, processedCategories: ["admissions"], unprocessedCategories: [], partial: false },
+      run: { id: "run-enriched", status: "succeeded", createdAt: timestamp, startedAt: timestamp, updatedAt: timestamp, completedAt: timestamp, processedCategories: ["admissions"], unprocessedCategories: [], partial: false },
       sources,
       documents,
       candidates: [value],
       claims: gate.claims,
+      explanations: [{ category: "admissions", referencedClaimIds: [gate.claims[0]!.id], summary: "Verified admissions evidence." }],
       evidenceSummary: {
         statusCounts: { verified: 1, corroborated: 0, "university-reported": 0, conflicting: 0, anecdotal: 0, inferred: 0, unknown: 0, outdated: 0 },
         totalClaims: 1,

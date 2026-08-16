@@ -13,6 +13,7 @@ import {
   runOpenRouterStructuredTask,
 } from "@/lib/integrations/openrouter/structured";
 import {
+  accountInjectedStructuredAttempts,
   assertValidExtractionBudget,
   createExtractionBudget,
   type StructuredAdapterInput,
@@ -30,7 +31,9 @@ import type {
   ExtractionTask,
 } from "./types";
 import {
+  canonicalizeResearchCategories,
   researchProviderAttemptSchema,
+  type ResearchCategory,
   type ResearchExtractionProvider,
   type ResearchProviderAttempt,
 } from "@/lib/research/contracts";
@@ -130,8 +133,18 @@ async function runSegmentTask(
   }
 
   if (options.runTask !== undefined) {
-    const injected = await options.runTask(task, options);
+    const injected = await options.runTask(task);
     const attempts = [...injected.attempts];
+    const provider = injected.provider === "gemini" || injected.provider === "groq" || injected.provider === "openrouter"
+      ? injected.provider
+      : undefined;
+    accountInjectedStructuredAttempts({
+      budget: options.budget!,
+      attempts,
+      provider,
+      hasPayload: injected.payload !== undefined,
+      stage: "extraction",
+    });
     if (injected.aborted) return { candidates: [], attempts, aborted: true, succeeded: false };
     if (injected.payload === undefined) {
       return { candidates: [], attempts, failureKind: injected.failureKind ?? "upstream", succeeded: false };
@@ -274,12 +287,26 @@ export async function extractResearchDocuments(
   documents: readonly import("@/lib/research/contracts").ResearchDocument[],
   options: ExtractionOptions,
 ): Promise<ExtractionStageResult> {
-  const categories = [...new Set(options.categories)];
+  const categories = canonicalizeResearchCategories(options.categories);
   if (categories.length === 0) throw new Error("at least one extraction category is required");
   const budget = options.budget ?? createExtractionBudget();
   assertValidExtractionBudget(budget);
   const effectiveOptions: ExtractionOptions = { ...options, categories, budget };
-  const segments: ExtractionSegment[] = documents.flatMap((document) => [...segmentResearchDocument(document)]);
+
+  const segmentEntries: Array<{ segment: ExtractionSegment; categories: readonly ResearchCategory[] }> = [];
+  const categorySegmentIds = new Map<ResearchCategory, Set<string>>(categories.map((category) => [category, new Set<string>()]));
+  for (const document of documents) {
+    const requested = options.categoriesByDocumentId === undefined
+      ? categories
+      : options.categoriesByDocumentId[document.id] ?? [];
+    const scoped = canonicalizeResearchCategories(requested.filter((category) => categories.includes(category)));
+    if (scoped.length === 0) continue;
+    for (const segment of segmentResearchDocument(document)) {
+      segmentEntries.push({ segment, categories: scoped });
+      for (const category of scoped) categorySegmentIds.get(category)?.add(segment.id);
+    }
+  }
+  const segments = segmentEntries.map((entry) => entry.segment);
   const candidates: import("@/lib/research/contracts").ClaimCandidate[] = [];
   const providerAttempts: ResearchProviderAttempt[] = [];
   const recordedConfigurationProviders = new Set<ResearchExtractionProvider>();
@@ -289,6 +316,17 @@ export async function extractResearchDocuments(
   const unprocessedSegmentIds: string[] = [];
   let aborted = false;
 
+  const categoryCompletion = () => {
+    const unprocessed = new Set(unprocessedSegmentIds);
+    const incompleteCategories = categories.filter((category) =>
+      [...(categorySegmentIds.get(category) ?? [])].some((segmentId) => unprocessed.has(segmentId)),
+    );
+    return {
+      completedCategories: categories.filter((category) => !incompleteCategories.includes(category)),
+      incompleteCategories,
+    };
+  };
+
   if (effectiveOptions.runTask === undefined && !effectiveOptions.signal?.aborted) {
     const providerConfigurations = [
       { provider: "gemini" as const, key: effectiveOptions.geminiApiKey, model: GEMINI_PRIMARY_MODEL },
@@ -297,23 +335,16 @@ export async function extractResearchDocuments(
     ];
     const unavailable = providerConfigurations.filter((entry) => !hasConfiguredKey(entry.key));
     if (unavailable.length > 0 && segments.length > 0) {
-      warnings.push(`unconfigured extraction providers: ${unavailable.map((entry) => entry.provider).join(", ")}`);
+      warnings.push("unconfigured extraction providers: " + unavailable.map((entry) => entry.provider).join(", "));
     }
     if (unavailable.length === providerConfigurations.length && segments.length > 0) {
       for (const entry of unavailable) {
-        providerAttempts.push(researchProviderAttemptSchema.parse({
-          stage: "extraction",
-          provider: entry.provider,
-          model: entry.model,
-          outcome: "skipped",
-          retryCount: 0,
-          durationMs: 0,
-          failureKind: "configuration",
-        }));
+        appendConfigurationSkip(providerAttempts, recordedConfigurationProviders, entry.provider, entry.model);
         failures.push({ kind: "configuration", provider: entry.provider });
       }
       unprocessedSegmentIds.push(...segments.map((segment) => segment.id));
       warnings.push("no extraction provider is configured; no segments were dispatched");
+      const completion = categoryCompletion();
       return {
         candidates: [],
         providerAttempts,
@@ -321,16 +352,17 @@ export async function extractResearchDocuments(
         warnings,
         processedSegmentIds,
         unprocessedSegmentIds,
+        ...completion,
         unfinished: true,
         budget: { limit: budget.limit, used: budget.used },
       };
     }
   }
 
-  for (let index = 0; index < segments.length; index += 1) {
-    const segment = segments[index];
+  for (let index = 0; index < segmentEntries.length; index += 1) {
+    const { segment, categories: taskCategories } = segmentEntries[index]!;
     if (effectiveOptions.signal?.aborted || budget.used >= budget.limit) {
-      unprocessedSegmentIds.push(...segments.slice(index).map((item) => item.id));
+      unprocessedSegmentIds.push(...segmentEntries.slice(index).map((entry) => entry.segment.id));
       aborted ||= effectiveOptions.signal?.aborted === true;
       break;
     }
@@ -342,7 +374,7 @@ export async function extractResearchDocuments(
     }
     const task: ExtractionTask = {
       segment,
-      categories,
+      categories: taskCategories,
       target: targetForTask(effectiveOptions.target),
       document,
     };
@@ -357,7 +389,7 @@ export async function extractResearchDocuments(
     }
     if (outcome.aborted) {
       aborted = true;
-      unprocessedSegmentIds.push(...segments.slice(index + 1).map((item) => item.id));
+      unprocessedSegmentIds.push(...segmentEntries.slice(index + 1).map((entry) => entry.segment.id));
       break;
     }
   }
@@ -365,10 +397,9 @@ export async function extractResearchDocuments(
   if (unprocessedSegmentIds.length > 0 && !aborted) {
     warnings.push("some extraction segments were not completed by the bounded provider chain");
   }
-  if (budget.used >= budget.limit && unprocessedSegmentIds.length > 0) {
-    failures.push({ kind: "budget" });
-  }
+  if (budget.used >= budget.limit && unprocessedSegmentIds.length > 0) failures.push({ kind: "budget" });
   if (aborted) warnings.push("extraction stopped because the caller cancelled the run");
+  const completion = categoryCompletion();
 
   return {
     candidates: dedupePromotedCandidates(candidates),
@@ -377,6 +408,7 @@ export async function extractResearchDocuments(
     warnings,
     processedSegmentIds,
     unprocessedSegmentIds: [...new Set(unprocessedSegmentIds)],
+    ...completion,
     unfinished: unprocessedSegmentIds.length > 0,
     budget: { limit: budget.limit, used: budget.used },
   };

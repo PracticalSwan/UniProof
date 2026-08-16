@@ -96,24 +96,23 @@ Implement only after Phase 2B–2C passes its acceptance gate.
 - [x] Add the deterministic Phase 2E matrix for truthful identity/provenance, Unicode/UTF-16 boundaries, conservative normalization, pair batching/caps, relationship validation/partial fallback, stage budgets/telemetry/abort, authority/independence/conflict/freshness/unknown/anecdotal/inferred semantics, privacy, explanation rejection/fallback, and preservation of every Phase 2A–2D regression.
 - [x] Follow the Phase 2E final-review policy in the execution runbook: no implementation subagents; only the final looping read-only reviewer, GLM variant first, one-way fallback to GPT only after an explicit terminal GLM error/rate-limit, and never treat a still-running child as timed out merely because one wait window elapsed.
 
-
-
-
-
-
-
-
-
 ### Phase 2F — Orchestration and Phase 2 verification
 
-- [ ] Implement a new small in-memory coordinator that resolves target identity once and reuses the Phase 2B/C modules through discovery -> retrieval -> segmentation/extraction -> normalization -> reconciliation -> evidence gate -> explanation/fallback -> ResearchResult; keep `runDiscoveryRetrieval()` as the existing B/C boundary.
-- [ ] Finalize schema invariants for terminal lifecycle/timestamps: orchestrator emits only succeeded/partial/failed; terminal partial boolean is exact; created <= started <= updated <= completed; no legacy completed/queued emission.
-- [ ] Make requested-category lifecycle a complete partition: processed/unprocessed unique/disjoint/union=requested, run and EvidenceSummary sets match, failed is operational, unknown is processed-only, and retained source/candidate data alone does not make a run partial.
-- [ ] Make EvidenceSummary exact from final gated claims: one coverage row per processed category only, exact claimCount/statuses/hasEvidence, zero-claim unknown row, exact total/statusCounts, conflict/outdated subsets derived from claims.
-- [ ] Calculate the legal worst-case provider-attempt count from actual discovery/extraction/reconciliation/explanation budgets; raise the current max only if required, to the smallest justified bound with regression, never truncate history.
-- [ ] Retain the complete offline fixture matrix for name/ID identity, all seven categories, discovery/retrieval security failures, segmentation/extraction failover, evidence independence/conflict/unknown/outdated/anecdotal/inferred states, semantic rejection, explanation fallback, and succeeded/partial/failed lifecycle invariants.
-- [ ] Run focused security/secret/requirements-traceability review plus typecheck, lint, build, tests, audit, workspace verification, diff/encoding checks; repeatedly fix and re-review until the final integrated reviewer reports no remaining fixable issues.
-- [ ] Keep pipeline correctness in memory; persistence remains a later explicit task after stable contracts/evidence semantics and RLS design.
+- [x] Extract a project-owned Phase 2B/C stage seam while preserving `runDiscoveryRetrieval()` compatibility; resolve target identity exactly once and carry that resolved target through D/E/F.
+- [x] Implement `lib/research/orchestration/` with one small full-pipeline entrypoint (`runPhase2Research` recommended), canonical requested-category ordering, UUID-based bounded run IDs, injectable monotonic clock/run-id seams, and no provider-wire types/secrets in injected stage callbacks.
+- [x] Split discovery's existing 32-record attempt limit from the final whole-run provider-history limit; keep discovery <=32, bound/dedupe non-dispatched AI skip telemetry, and derive/prove the final **86-record** ceiling = 32 discovery + 28 extraction + 16 reconciliation + 10 explanation without truncating actual attempts.
+- [x] Split the existing 60-second run timeout into a discovery-specific deadline; compose caller `AbortSignal` through discovery and DNS-pinned retrieval, add truthful cancelled termination/failure state, cancel in-flight pinned requests/redirect chains, clean up listeners/timers, and do not impose the 60-second discovery deadline on the full 24/12/6-attempt Phase 2F AI pipeline.
+- [x] Make discovery lifecycle truthful after final source selection: distinguish covered vs clean-empty vs degraded direct/ROR salvage vs operationally failed; degraded salvage is retained but not decision-eligible; preserve multi-category associations across canonical URL dedupe; source-budget loss of a category's only association becomes `source-limit`.
+- [x] Make retrieval/extraction lifecycle fail closed: every selected category-associated source must become usable or proven redundant; identity-only source failure does not poison categories; clean-empty categories consume no AI; add backward-compatible per-document category scoping so unprocessed segments make only genuinely associated categories incomplete; narrow extraction `runTask` to the public task only and make injected attempts consume the same shared extraction budget as production while preserving earlier candidates.
+- [x] Pass Phase 2E only B/C/D-complete decision-eligible categories; retain source/document/candidate provenance but prune final claims to processed categories, and preserve all Phase 2E authority/period/scope/unknown/conflict invariants.
+- [x] Add strict evidence explanations to final `ResearchResult`: exactly one validated/model-or-fallback explanation per processed category, same-category claim references only, zero-reference deterministic fallback for unknown, no explanation for unprocessed categories, and no AI call for zero-claim categories.
+- [x] Strengthen terminal lifecycle/failure contracts: succeeded/partial/failed only; exact monotonic timestamps/partial boolean; processed/unprocessed exact request partition; failed has zero processed; `categoriesFailed` subset unprocessed; truthful `cancelled` and run-level `normalization`; bounded deduplicated terminal failures only after fallback exhaustion.
+- [x] Rebuild EvidenceSummary from final processed categories/final claims only: exact coverage/statusCounts/totalClaims/conflict/outdated/unknown/failed sets, then validate explanations and complete `ResearchResult` cross-record provenance at the return boundary.
+- [x] Add the expanded offline `tests/phase2f-orchestration.test.ts` matrix covering category-order permutation, attempt ceilings, discovery empty-vs-failed, multi-category dedupe, retrieval redundancy/failure, extraction unfinished, all provider fallbacks/budgets, semantic overflow, explanation integrity/fallback, aborts, and succeeded/partial/failed lifecycle; keep all Phase 2A-E regressions green.
+- [x] Use **no implementation subagents**. After every local gate passes, the only allowed looping reviewer is installed read-only `code-reviewer-glm`; never use GPT/substitute reviewers. No-result/no-error means keep checking if still running. Explicit HTTP 429 closes GLM and skips further subagent review; other terminal GLM failure also ends subagent use. For this continuation, the ChatGPT/CodexPro host exposed no executable subagent-dispatch action, so no reviewer child was fabricated; the main agent completed the required defect-first inline diff/invariant/security review and fixed the findings it discovered.
+- [x] Run focused security/secret/requirements traceability plus focused/full tests, typecheck, lint, build, audit, workspace verifier, Windows diff check, UTF-8/control scan, provider-secret/public-env scan, ignored `.env.local` verification, and final diff/status review. No live provider calls, deployment, persistence/RLS, or UI wiring were used; the user separately authorized the final Phase 2F commit and push after these gates pass.
+
+- [x] Keep pipeline correctness in memory; persistence remains a later explicit task after stable contracts/evidence semantics and RLS design.
 
 ## Phase 3 — Research Mode
 

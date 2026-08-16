@@ -1,6 +1,6 @@
 # Phase 2D–2F Execution Runbook — AI Extraction, Reconciliation, and Orchestration
 
-Status: Phase 2D and Phase 2E implemented and verified. Deterministic automated coverage remains offline; on 2026-08-16 one explicitly authorized live smoke request succeeded for each configured Tavily, Brave, Gemini, Groq, and OpenRouter connection. Phase 2F remains planned.
+Status: Phase 2D, Phase 2E, and Phase 2F implemented. Phase 2F now provides the full in-memory terminal orchestrator and completes Phase 2 at the backend contract boundary. Deterministic automated coverage remains offline; on 2026-08-16 one explicitly authorized live smoke request succeeded for each configured Tavily, Brave, Gemini, Groq, and OpenRouter connection, and no additional live provider calls were used for Phase 2F completion.
 
 Parent architecture: `docs/planning/phase-2-evidence-research-pipeline.md`.
 
@@ -460,7 +460,9 @@ This batch-specific policy overrides normal specialist-agent routing for Phase 2
 
 ## Phase 2F.1 — Deterministic orchestrator
 
-Implement one new small in-memory coordinator under `lib/research/orchestration/`; it is not a multi-agent runtime. Reuse the implemented Phase 2B/C modules, but do not overload `runDiscoveryRetrieval()` with Phase 2E/F lifecycle semantics. That function remains a tested discovery/retrieval boundary and compatibility helper.
+Implementation status: complete. `lib/research/orchestration/` now owns `runPhase2Research`, monotonic run metadata/lifecycle helpers, and exact EvidenceSummary derivation. The Phase 2B/C compatibility wrapper remains available while an internal B/C stage seam carries the one resolved target, category/source associations, normalized sources/documents, and operational state into Phase 2F. Final review additionally hardened cancellation after awaited target resolution, clean-empty versus timed-out supplement semantics, strict injected AI budget accounting, and exact final conflict/outdated/explanation cross-record validation.
+
+The implementation uses one new small in-memory coordinator under `lib/research/orchestration/`; it is not a multi-agent runtime. Reuse the implemented Phase 2B/C modules, but do not overload `runDiscoveryRetrieval()` with Phase 2E/F lifecycle semantics. That function remains a tested discovery/retrieval boundary and compatibility helper.
 
 Resolve request/target identity once at the beginning and carry the project-owned resolved identity through discovery, extraction promotion, normalization, and gating. Do not re-resolve names independently in later stages. Merge provider attempts from every stage in actual execution order and validate the final ordered history against the bounded run contract.
 
@@ -485,9 +487,9 @@ validate request + resolve target once
 
 Each stage receives project-owned immutable inputs and returns project-owned outputs plus bounded attempts/failures. Never pass mutable provider clients, raw HTTP responses, raw provider payloads, prompts/completions, API-key-bearing objects, or transient segment text through the final orchestration result.
 
-Category processing is independent enough that one category failure need not erase successful work from another category. Preserve validated sources/documents/candidates/claims as the run advances. A later failure may make a category operationally incomplete, but it cannot delete earlier provenance records merely to simplify terminal-state calculation.
+Category processing is independent enough that one category failure need not erase successful work from another category. Preserve validated sources/documents/candidates and any provisional claim artifacts internally as the run advances. A later failure may make a category operationally incomplete, but it cannot delete earlier lower-level provenance merely to simplify terminal-state calculation. At the final decision boundary, however, `ResearchResult.claims` contains only processed-category claims; provisional claims from an incomplete category are intentionally excluded so the final result cannot contradict its own lifecycle state.
 
-Before finalizing the orchestrator's provider-attempt ceiling, calculate the actual worst-case discovery + extraction + reconciliation + explanation attempts under the implemented budgets. If the current global max of 32 cannot represent a legal bounded run, increase it to the smallest justified server-owned bound with a regression; do not silently truncate attempt history and do not raise it to an arbitrary large number.
+Before finalizing the orchestrator's provider-attempt ceiling, split the current overloaded discovery/result-history bound. Keep discovery at its own exact `RESEARCH_MAX_DISCOVERY_PROVIDER_ATTEMPTS_PER_RUN=32`; do not enlarge discovery merely because the final result needs more history. The final whole-run result ceiling must be derived from the implemented stages and bounded non-dispatched telemetry: discovery 32; extraction 24 actual HTTP attempts + at most 3 provider-scoped configuration/provider-budget skips + 1 total-budget skip = 28; reconciliation 12 + 3 + 1 = 16; explanation 6 + 3 + 1 = 10. Therefore the smallest justified final `RESEARCH_MAX_PROVIDER_ATTEMPTS_PER_RUN` is **86**. Add a pure derivation/regression from the stage constants; never use an unexplained magic number, silently truncate history, or let repeated provider-budget checks append duplicate skip records.
 
 ## Phase 2F.2 — Lifecycle and evidence-summary invariants
 
@@ -506,7 +508,7 @@ For every orchestrator-produced terminal run:
 - `createdAt <= startedAt <= updatedAt <= completedAt` using parsed instants, and no timestamp may be invalid/NaN;
 - `processedCategories` and `unprocessedCategories` are unique, disjoint, requested-category-only sets whose union equals the requested category set;
 - `run.processedCategories` exactly equals `evidenceSummary.categoriesProcessed`, and the unprocessed sets also match;
-- `categoriesFailed` is a subset of requested categories and may intersect `categoriesUnprocessed`, but it is never automatically copied into processed/unknown;
+- `categoriesFailed` is a subset of `categoriesUnprocessed` for Phase 2F output; it is never copied into processed/unknown and it never includes a category whose fallback path ultimately completed;
 - `categoriesUnknown` is a subset of processed categories only;
 - categoriesWithConflicts/categoriesOutdated are subsets of processed categories and are derived from final gated claims rather than provider failures.
 
@@ -554,6 +556,204 @@ Run TypeScript, lint, build, dependency audit, workspace verification, diff chec
 Do not add Supabase persistence merely to complete Phase 2. Persistence remains a later explicit task after stable contracts/evidence semantics and before private history it requires designed/tested migrations plus RLS.
 
 Do not wire the live Research UI until this gate passes.
+
+## Phase 2F.5 — Hardened integration decisions
+
+The following decisions are mandatory for the final integration batch and specialize the Phase 2F.1–2F.4 skeleton above.
+
+### B/C compatibility seam and one-time target resolution
+
+Do not make `runDiscoveryRetrieval()` own Phase 2F lifecycle. Extract a project-owned B/C stage helper from the existing implementation that returns the validated request, the one `TargetResolutionResult`, discovery queries/telemetry, canonical candidate-source associations, normalized sources/documents, sanitized failures/warnings, and per-category B/C completion state. Keep `runDiscoveryRetrieval()` as a compatibility wrapper over that helper so its existing tests/return shape remain valid.
+
+Phase 2F calls the B/C stage helper exactly once and carries `resolution.target` through extraction promotion and reconciliation. Never re-resolve the university/program later from names or provider text. Extend `DiscoveryOptions` with a caller `signal?: AbortSignal` and compose it with the existing discovery-only timeout signal; add explicit project-owned discovery termination state (caller-cancelled vs discovery-timeout vs attempt-budget/completed) rather than inferring cancellation from warning strings. Extend the B/C retrieval seam and `fetchPublicUrl` with the same caller signal; pre-abort performs no DNS/network work, in-flight abort destroys/cancels the active pinned request and prevents another redirect/hop, and retrieval reports a truthful sanitized `cancelled` failure code rather than `request-timeout`/`transport`. Remove abort listeners/timers in `finally` so repeated research runs do not leak handlers.
+
+Create the full coordinator under `lib/research/orchestration/`, preferably split into `types.ts`, `lifecycle.ts`, `summary.ts`, `orchestrator.ts`, and `index.ts`, with one canonical entrypoint such as `runPhase2Research(input, options)`. Do not repoint the legacy `runResearchPipeline` alias during this batch if that risks compatibility/circular imports; Phase 3 can explicitly adopt the new entrypoint.
+
+### Canonical category order and deterministic run metadata
+
+Expose one project-owned canonical research-category array from the contract and use it for all Phase 2F stage dispatch/lifecycle arrays:
+
+```text
+admissions, tuition, scholarships, program-structure, research, outcomes, support
+```
+
+After request validation, canonicalize the requested category set once before discovery. Shuffling the same requested category set must not change provider dispatch order or the non-timing semantic result. `providerAttempts` remains ordered by actual execution.
+
+Default production run IDs must not be timestamp-only. Use a bounded application-owned UUID-based ID such as `run-${crypto.randomUUID()}` and inject `createRunId` for deterministic tests. Inject `now(): string`; validate its ISO instants and keep `createdAt <= startedAt <= updatedAt <= completedAt`. Equal adjacent timestamps are valid. If a valid clock moves backward, clamp the next metadata instant to the previous one; invalid injected clock output is an internal/test-seam error.
+
+The existing `RESEARCH_MAX_RUN_TIMEOUT_MS=60_000` is a discovery-stage deadline, not a truthful full-pipeline deadline. Rename/split it to `RESEARCH_MAX_DISCOVERY_RUN_TIMEOUT_MS=60_000` (retain a compatibility alias only if an existing caller needs it). Phase 2F is bounded by the existing per-request timeouts, source/claim limits, stage attempt budgets, and caller `AbortSignal`; do not invent an end-to-end deadline that makes the legal 24/12/6 AI attempt budgets unreachable.
+
+### Discovery category state must distinguish empty from failed
+
+`coveredCategories/uncoveredCategories` alone cannot drive Phase 2F because uncovered conflates clean evidence absence with operational failure. Add internal project-owned category outcomes while retaining compatibility fields:
+
+- `covered`: at least one general-web provider completed the category query (success or clean empty), and at least one finally selected bounded candidate remains associated after all bounded supplements/dedupe;
+- `empty`: at least one general-web provider completed the category query, and all bounded general-web/direct/ROR mechanisms completed without leaving a selected candidate;
+- `degraded`: neither Tavily nor Brave completed the category query, but direct/ROR salvage retained one or more validated candidates; preserve them, but the category remains operationally incomplete and is not decision-eligible;
+- `failed`: neither general-web provider completed the category query and no degraded salvage source is retained; the category remains unprocessed/failed.
+
+Tavily failure followed by a **success or clean empty result from Brave** completes the general-web discovery requirement; the earlier Tavily failure remains telemetry only. Tavily clean-empty + Brave clean-empty + deterministic direct/ROR empty may be clean `empty`. If both Tavily and Brave are unavailable/failed/skipped, direct/ROR remains the established degraded salvage path: retain any validated direct/ROR sources and downstream provenance, but the affected category stays operationally incomplete/failed because structured/direct evidence did not replace the required bounded general-web discovery step. Do not final-gate that category merely because degraded evidence exists. Identity-query failure does not automatically fail categories when the already resolved target remains usable.
+
+The same canonical URL may be discovered for several categories while `CandidateSource.requestedCategory` is singular. Preserve an ephemeral category -> canonical candidate/source association map through dedupe instead of turning the domain field into an ad-hoc array. The strongest candidate provenance may win canonical dedupe while every legitimate category association survives lifecycle accounting.
+
+Derive category coverage **after** canonical/per-domain/per-run source selection. If source-budget selection removes a category's only association and no selected shared source remains, mark it incomplete with `source-limit`; do not report a pre-budget hit as covered. Omitting excess lower-ranked candidates is normal bounded research when at least one selected association remains.
+
+Discovery keeps its own exact 32-record attempt-history ceiling. Fix budget-skip behavior so a 33rd record is never appended just to report that 32 has already been reached.
+
+### Retrieval/normalization completion is fail-closed per selected source
+
+A clean discovery-empty category completes B/C with zero documents and can later become unknown without any AI call.
+
+For a covered category, every selected category-associated canonical source must either produce a usable normalized document or be provably the same canonical/content source as an already retained usable document associated with that category. If two selected candidates converge only **after** redirect canonicalization or content hashing, merge/union their category associations onto the retained usable source/document before lifecycle calculation; otherwise the losing duplicate can make a real category association disappear. An SSRF/policy rejection, DNS/connect/request timeout, oversize response, unsupported MIME/encoding, retrieval failure, or normalization failure on a selected relevant source leaves that category incomplete unless exact redundancy is proven. One successful source cannot hide another selected relevant source failure because the missed source could contain a material conflict.
+
+Failure of a supplemental identity-only source with no category association does not automatically fail every category. Existing accepted bounded/truncated normalized documents remain usable according to the Phase 2C contract; do not invent a new incomplete state solely because application-owned text normalization reached its documented bound.
+
+Do not fabricate `stage="retrieval"` provider attempts using `provider="direct"`; retrieval is not a provider adapter in the current provider enum. Retrieval/normalization effects belong in sanitized final failures/warnings.
+
+### Extraction and reconciliation eligibility
+
+Call extraction only for B/C-complete **covered** categories. Clean discovery-empty categories bypass extraction entirely, are treated as extraction-complete-empty, and consume no AI attempts.
+
+The existing Phase 2D extraction API applies one global category set to every document. That is too coarse for Phase 2F: it could search a clean-empty category inside another category's documents, and a failed tuition-only segment could incorrectly demote admissions. Add one narrow backward-compatible project-owned document-category scope (for example `categoriesByDocumentId`) to the extraction stage. When omitted, preserve the released Phase 2D global-category behavior and all existing tests. When supplied by Phase 2F, each segment task receives only the canonical categories associated with that document by the B/C stage.
+
+Also harden the existing extraction injection seam before Phase 2F relies on it: change `runTask(task, options)` to a minimum public/project-owned `runTask(task)` contract so provider API keys and unrelated provider options are never handed to the test callback. Account injected non-skipped attempts against the same shared extraction budget as live transport (using the same bounded logic already established for reconciliation; a synthetic payload with no attempt record still cannot bypass the budget). A test seam must not be able to process unlimited segments/candidates while production is capped at 24 actual attempts. Add regression coverage that injected execution stops at the budget, preserves already promoted candidates, and does not expose provider keys to the callback.
+
+Derive extraction category completion from that scope: an unprocessed segment makes **only the categories associated with that document** incomplete; a shared document affects every category genuinely associated with it; a failure in a tuition-only document does not poison admissions. Preserve already validated candidates, but do not call an affected category complete merely because an earlier segment produced a candidate. A category whose every associated segment is processed is extraction-complete even when valid outputs are empty. Add explicit completed/incomplete category metadata to the project-owned extraction stage result or derive it mechanically from the segment/document-category map; do not infer it from candidate presence.
+
+Pass Phase 2E `decisionEligibleCategories` as exactly the union of clean discovery-empty categories and covered categories that completed retrieval/normalization/extraction. Semantic overflow, unresolved required relationships, provider exhaustion, or abort remain incomplete. Phase 2E can preserve provisional gated claims for an incomplete category; Phase 2F must filter final `ResearchResult.claims` to final processed categories only while retaining bounded validated sources/documents/candidates from incomplete categories.
+
+### Explanations must become a real final result instead of discarded quota
+
+Phase 2E already returns bounded evidence explanations, but `ResearchResult` currently has no explanation field. Phase 2F must add a strict project-owned explanation contract to `ResearchResult` and retain the Phase 2E result; do not spend the six-attempt explanation budget and then discard the output.
+
+Promote the existing Phase 2E `EvidenceExplanation` shape into one shared domain contract/schema under the research contracts rather than duplicating a second nearly-identical Phase 2F type; Phase 2E imports/reuses that shared type so the stage and final result cannot drift. The final explanation shape contains `category`, unique bounded `referencedClaimIds`, a summary bounded by `RESEARCH_MAX_EXPLANATION_SUMMARY_UTF16`, and optional `fallback`.
+
+Add `ResearchResult.explanations` as a bounded/defaulted array and strengthen cross-record validation: exactly one explanation per processed category, no explanation for unprocessed categories, and every referenced claim exists among final same-category claims. A claim-bearing processed category references at least one final claim. A processed unknown category has zero claims, zero referenced IDs, and deterministic fallback; zero-claim categories never trigger explanation AI. This is an intentional final-contract evolution: update legacy deterministic fixtures that represent processed/final results rather than weakening the invariant. Invalid/model/provider/budget/abort explanation outcomes fall back deterministically and never change evidence state or category lifecycle.
+
+Phase 2F invokes Phase 2E with explanations enabled and retains explanations only for processed categories. This makes the integrated explanation attempt budget meaningful and justifies the final 86-record provider-attempt ceiling.
+
+### Bounded AI skip telemetry required for the 86-record proof
+
+Actual HTTP success/failure/retry/quality/fallback records are never deduplicated or truncated. Non-dispatched records are bounded separately:
+
+- at most one provider-scoped skip per stage/provider (configuration **or** provider-local budget); a provider cannot legitimately be both unconfigured and later provider-budget-exhausted in the same stage;
+- at most one total-budget skip per AI stage;
+- repeated segment/batch processing after an already recorded provider/total budget skip must not append duplicate skip records.
+
+This proves extraction <=28, reconciliation <=16, explanation <=10 while preserving the actual HTTP ceilings 24/12/6.
+
+### Final lifecycle, abort, and failure aggregation
+
+Phase 2F emits only `succeeded`, `partial`, or `failed`. Strengthen terminal contract invariants with red tests first:
+
+- `run.partial === (status === "partial")`;
+- terminal runs require started/completed timestamps in monotonic order;
+- succeeded has no unprocessed categories;
+- partial has at least one processed and at least one unprocessed category;
+- failed has zero processed categories;
+- processed/unprocessed are unique, requested-only, disjoint, and union to the validated requested set;
+- `categoriesFailed` is a subset of unprocessed;
+- run and EvidenceSummary lifecycle sets match exactly.
+
+Add truthful `cancelled` to run/category operational failure vocabulary instead of mapping caller abort to timeout/upstream. Add `normalization` to run-level failure codes so a terminal normalization failure is not mislabeled retrieval. Invalid raw request returns a validated failed result with `failureCode="validation"`, zero provider calls, empty category sets when no trustworthy requested set exists, and no raw Zod detail. Valid unresolved/conflicting target means all requested categories unprocessed/failed and no downstream extraction/reconciliation.
+
+Pre-abort after a valid request makes zero provider dispatches and fails/cancels all requested categories. In-flight abort stops new calls/retries/quality escalation/fallback, preserves already validated work, leaves already completed categories processed, and makes unfinished categories unprocessed; partial if anything completed, failed otherwise. Abort during explanation does not demote an evidence-complete category because deterministic fallback is available.
+
+Expected operational failures return a validated result. A programming/invariant failure where application-owned final construction cannot pass `researchResultSchema` is not disguised as evidence failure; throw one sanitized internal orchestration error without provider/source/Zod payloads.
+
+Do not copy every transient stage failure into final `ResearchResult.failures`. `providerAttempts` already owns provider fallback history. Aggregate at most one salient operational failure per unprocessed category plus at most one global unattributed failure, dedupe by category/code, use bounded generic messages, and canonical category order. A provider failure followed by a successful fallback is never a terminal category failure. This keeps the final failure list comfortably inside the existing `RESEARCH_MAX_FAILURES_PER_RUN` bound without truncating meaningful category state.
+
+Aggregate warnings separately: sanitize/dedupe exact normalized messages in deterministic stage/category order and respect `RESEARCH_MAX_WARNINGS_PER_RUN`. If more unique diagnostic warnings exist than the final contract can carry, retain the first bounded set deterministically and reserve the last slot for one application-owned `additional warnings omitted` marker; never copy raw provider error bodies/prompts/source text into warnings.
+
+Do not silently slice other domain arrays to make the final schema pass. B/C must enforce candidateSource/source/document ceilings before Phase 2F; extraction's live 24-attempt × 12-claims-per-payload bound and corrected injected-budget accounting keep promoted candidates below the 500-run claim/candidate ceiling. If a project-owned stage nonetheless violates a supposedly impossible cardinality invariant, treat it as a sanitized internal programming error rather than dropping arbitrary evidence. Explanations are bounded by the seven processed categories.
+
+For terminal failed runs, choose the run-level primary failure code deterministically in this precedence when applicable:
+
+```text
+cancelled > validation > timeout > source-discovery > retrieval > normalization > source-limit > provider-rate-limit > provider-error > unknown
+```
+
+Succeeded runs have no failure code. Partial runs use category failures/provider telemetry rather than pretending one global code explains all unfinished categories.
+
+### EvidenceSummary is rebuilt from final state
+
+After final processed/unprocessed categories are known, filter final claims to processed categories and rebuild EvidenceSummary from scratch. Do not trust intermediate counters.
+
+For every processed category emit exactly one coverage row and none for unprocessed categories. `claimCount` comes from final claims, `statuses` is their deterministic unique status set, `hasEvidence === claimCount > 0`, processed zero-claim means category-level unknown, statusCounts/totalClaims come from final claims, conflicts/outdated come from final corresponding statuses, and `categoriesFailed` comes only from terminal operational failures and remains subset of unprocessed. Validate final explanations against final claims, then validate the complete `ResearchResult` at the return boundary.
+
+### Legacy optional run-summary fields must not lie
+
+`ResearchRun.discoveryProvider`, `extractionModel`, `maxExtractionCalls`, and `extractionCallsUsed` predate the full multi-provider/stage-aware orchestrator. Phase 2F must not populate them with misleading guesses merely because the fields exist. Ordered `providerAttempts` and the stage budgets are the source of truth. Leave `discoveryProvider`/`extractionModel` absent unless one unambiguous value truthfully represents the completed run; a failed first provider or mixed final-candidate models must not be collapsed into one label. Do not map the 24-HTTP-attempt extraction budget into the older 100-call schema fields as if those names were equivalent. Preserve compatibility acceptance of the optional fields, but Phase 2F may omit them.
+
+Every final provider attempt must carry its explicit actual stage; do not rely on `researchProviderAttemptSchema`'s historical default-to-discovery behavior in new Phase 2F code.
+
+## Phase 2F.6 — Expanded minimum test matrix
+
+In addition to the Phase 2F.3 fixtures, `tests/phase2f-orchestration.test.ts` must explicitly cover at least these integration regressions:
+
+1. invalid request -> failed/validation, zero provider attempts, sanitized output;
+2. valid unresolved/conflicting target -> all requested unprocessed/failed, no downstream AI;
+3. deterministic injected run ID/clock plus bounded UUID default and monotonic/backward-clock behavior;
+4. shuffled category input yields identical semantic result/provider dispatch order;
+5. discovery history stays <=32, including budget exhaustion without record 33;
+6. integrated max is derived/proven as 86 and a maximum legal history validates without truncation;
+7. repeated provider-local/total budget checks do not duplicate non-dispatched skip telemetry;
+8. no fabricated retrieval provider attempt;
+9. Tavily failure -> Brave success is complete; earlier failure remains telemetry only;
+10. all discovery mechanisms clean-empty -> completed empty, not failure;
+11. discovery operational failure + no later usable evidence -> incomplete, never unknown;
+12. one canonical URL discovered for two categories retains strongest candidate and both ephemeral category associations;
+13. source selection dropping a category's only association -> source-limit; dropping only excess sources while one remains is normal;
+14. clean-empty category bypasses retrieval/extraction AI and can finish succeeded/unknown;
+15. selected relevant retrieval failure remains category-incomplete even when another selected source succeeds;
+16. identity-only supplemental retrieval failure does not poison unrelated categories;
+17. duplicate canonical/content source proven redundant does not create false retrieval failure;
+18. SSRF/private redirect, DNS/connect/request timeout, oversize, MIME/encoding, retrieval and normalization failures map safely;
+19. accepted bounded/truncated document remains usable per Phase 2C;
+20. valid-empty extraction completes; per-document category scoping preserves Phase 2D compatibility, keeps clean-empty categories out of unrelated documents, and makes an unprocessed segment incomplete only for the categories associated with that document while earlier candidates survive;
+21. complete Gemini -> quality escalation -> Groq -> OpenRouter behavior remains bounded/no-paid with concrete model provenance;
+22. provider-local budget fails over and stage-total budget stops dispatch;
+23. Phase 2E receives only B/C/D-complete categories;
+24. exact semantic cases avoid unnecessary AI; unresolved/overflow/provider exhaustion affects only required categories and never becomes unknown;
+25. provisional claims from incomplete categories are absent from final claims while source/document/candidate provenance remains;
+26. ownership-established authority, independent corroboration, same-owner/mirror rejection, conflict, outdated, anecdotal, inferred, future/opaque period and unmodeled campus/scope survive end-to-end;
+27. `program-structure` end-to-end;
+28. final candidate/source/document/claim provenance still passes all Phase 2E hardening;
+29. claim-bearing explanation references only same-category final claims;
+30. unknown category gets zero-reference deterministic fallback and no AI request for that category;
+31. mixed claim-bearing + unknown categories send only claim-bearing categories to explanation AI;
+32. invalid/novel-fact/URL/provider-exhausted explanation falls back without lifecycle change;
+33. explanation abort does not demote a completed category;
+34. pre-abort produces zero provider calls; in-flight abort after one category completes produces partial with no post-abort retry/fallback;
+35. fully evidenced succeeded, unknown-only succeeded, mixed partial, and zero-processed failed lifecycle cases;
+36. failed run can retain provenance arrays while having zero processed/final claims;
+37. categoriesFailed subset unprocessed; unknown/conflict/outdated remain processed evidence semantics;
+38. exact coverage/statusCounts/totalClaims/conflict/outdated/unknown derivation;
+39. every processed category has exactly one final explanation; unprocessed categories have none;
+40. final failures are bounded/deduplicated and successful fallback never becomes terminal category failure;
+41. no secrets/private provider payloads/prompts/errors leak into final result or client boundary;
+42. all Phase 2A–2E tests remain green.
+
+All default tests remain deterministic/offline and use injected adapters/transports. No live Tavily/Brave/ROR/Gemini/Groq/OpenRouter/DNS/university/Supabase call is a completion requirement.
+
+## Phase 2F.7 — GLM-only final-review policy
+
+For this final Phase 2 batch, the main Codex agent performs all implementation, debugging, testing, requirements/security review, documentation, and fixes **inline**. Do not use implementation/research/test/security/docs/specialist subagents. The user will run the task under the z.ai Coding Plan `zai-coding/glm-5.3` OpenAI-compatible endpoint; treat the main model as capable and do not split work merely to accommodate a small/fast model.
+
+The **only** allowed subagent is the looping read-only final reviewer after all local gates pass:
+
+1. use the installed GLM reviewer `C:\Users\LOQ\.codex\agents\code-reviewer-glm.toml`, agent name `code-reviewer-glm` (GLM-5.3 Max, read-only);
+2. GPT agents are unavailable for this batch: never dispatch a GPT reviewer or another substitute reviewer;
+3. one reviewer child at a time, one child per iteration, no parallelism/swarm;
+4. a parent wait window ending with no result and no error is **not** failure/timeout. Inspect child status; if still running/thinking, leave it alive and continue checking. Do not impose an arbitrary wall-clock cutoff on the slow GLM reviewer;
+5. if the GLM reviewer returns an explicit HTTP 429/API rate-limit response, close it, do not retry it, and **skip all further subagent review** for this task. Do not use another agent. The main agent still performs the mandatory final inline diff/invariant/security review;
+6. if GLM returns another explicit terminal dispatch/model/provider/malformed-result error, stop subagent use with no substitute and finish review inline;
+7. if GLM returns actionable findings, main agent independently validates/fixes valid defects, reruns focused + full required gates, then may invoke the same GLM reviewer again;
+8. stop on `No findings.`;
+9. maximum three **successful** GLM review iterations; after that complete remaining work inline;
+10. reviewer is read-only and may not edit, commit, push, deploy, publish, call live providers, or delegate.
+
+This Phase 2F policy supersedes the historical Phase 2E reviewer policy earlier in this same runbook for the Phase 2F implementation task. Do not inherit Phase 2E's old GPT fallback. This policy does not authorize commit/push/deployment/live smoke calls. Do not treat slow ongoing GLM reasoning as rate-limit failure.
 
 ## Verification discipline
 

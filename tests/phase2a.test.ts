@@ -212,7 +212,9 @@ describe("Phase 2A research contracts", () => {
         id: "run-1",
         status: "partial",
         createdAt: timestamp,
+        startedAt: timestamp,
         updatedAt: timestamp,
+        completedAt: timestamp,
         partial: true,
         processedCategories: ["admissions"],
         unprocessedCategories: ["tuition"],
@@ -273,6 +275,11 @@ describe("Phase 2A research contracts", () => {
           verificationStatus: "verified",
         },
       ],
+      explanations: [{
+        category: "admissions",
+        referencedClaimIds: ["claim-1"],
+        summary: "Verified admissions deadline evidence.",
+      }],
       evidenceSummary: {
         statusCounts: {
           verified: 1,

@@ -1,6 +1,6 @@
 # Phase 2 — Evidence and Research Pipeline
 
-Status: Phase 2A–2E implemented; deterministic offline verification is complete, and the configured Tavily, Brave, Gemini, Groq, and OpenRouter connections each passed one authorized live smoke request on 2026-08-16. Phase 2F remains planned.
+Status: Phase 2A–2F implemented. Phase 2 is complete at the validated in-memory backend boundary; deterministic offline verification covers the full discovery -> retrieval -> extraction -> reconciliation -> evidence gate -> explanation -> terminal `ResearchResult` flow. The configured Tavily, Brave, Gemini, Groq, and OpenRouter connections each passed one authorized live smoke request on 2026-08-16; no additional live provider calls were used to complete Phase 2F. Persistence/RLS and live Research UI wiring remain later work.
 
 Implementation runbooks:
 
@@ -511,9 +511,11 @@ If AI reconciliation becomes unavailable after the full Gemini -> Groq -> OpenRo
 
 This design keeps AI central to extraction, semantic interpretation, reconciliation, and explanation while keeping the product's evidence guarantees outside model control.
 
-## Phase 2F — Fixtures, orchestration, and verification
+## Phase 2F — Full in-memory orchestration and Phase 2 completion
 
-Purpose: prove the pipeline, provider fallbacks, and evidence gates with deterministic cases before connecting it to the Research UI.
+Purpose: join the already verified Phase 2B–2E stages into one truthful end-to-end `ResearchResult`, prove provider/category lifecycle and evidence invariants under every bounded failure mode, and complete the Phase 2 backend before any Research UI or persistence wiring.
+
+The implementation-grade source of truth is `docs/planning/phase-2d-2f-ai-reconciliation-orchestration.md`. Phase 2F must preserve the released Phase 2E hardening rather than reinterpreting it: mandatory candidate provenance, ownership-established university authority, conservative period/scope semantics, bounded semantic overflow, truthful attempt telemetry, zero-claim unknown semantics, UTF-16-safe explanation fallback, and the public-only AI seams all remain mandatory.
 
 Create fixtures/tests for:
 
@@ -542,6 +544,26 @@ Create fixtures/tests for:
 - partial research run with successful and failed categories.
 
 The orchestrator should remain a small deterministic pipeline coordinator, not a production-style multi-agent system. Each stage consumes and returns project-owned contracts, records bounded provider/failure status, and never discards validated results because a later stage fails.
+
+Mandatory integration rules:
+
+- resolve the target once; refactor the Phase 2B/C compatibility pipeline to expose a project-owned stage result rather than re-resolving identity later;
+- canonicalize the requested category set before dispatch so equivalent requests are permutation-stable;
+- preserve multi-category associations when canonical source dedupe chooses one strongest `CandidateSource`;
+- distinguish discovery `covered`, clean `empty`, degraded direct/ROR salvage, and operational `failed` after final source selection; degraded salvage is retained but is not decision-eligible, and category coverage is derived after source-count/domain limits rather than from pre-budget hits;
+- a selected category-associated retrieval/normalization failure keeps that category incomplete unless exact redundancy with a retained usable document is proven;
+- a clean empty category bypasses retrieval/extraction AI and may become category-level unknown only after the required bounded work completed;
+- add a backward-compatible per-document category scope to extraction so Phase 2F sends each segment only the categories actually associated with that document; an unprocessed segment makes those associated categories incomplete, not unrelated categories, while preserving earlier candidates;
+- Phase 2E receives only categories that completed B/C/D; final claims are filtered to Phase 2E-completed categories while sources/documents/candidates from incomplete work remain retained;
+- add bounded final evidence explanations to `ResearchResult` instead of generating and discarding Phase 2E explanation output; every processed category has exactly one validated/model or deterministic-fallback explanation, and zero-claim unknown categories consume no explanation AI;
+- split discovery's 32-record attempt limit from the final result-history limit and derive the whole-run ceiling as **86 = 32 discovery + 28 extraction + 16 reconciliation + 10 explanation**; actual HTTP attempts are never truncated and repeated non-dispatched budget/configuration telemetry is deduplicated to the documented bound;
+- do not fabricate retrieval provider attempts; retrieval/normalization failures remain sanitized operational failures;
+- split the existing 60-second `RESEARCH_MAX_RUN_TIMEOUT_MS` into a discovery-specific deadline rather than applying it to the full Phase 2F pipeline;
+- caller cancellation is a truthful `cancelled` operational outcome, never mislabeled timeout, and cannot trigger another retry/fallback after abort;
+- `categoriesFailed` is always a subset of unprocessed; provider failures that later fall back successfully remain telemetry, not terminal category failures;
+- rebuild EvidenceSummary and explanations from final processed categories/final claims, then validate the complete `ResearchResult` at the return boundary.
+
+Phase 2F implementation uses no implementation subagents. Only the final looping read-only `code-reviewer-glm` may be used after all local gates pass. A still-running child is not timed out merely because one wait window elapsed. Explicit HTTP 429 means close the GLM reviewer and skip further subagent review with **no GPT fallback**; the main agent still completes its final inline review.
 
 Only after these tests pass should Phase 3 connect `/research` to a live research endpoint and expose loading, partial, conflict, stale, unresolved-semantic, error, provider-fallback, and retry states.
 
@@ -595,6 +617,9 @@ Required evidence before completion:
 - No AI/search provider secret can enter a client bundle or `NEXT_PUBLIC_*` variable.
 - Free-tier AI/search calls contain only public research content and minimum non-sensitive research context.
 - AI semantic reconciliation cannot bypass deterministic evidence-policy gates.
+- Phase 2F proves the exact 86-record integrated provider-attempt ceiling without enlarging discovery beyond its separate 32-record bound or truncating actual attempts.
+- Final `ResearchResult` explanations are evidence-bounded, claim-referenced, deterministic-fallback capable, and present exactly once per processed category; zero-claim unknown categories consume no explanation AI.
+- Terminal lifecycle tests prove succeeded/partial/failed partitions, cancellation, monotonic timestamps, categoriesFailed subset unprocessed, and final-claim pruning for incomplete categories.
 - `npx tsc --noEmit`, lint, build, relevant automated tests, dependency audit, and workspace verification pass.
 - Focused security review covers outbound retrieval, prompt injection, provider failover, secrets, free-tier quotas, privacy routing, and safe logging.
 - Repository Git operations remain separately authorized actions; the public `origin/main` repository is already initialized and published.
@@ -616,8 +641,8 @@ Required evidence before completion:
 1. Phase 2A is complete: core contracts, outbound URL policy, retrieval limits, and deterministic security tests.
 2. Phase 2B + Phase 2C are complete and verified: Unicode-safe target resolution, Tavily -> Brave -> direct/ROR discovery, DNS-pinned retrieval, bounded normalization, provider telemetry, and deterministic regressions are the implemented baseline recorded in the dedicated runbook.
 3. **Phase 2D is implemented and verified** — portable structured extraction, deterministic segmentation/exact quote promotion, Gemini 3.5 Flash-Lite -> bounded 3.5 Flash quality escalation -> Groq -> OpenRouter Free failover, provider-specific plus total attempt budgets, bounded retries/telemetry, and the fixed provider-key setup flow. On 2026-08-16, one explicitly authorized live request succeeded for each configured Tavily, Brave, Gemini, Groq, and OpenRouter connection; normal automated tests remain offline and deterministic.
-4. Phase 2E as its own batch: truthful ID-or-name verified-claim identity, deterministic normalization, AI semantic reconciliation, deterministic evidence-policy gates, and evidence-bounded explanation.
-5. Phase 2F as its own batch: full in-memory orchestration, terminal lifecycle/evidence-summary invariants, provider-attempt-bound proof, complete fallback/evidence fixture matrix, focused security review, and handoff to Phase 3.
+4. **Phase 2E is implemented, independently re-reviewed, and released in `bc1901b`** — truthful ID-or-name verified-claim identity, mandatory candidate provenance, deterministic normalization, AI semantic reconciliation, ownership-established authority/independence gates, conservative period/scope handling, bounded reconciliation/explanation budgets, category-level unknown semantics, and evidence-bounded deterministic explanation fallback.
+5. **Phase 2F is implemented and verified** — `runPhase2Research` now coordinates B/C/D/E in memory with exact category lifecycle, caller cancellation across target resolution/retrieval/AI stages, per-document extraction category scope, processed-category-only final claims, one validated/fallback explanation per processed category, a derived 86-record final provider-history bound with discovery still capped at 32, and deterministic succeeded/partial/failed output. Phase 2 is complete; Phase 3 Research Mode is next.
 
 Do not skip the established Phase 2A safety boundary when connecting live discovery or AI providers.
 

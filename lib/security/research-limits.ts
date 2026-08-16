@@ -13,8 +13,8 @@ export const RESEARCH_MAX_DISCOVERY_QUERY_CHARACTERS = 350;
 export const RESEARCH_MAX_DISCOVERY_QUERY_WORDS = 45;
 export const RESEARCH_MAX_DISCOVERY_QUERIES = 8;
 export const RESEARCH_MAX_DISCOVERY_RESULTS = 5;
-export const RESEARCH_MAX_PROVIDER_ATTEMPTS_PER_RUN = 32;
-export const RESEARCH_MAX_RUN_TIMEOUT_MS = 60_000;
+export const RESEARCH_MAX_DISCOVERY_PROVIDER_ATTEMPTS_PER_RUN = 32;
+export const RESEARCH_MAX_DISCOVERY_RUN_TIMEOUT_MS = 60_000;
 export const RESEARCH_MAX_CATEGORIES = 7;
 export const RESEARCH_MAX_EXTRACTION_CALLS_PER_RUN = 100;
 export const RESEARCH_MAX_CLAIMS_PER_RUN = 500;
@@ -23,6 +23,7 @@ export const RESEARCH_MAX_NORMALIZED_TEXT_CHARACTERS = 200_000;
 export const RESEARCH_MAX_SOURCES_PER_RUN = 12;
 export const RESEARCH_MAX_SOURCES_PER_DOMAIN = 3;
 export const RESEARCH_MAX_FAILURES_PER_RUN = RESEARCH_MAX_SOURCES_PER_RUN + RESEARCH_MAX_CATEGORIES;
+export const RESEARCH_MAX_WARNINGS_PER_RUN = 50;
 
 // Phase 2D AI transport and segmentation limits are intentionally separate
 // from the historical Phase 2A extraction-call/schema ceiling above.
@@ -38,6 +39,17 @@ export const RESEARCH_MAX_EXPLANATION_SUMMARY_UTF16 = 600;
 export const RESEARCH_MAX_EXTRACTION_SEGMENT_CHARACTERS = 5_000;
 export const RESEARCH_EXTRACTION_SEGMENT_OVERLAP_CHARACTERS = 250;
 export const RESEARCH_MAX_RETRY_AFTER_MS = 2_000;
+
+/**
+ * Final result history adds at most three provider-scoped non-dispatched
+ * skips and one total-stage skip to each AI stage. Actual HTTP attempts are
+ * never truncated to reach this bound.
+ */
+export const RESEARCH_MAX_PROVIDER_ATTEMPTS_PER_RUN =
+  RESEARCH_MAX_DISCOVERY_PROVIDER_ATTEMPTS_PER_RUN +
+  (RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN + 4) +
+  (RESEARCH_MAX_RECONCILIATION_HTTP_ATTEMPTS_PER_RUN + 4) +
+  (RESEARCH_MAX_EXPLANATION_HTTP_ATTEMPTS_PER_RUN + 4);
 
 export const RESEARCH_ALLOWED_RESPONSE_CONTENT_TYPES: readonly string[] =
   Object.freeze(["text/html", "text/plain", "application/pdf"]);

@@ -56,6 +56,7 @@ type HopResult =
 
 type RequestOptions = {
   deadline: number;
+  signal?: AbortSignal;
 };
 
 const REQUEST_USER_AGENT = "UniProof/0.1 research-retrieval";
@@ -199,21 +200,33 @@ function requestPinned(
     let connected = false;
     let connectTimer: ReturnType<typeof setTimeout> | undefined;
     let requestTimer: ReturnType<typeof setTimeout> | undefined;
-    let request: ClientRequest;
+    let request: ClientRequest | undefined;
+    const onAbort = () => {
+      if (settled) return;
+      request?.destroy();
+      finish({ ok: false, failure: { code: "cancelled", message: "source request was cancelled" } });
+    };
 
     const finish = (result: HopResult) => {
       if (settled) return;
       settled = true;
       if (connectTimer !== undefined) clearTimeout(connectTimer);
       if (requestTimer !== undefined) clearTimeout(requestTimer);
+      options.signal?.removeEventListener("abort", onAbort);
       resolve(result);
     };
     const destroyWithFailure = (failureValue: RequestFailure) => {
       if (!settled) {
-        request.destroy();
+        request?.destroy();
         finish({ ok: false, failure: failureValue });
       }
     };
+    if (options.signal?.aborted) {
+      finish({ ok: false, failure: { code: "cancelled", message: "source request was cancelled" } });
+      return;
+    }
+    options.signal?.addEventListener("abort", onAbort, { once: true });
+
     const markConnected = (socket: { remoteAddress?: string; remoteFamily?: string | number }) => {
       if (connected || settled) return;
       connected = true;
@@ -326,9 +339,12 @@ function requestPinned(
 
 export async function requestPinnedTransport(
   target: PinnedTransportTarget,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<HopResult> {
-  return requestPinned(target, { deadline: Date.now() + (options.timeoutMs ?? RESEARCH_REQUEST_TIMEOUT_MS) });
+  return requestPinned(target, {
+    deadline: Date.now() + (options.timeoutMs ?? RESEARCH_REQUEST_TIMEOUT_MS),
+    signal: options.signal,
+  });
 }
 
 function mapValidationFailure(validation: Exclude<OutboundUrlValidation, { valid: true }>, rawUrl: string): RetrievalFailure {
@@ -337,17 +353,28 @@ function mapValidationFailure(validation: Exclude<OutboundUrlValidation, { valid
   return failure("invalid-url", "source URL is not valid for retrieval", rawUrl);
 }
 
-async function withDeadline<T>(operation: Promise<T>, deadline: number): Promise<T | undefined> {
+async function withDeadline<T>(
+  operation: Promise<T>,
+  deadline: number,
+  signal?: AbortSignal,
+): Promise<T | undefined> {
   const remaining = deadline - Date.now();
-  if (remaining <= 0) return undefined;
+  if (remaining <= 0 || signal?.aborted) return undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
   const timeout = new Promise<undefined>((resolve) => {
     timer = setTimeout(() => resolve(undefined), remaining);
   });
+  const cancellation = new Promise<undefined>((resolve) => {
+    if (signal === undefined) return;
+    onAbort = () => resolve(undefined);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
   try {
-    return await Promise.race([operation, timeout]);
+    return await Promise.race([operation, timeout, cancellation]);
   } finally {
     if (timer !== undefined) clearTimeout(timer);
+    if (onAbort !== undefined) signal?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -356,9 +383,11 @@ export async function fetchPublicUrl(
   options: {
     dnsResolver?: OutboundDnsResolver;
     maxRedirects?: number;
+    signal?: AbortSignal;
   } = {},
 ): Promise<RetrievalResult> {
   const originalUrl = rawUrl;
+  if (options.signal?.aborted) return failure("cancelled", "source request was cancelled", rawUrl);
   const deadline = Date.now() + RESEARCH_REQUEST_TIMEOUT_MS;
   let currentUrl = rawUrl;
   let redirectCount = 0;
@@ -368,12 +397,18 @@ export async function fetchPublicUrl(
   const maxRedirects = options.maxRedirects ?? RESEARCH_MAX_REDIRECTS;
 
   while (true) {
+    if (options.signal?.aborted) return failure("cancelled", "source request was cancelled", currentUrl);
     if (Date.now() >= deadline) return failure("request-timeout", "source request timed out", currentUrl);
     const validation = await withDeadline(
       validateOutboundUrlAtResolutionTime(currentUrl, { allowHttp: true, dnsResolver: options.dnsResolver }),
       deadline,
+      options.signal,
     );
-    if (validation === undefined) return failure("request-timeout", "source request timed out", currentUrl);
+    if (validation === undefined) {
+      return options.signal?.aborted
+        ? failure("cancelled", "source request was cancelled", currentUrl)
+        : failure("request-timeout", "source request timed out", currentUrl);
+    }
     if (!validation.valid) return mapValidationFailure(validation, currentUrl);
     if (seen.has(validation.canonicalUrl)) return failure("redirect-loop", "source redirect loop detected", currentUrl);
     seen.add(validation.canonicalUrl);
@@ -383,7 +418,7 @@ export async function fetchPublicUrl(
     const addressFamily = isIP(hostnameWithoutBrackets) === 4 ? 4 : isIP(hostnameWithoutBrackets) === 6 ? 6 : null;
     const target: PinnedTransportTarget = { ...validation, selectedAddress, addressFamily };
     pinnedAddresses.push(selectedAddress);
-    const hop = await requestPinned(target, { deadline });
+    const hop = await requestPinned(target, { deadline, signal: options.signal });
     if (!hop.ok) return failure(hop.failure.code, hop.failure.message, currentUrl);
     if (hop.kind === "response") {
       return {
@@ -410,8 +445,13 @@ export async function fetchPublicUrl(
         maxRedirects,
       }),
       deadline,
+      options.signal,
     );
-    if (next === undefined) return failure("request-timeout", "source request timed out", currentUrl);
+    if (next === undefined) {
+      return options.signal?.aborted
+        ? failure("cancelled", "source request was cancelled", currentUrl)
+        : failure("request-timeout", "source request timed out", currentUrl);
+    }
     if (!next.valid) return mapValidationFailure(next, currentUrl);
     if (validation.protocol === "https:" && next.protocol === "http:") {
       return failure("redirect-downgrade", "HTTPS to HTTP redirects are blocked", currentUrl);

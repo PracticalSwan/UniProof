@@ -161,6 +161,52 @@ export function createExplanationBudget(
   return createStructuredAiBudget("explanation", limit, providerLimits);
 }
 
+export function accountInjectedStructuredAttempts(input: {
+  budget: StructuredAiBudget;
+  attempts: readonly ResearchProviderAttempt[];
+  provider?: ResearchExtractionProvider;
+  hasPayload: boolean;
+  stage: StructuredTaskKind;
+}): void {
+  const actual = input.attempts.filter((attempt) => attempt.outcome !== "skipped");
+  for (const attempt of input.attempts) {
+    if (attempt.stage !== input.stage) {
+      throw new Error("injected structured task returned an attempt for the wrong stage");
+    }
+    if (
+      attempt.provider !== "gemini" &&
+      attempt.provider !== "groq" &&
+      attempt.provider !== "openrouter"
+    ) {
+      throw new Error("injected structured task returned a non-AI provider attempt");
+    }
+  }
+
+  const required = actual.length || (input.hasPayload ? 1 : 0);
+  if (required > input.budget.limit - input.budget.used) {
+    throw new Error("injected structured task exceeded the shared attempt budget");
+  }
+
+  const providerCounts = new Map<ResearchExtractionProvider, number>();
+  for (const attempt of actual) {
+    const provider = attempt.provider as ResearchExtractionProvider;
+    providerCounts.set(provider, (providerCounts.get(provider) ?? 0) + 1);
+  }
+  if (actual.length === 0 && input.hasPayload && input.provider !== undefined) {
+    providerCounts.set(input.provider, 1);
+  }
+  for (const [provider, count] of providerCounts) {
+    if (count > input.budget.providerLimits[provider] - input.budget.providerUsed[provider]) {
+      throw new Error("injected structured task exceeded the provider attempt budget");
+    }
+  }
+
+  input.budget.used += required;
+  for (const [provider, count] of providerCounts) {
+    input.budget.providerUsed[provider] += count;
+  }
+}
+
 export const createAiBudget = createStructuredAiBudget;
 export const createStageBudget = createStructuredAiBudget;
 

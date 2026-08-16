@@ -386,6 +386,7 @@ export async function runProviderTransport(
         retryCount,
         durationMs: 0,
         failureKind: "budget",
+        budgetScope: reservation === "total-budget" ? "total" : "provider",
       }));
       return {
         ok: false,

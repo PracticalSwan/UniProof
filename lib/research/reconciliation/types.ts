@@ -1,5 +1,6 @@
 import type {
   ClaimCandidate,
+  EvidenceExplanation,
   ResearchCategory,
   ResearchDocument,
   ResearchProviderAttempt,
@@ -106,6 +107,11 @@ export type ReconciliationTask = {
   requestedPeriod?: ResearchPeriodContext;
 };
 
+export type ExplanationTask = {
+  claims: readonly VerifiedClaim[];
+  categories: readonly ResearchCategory[];
+};
+
 export type ReconciliationOptions = {
   candidates: readonly ClaimCandidate[];
   sources: readonly ResearchSource[];
@@ -127,7 +133,7 @@ export type ReconciliationOptions = {
   enableExplanations?: boolean;
   explanation?: boolean;
   explanationBudget?: StructuredAiBudget;
-  explanationRunTask?: (input: unknown) => Promise<{
+  explanationRunTask?: (input: ExplanationTask) => Promise<{
     payload?: unknown;
     provider?: "gemini" | "groq" | "openrouter";
     model?: string;
@@ -150,11 +156,4 @@ export type ReconciliationStageResult = {
   explanations: readonly EvidenceExplanation[];
   reconciliationBudget: ReconciliationBudgetUsage;
   explanationBudget: ReconciliationBudgetUsage;
-};
-
-export type EvidenceExplanation = {
-  category: ResearchCategory;
-  referencedClaimIds: readonly string[];
-  summary: string;
-  fallback?: boolean;
 };

@@ -126,6 +126,7 @@ describe("Phase 2E independent review regressions", () => {
         id: "run-aliases",
         status: "succeeded",
         createdAt: timestamp,
+        startedAt: timestamp,
         updatedAt: timestamp,
         completedAt: timestamp,
         processedCategories: ["admissions"],
@@ -136,6 +137,7 @@ describe("Phase 2E independent review regressions", () => {
       documents,
       candidates: [left, right],
       claims: gate.claims,
+      explanations: [{ category: "admissions", referencedClaimIds: [gate.claims[0]!.id], summary: "Corroborated admissions duration evidence." }],
       evidenceSummary: {
         statusCounts: { verified: 0, corroborated: 1, "university-reported": 0, conflicting: 0, anecdotal: 0, inferred: 0, unknown: 0, outdated: 0 },
         totalClaims: 1,

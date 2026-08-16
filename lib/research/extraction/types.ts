@@ -59,12 +59,16 @@ export type ExtractionStageResult = {
   warnings: readonly string[];
   processedSegmentIds: readonly string[];
   unprocessedSegmentIds: readonly string[];
+  completedCategories: readonly ResearchCategory[];
+  incompleteCategories: readonly ResearchCategory[];
   unfinished: boolean;
   budget: { limit: number; used: number };
 };
 
 export type ExtractionOptions = {
   categories: readonly ResearchCategory[];
+  /** Optional Phase 2F scope. When omitted, every document receives the legacy global category set. */
+  categoriesByDocumentId?: Readonly<Record<string, readonly ResearchCategory[]>>;
   target?: ExtractionTargetIdentity;
   geminiApiKey?: string;
   groqApiKey?: string;
@@ -73,8 +77,8 @@ export type ExtractionOptions = {
   signal?: AbortSignal;
   budget?: ExtractionBudget;
   providerOptions?: Omit<StructuredProviderOptions, "apiKey" | "signal" | "budget">;
-  /** Test seam for the complete per-segment provider chain. */
-  runTask?: (task: ExtractionTask, options: ExtractionOptions) => Promise<{
+  /** Test seam for the complete per-segment provider chain. It receives public/project-owned task data only. */
+  runTask?: (task: ExtractionTask) => Promise<{
     payload?: PortableExtractionPayload;
     model?: string;
     provider?: string;

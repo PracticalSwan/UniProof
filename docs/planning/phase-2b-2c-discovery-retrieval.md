@@ -117,7 +117,7 @@ Keep all provider keys server-only. Do not add any `NEXT_PUBLIC_*` provider cred
 Add `npm run setup:providers` backed by `scripts/setup-providers.mjs`. The Phase 2B–2C batch established the discovery-key behavior; the implemented Phase 2D extension manages the same file and fixed key flow for Gemini, Groq, and OpenRouter without creating a second setup mechanism.
 
 The setup script must preserve unrelated `.env.local` lines, replace only exact managed keys, hide key input when stdin is an interactive TTY (neutral mask characters may provide typing feedback), restore terminal state in `finally`, never print key values, and keep `.env.local` ignored. If stdin is non-interactive, accept already-set environment variables rather than attempting a visible prompt.
-Do not automatically enable full live research mode after provider keys are configured, because Phase 2E reconciliation and Phase 2F orchestration/UI wiring remain separate batches. Report which managed providers are configured and which fallback path is available.
+Do not automatically enable full live research mode after provider keys are configured. Phase 2E reconciliation and Phase 2F full in-memory orchestration are implemented, but live Research endpoint/UI wiring remains Phase 3. Report which managed providers are configured and which fallback path is available.
 
 Connectivity checks must be explicit opt-in because they consume provider quota/credits. A default setup run validates file/env configuration only.
 

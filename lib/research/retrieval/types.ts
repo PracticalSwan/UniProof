@@ -25,6 +25,7 @@ export type RetrievedResponse = {
 };
 
 export type RetrievalFailureCode =
+  | "cancelled"
   | "invalid-url"
   | "blocked-target"
   | "dns-failed"

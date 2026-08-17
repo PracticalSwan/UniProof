@@ -1,6 +1,6 @@
 # Phase 3 — Research Mode Architecture and Execution Plan
 
-Status: Phase 3A, Phase 3B, and the Phase 3C interactive Research workspace are implemented. Phase 3C received an independent defect-first review on 2026-08-18 covering rendered accessibility, retry/result state composition, canonical target labeling, and refresh evidence behavior, with regressions added and deterministic browser verification repeated. Phase 3D browser/accessibility hardening remains the next Research-mode batch. Phase 3 continues to preserve Phase 2 evidence semantics and remains in-memory; persistence and public deployment are still deferred.
+Status: Phase 3A–3D Research Mode is implemented and locally acceptance-complete as of 2026-08-18, based on reviewed Phase 3C commit `d71c1628500c5ae71e14113ae8144cf4c1f14e99` plus the reviewed Phase 3D change set. A post-implementation main-agent review found and fixed three additional acceptance issues before publication: Playwright dev-harness path traversal could move recursive cleanup outside `output/playwright`, the site lacked a keyboard bypass for the repeated sticky navigation, and the E2E route controller did not fail teardown when an expected reply remained unconsumed. Those fixes are regression-covered and preserve the Phase 2/3 evidence boundary. Fresh final evidence now includes 16/16 Phase 3A, 32/32 Phase 3B, 72/72 Phase 3C focused Vitest, 306/306 full Vitest, 66/66 dev Playwright, 35/35 repeated race executions, 66/66 built-application Playwright, successful TypeScript/lint/build checks, 0 production dependency vulnerabilities, and the final security/workspace/integrity gates described below. Phase 3 preserves Phase 2 evidence semantics and remains in-memory; persistence, authentication, Comparison/Guide implementation, public deployment, durable endpoint rate limiting, and any new live-provider smoke remain deferred.
 
 Detailed implementation runbooks:
 
@@ -9,7 +9,7 @@ Detailed implementation runbooks:
 - Phase 3C — interactive Research workspace + evidence UX: `docs/superpowers/plans/2026-08-17-phase-3c-research-workspace-and-evidence-ui.md`
 - Phase 3D — failure-state hardening + accessibility + browser acceptance: `docs/superpowers/plans/2026-08-17-phase-3d-research-hardening-and-browser-qa.md`
 
-Execution policy follows `AGENTS.md`: GLM-5.3 Max performs all work, verification, documentation, and final review in the main agent with no subagents; native OpenAI GPT models retain the final read-only `code-reviewer` step after local gates.
+Execution policy normally follows `AGENTS.md`, but **Phase 3D has an explicit task-specific user override: zero subagents/reviewer agents for every model**. The main ChatGPT agent must perform Phase 3D planning, implementation, TDD, browser/accessibility/security review, documentation, and final defect-first review inline. Do not invoke the native-GPT `code-reviewer` or any specialist child for this batch.
 
 ## 1. Goal
 
@@ -38,7 +38,7 @@ Phase 3 MUST NOT:
 - perform automatic live-provider smoke tests;
 - deploy, publish, commit, or push without separate authorization.
 
-The protected untracked `ui-flow-screenshots/` directory remains outside implementation and verification writes unless the user explicitly authorizes use of those files.
+The protected untracked `ui-flow-screenshots/` directory currently contains ten user-requested current-state PNGs (`01`–`10`). Phase 3D treats them as read-only reference material: do not use them as Playwright output or modify/stage/delete them. Because the directory is untracked, Phase 3D records filename+size+SHA-256 before work and proves the manifest is identical at completion.
 
 ## 3. Architectural boundary
 
@@ -129,7 +129,9 @@ Acceptance gate before 3D:
 
 Exercise every UX lifecycle and stress edge case with deterministic API interception and offline fixtures; fix only Phase 3 presentation/controller defects.
 
-Phase 3 completes only when the full acceptance matrix and repository gates pass.
+Implemented result: the direct runner is exact `@playwright/test@1.62.1`; browser specs are split by concern and use one worker, zero retries, blocked service workers, deterministic route barriers, and fail-closed external-network/page/console/dialog/popup guards. Because an unrelated developer `next dev` process can hold the workspace `.next/dev` lock, dev-mode Playwright creates a process-unique ignored source snapshot under `output/playwright/` and starts a fresh `next dev` there rather than attaching to or terminating the developer server. Production-mode acceptance runs the actual built workspace with `next start`. The only Phase 3D product defect found during browser acceptance was unsupported-target accessibility after a program-scoped target was invalidated; both cleared target IDs now retain exact error associations.
+
+Phase 3 completed when the full acceptance matrix and repository gates passed; public deployment remains a separate Phase 6 decision.
 
 ## 5. Public supported catalog model
 
@@ -429,7 +431,7 @@ Phase 3C uses four small client-safe seams rather than scattering correctness ac
 
 1. `client-form.ts` owns catalog-aware target/program ownership, canonical category toggles, blank optional omission, target labels, and final `researchModeRequestSchema` validation.
 2. `client-state.ts` owns the pure reducer plus an immutable `ResearchSubmissionSnapshot` containing the exact validated public request and catalog-derived target label.
-3. `client-transport.ts` owns the single `/api/research` fetch, strict JSON/content-type/envelope validation, submitted target/program/category binding, sanitized network/invalid-response outcomes, and signal-authoritative cancellation.
+3. `client-transport.ts` owns the single `/api/research` fetch, strict JSON/content-type/envelope validation, submitted target/program/category binding, sanitized network/invalid-response outcomes, and signal-authoritative cancellation. Phase 3D hardens this seam further with an **actual <=4 MiB streamed response-byte bound and fatal UTF-8 decoding**, so missing/dishonest `Content-Length` cannot bypass the browser trust boundary.
 4. `format.ts` owns deterministic presentation-only formatting.
 
 Recommended run states keep form state separate and retain the submission that produced a dossier/error:
@@ -713,31 +715,35 @@ The implementation and tests must cover at least the following.
 
 ## 17. Testing architecture
 
-Use the existing Vitest stack plus Playwright Test for browser acceptance. The current manifest declares the `playwright` automation library but not the official `@playwright/test` runner used by current Playwright Test configuration/fixtures; Phase 3D must first align that **dev dependency at the existing 1.62.x version**, replacing the redundant direct package if no independent library import exists. Do not turn this into a general dependency upgrade.
+Use the existing Vitest stack plus Playwright Test for browser acceptance. At the reviewed Phase 3C baseline the manifest has direct `playwright@1.62.1` only and no independent checked-in import; Phase 3D replaces that top-level dependency with exact `@playwright/test@1.62.1`. This is a runner alignment only, not a general dependency upgrade.
 
 Use:
 
-- Vitest for catalog schemas, request validation, pure formatter/state reducer, server handler via dependency injection, dossier composer, public DTO invariants, and lightweight server-rendered Research UI regressions that do not require a browser;
-- `@playwright/test` for real rendered Research workspace behavior and accessibility/viewport flows;
-- Playwright network interception/fulfillment with validated dossier fixtures so browser tests make zero provider calls;
+- Vitest for catalog schemas, request validation, state/form/format logic, server handler/composer/public DTO invariants, lightweight server-rendered UI regressions, and client-transport stream/UTF-8/cancellation cases that require synthetic `ReadableStream` control;
+- `@playwright/test` for real rendered Research workspace interaction, lifecycle ownership, accessibility/focus, responsive/long-content, malformed-response presentation, and network discipline;
+- deterministic Playwright `/api/research` interception with schema-validated valid fixtures plus clearly separated raw invalid responses;
+- a fail-closed browser network guard that permits loopback application traffic and browser-internal `data:`/`blob:` only; no automated E2E depends on external providers, evidence sources, universities, fonts, or analytics;
+- dedicated Playwright dev and production-server runs with `reuseExistingServer:false`, one worker, zero retries, and explicit repeat-each stability checks for race specs;
 - existing Phase 2 tests as non-regression coverage.
 
-Recommended new test files:
+Phase 3D browser files are intentionally split by concern:
 
 ```text
-tests/phase3a-research-catalog.test.ts
-tests/phase3b-research-api.test.ts
-tests/phase3b-dossier-composer.test.ts
-tests/phase3c-research-state.test.ts
-tests/phase3c-research-form.test.ts
-tests/phase3c-research-transport.test.ts
-tests/phase3c-research-format.test.ts
-tests/phase3c-research-ui.test.ts
-tests/e2e/research-mode.spec.ts
 playwright.config.ts
+tests/fixtures/research-dossiers.ts
+tests/e2e/helpers/research-browser.ts
+tests/e2e/research-form.spec.ts
+tests/e2e/research-lifecycle.spec.ts
+tests/e2e/research-races.spec.ts
+tests/e2e/research-evidence.spec.ts
+tests/e2e/research-errors.spec.ts
+tests/e2e/research-accessibility.spec.ts
+tests/e2e/research-responsive.spec.ts
 ```
 
-Use strict fixtures validated by the same public schemas. Do not make browser tests depend on live Tavily/Brave/ROR/Gemini/Groq/OpenRouter availability.
+Existing Phase 3C test files remain part of the focused acceptance set, especially `tests/phase3c-research-transport.test.ts` and `tests/phase3c-research-ui.test.ts` because Phase 3D must retain reviewed retry/clear/accessibility/refresh behavior and add the actual response-byte/fatal-UTF-8 transport regressions.
+
+`vitest.config.mts` continues to include `tests/**/*.test.ts`, so Playwright `*.spec.ts` files are not accidentally run by `npm test`; `tsconfig.json` still typechecks them. Do not make browser tests depend on live Tavily/Brave/ROR/Gemini/Groq/OpenRouter availability.
 
 ## 18. Test seam requirements
 
@@ -763,17 +769,16 @@ Browser E2E should mock `/api/research` at the network layer rather than add a p
 
 ## 19. Verification gates
 
-After each subphase:
+During TDD, run the smallest affected Vitest/Playwright spec first and observe red -> green for every proved defect. Do not rely on retries or arbitrary sleeps to make race tests pass.
+
+At final Phase 3 completion, freshly run:
 
 ```text
-cmd.exe /c npx.cmd vitest run <focused Phase 3 test file(s)>
-cmd.exe /c npx.cmd tsc --noEmit
-cmd.exe /c npm.cmd run lint
-```
-
-At Phase 3 completion:
-
-```text
+cmd.exe /c npx.cmd vitest run tests/phase3a-research-catalog.test.ts
+cmd.exe /c npx.cmd vitest run tests/phase3b-dossier-composer.test.ts tests/phase3b-research-api.test.ts
+cmd.exe /c npx.cmd vitest run tests/phase3c-research-state.test.ts tests/phase3c-research-form.test.ts tests/phase3c-research-transport.test.ts tests/phase3c-research-format.test.ts tests/phase3c-research-ui.test.ts
+cmd.exe /c npx.cmd playwright test
+cmd.exe /c npx.cmd playwright test tests/e2e/research-races.spec.ts --repeat-each=5
 cmd.exe /c npm.cmd test
 cmd.exe /c npx.cmd tsc --noEmit
 cmd.exe /c npm.cmd run lint
@@ -783,18 +788,26 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "D:/Side Projects/UniPro
 cmd.exe /c git diff --check
 ```
 
-Also run:
+After the successful build, run the complete Playwright suite once against the built `next start` application using the Playwright-config-only `UNIPROOF_E2E_PRODUCTION=1` switch. The browser suite must use a dedicated loopback server, `reuseExistingServer:false`, one worker, zero configured retries, deterministic route barriers, and a fail-closed external-network guard.
 
-- Playwright Research-mode desktop + mobile + keyboard flows;
-- console/page-error inspection;
-- horizontal-overflow checks;
-- UTF-8/control scan of changed text files;
-- provider-secret / `NEXT_PUBLIC_*` scan;
+Also require:
+
+- manual main-agent desktop/mobile/narrow + keyboard/focus inspection;
+- no page errors, unexpected app console errors, JS dialogs, popups, service-worker behavior, or external HTTP(S) browser requests;
+- required viewport horizontal-overflow checks plus near-contract-max content and 500-claim stress;
+- actual <=4 MiB streamed client response bound, fatal UTF-8 decoding, and stream-cancellation tests;
+- strict UTF-8/control scan of changed text files;
+- real provider credential-value scan against changed tracked files and final `.next` output without printing secrets;
+- provider `NEXT_PUBLIC_*`, production client/Phase-2-internal, executable-evidence, persistence/query/background-retry scans;
 - `.env.local` ignored/untracked verification;
-- final diff review against Phase 3 scope;
-- requirements traceability for `docs/requirements.md` Research Mode and quality/safety requirements.
+- exact `@playwright/test@1.62.1` dependency/lock verification with no unrelated package upgrades;
+- before/after filename+size+SHA-256 equality for all ten protected `ui-flow-screenshots/` files;
+- no Playwright/test artifacts staged;
+- final diff/status review against Phase 3D scope;
+- requirements traceability for `docs/requirements.md` Research Mode and quality/safety requirements;
+- one final defect-first review performed **inline by the main ChatGPT agent only, with zero subagents/reviewer agents**.
 
-No live provider call is required for automated acceptance. If a live end-to-end research smoke is desired later, it requires explicit authorization and is performed once with bounded input after the deterministic gates pass.
+No live provider call is required for automated acceptance. A live end-to-end research smoke requires separate explicit user authorization after deterministic gates pass; Phase 3D itself does not deploy or publish.
 
 ## 20. Public deployment blocker
 
@@ -822,3 +835,31 @@ During implementation:
 - do not mark persistence/RLS/Comparison/Guide tasks complete.
 
 Phase 3 is complete when a judge can locally use the Research mode to select a supported target, run or deterministically simulate the real Research workflow, inspect final evidence/source provenance, observe unknown/conflict/outdated/partial/failure states truthfully, use the interface by keyboard on desktop/mobile layouts, and all deterministic gates pass without weakening Phase 2 evidence contracts.
+
+## 22. Phase 3D observed requirements traceability
+
+| Requirement / acceptance concern | Observed evidence |
+| --- | --- |
+| Target search/select | `research-form.spec.ts` covers university/program search, aliases/subjects, case/punctuation normalization, AND filters, supported-only selection, owner-university binding, university-only scope, clear target, and no silent retargeting. |
+| Seven Research categories | Form and lifecycle browser specs verify all seven initially selected, zero-category rejection, canonical request ordering, canonical dossier ordering, and category-state rendering. |
+| Source provenance + exact supporting evidence | `research-evidence.spec.ts` verifies exact supporting text, all claim sources, representative-source-first ordering, publisher/type/retrieved metadata, and safe source links. |
+| Unknown | `research-lifecycle.spec.ts` proves `succeeded` runs can contain category-level Unknown with zero claims/evidence actions and no operational-failure styling. |
+| Incomplete / partial | Partial lifecycle and race specs preserve ready/unknown rows, render operational incomplete reasons, expose explicit Retry only, and make no automatic request. |
+| Conflicts | `research-evidence.spec.ts` displays every competing value/evidence association and asserts no preferred/winner treatment. |
+| Outdated | Evidence specs keep Outdated explicit and separate effective/academic metadata from Retrieved timestamps. |
+| Anecdotal / inferred | All-ready fixtures render exact Anecdotal and Inferred claim badges; no promotion or confidence invention is performed in the UI. |
+| Official links | Evidence specs assert catalog-owned official program/university hrefs plus `_blank`, `noopener noreferrer`, and `no-referrer` without navigating externally. |
+| Loading | Form/accessibility specs verify one indeterminate controlled loading status, disabled mutable controls, reachable Cancel, and no fake percentage/provider stage. |
+| Failed dossier | Lifecycle specs prove a valid `run.status === "failed"` remains dossier data with failed-run/incomplete-row presentation rather than a generic transport error. |
+| Retry | Race/error specs prove sole retry ownership after a newer refresh error, exact immutable failed-body replay, and no blind Retry for correction-required errors. |
+| Clear result | Race specs prove `Clear result` removes the preserved dossier and refresh error while preserving current editable form state. |
+| Cancellation | Barrier-based race specs prove idempotent Cancel, no automatic retry, preserved inputs, stale completion immunity, and unmount abort behavior. |
+| Immutable request ownership | Form/race specs prove same-tick single-flight, captured-body immutability, stale-sequence protection, exact Retry snapshot ownership, and current-form new Research ownership. |
+| Keyboard / accessibility | Accessibility/evidence specs verify a keyboard-visible skip link that bypasses repeated sticky navigation into the focusable `main-content` target, one main landmark, labels, `aria-current`, exact error associations, no positive tabindex, visible focus, full desktop/mobile keyboard reachability, modal trap/Escape/return, controlled announcements, practical target geometry, reduced motion, and sticky-header non-obscuration at 320/375/390 px. |
+| Responsive layout | `research-responsive.spec.ts` verifies <=1 px horizontal overflow at 320x740, 375x812, 390x844, 768x1024, 1024x768, and 1440x900 with near-contract-max content, 12 sources, and 500 claims. |
+| Preserved input | Form/error/race specs verify editable input survives recoverable server errors, cancellation, Retry/new-request divergence, and Clear result. |
+| No invented values | Evidence specs preserve string/number/boolean scalar meaning, including numeric-looking string `007`, and assert no winner, conversion, inferred date, or confidence presentation. |
+| Client response bound | Phase 3C transport regressions verify actual streamed >4 MiB rejection with missing/dishonest length, exact 4 MiB size acceptance, fatal invalid-UTF-8 rejection, abort-during-read cancellation, and non-blocking reader cleanup. |
+| No external browser network | Every Playwright test installs a fail-closed loopback/data/blob-only guard plus page/console/dialog/popup guards; both 66-test dev and 66-test built-app suites completed with zero unexpected external HTTP(S) requests. |
+| Acceptance-harness safety | `tests/playwright-config-safety.test.ts` proves inherited dev-harness IDs cannot traverse outside `output/playwright`; `tests/playwright-route-controller.test.ts` plus E2E teardown require every queued expected Research reply to be consumed, while malformed JSON objects use an explicitly unvalidated fixture path. |
+| Protected screenshot integrity | Ten `ui-flow-screenshots/` files were hashed by filename/size/SHA-256 before the publication review and are rechecked after code/docs freeze; the implementation-time comparison was already exactly equal 10/10. |

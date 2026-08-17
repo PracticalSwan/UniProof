@@ -163,6 +163,9 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
           }));
           setFieldErrors({
             universityId: "The previously selected target is no longer supported. Choose a supported target again.",
+            ...(submission.request.programId === undefined ? {} : {
+              programId: "The previously selected program is no longer supported. Choose a supported target again.",
+            }),
           });
         }
         dispatch({ type: "error", sequence, error: outcome.error });

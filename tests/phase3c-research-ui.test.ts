@@ -157,6 +157,32 @@ describe("Phase 3C rendered accessibility and target labeling", () => {
     expect(markup).toContain('id="research-question-error"');
   });
 
+  it("keeps both cleared target errors associated after a program-scoped target becomes unsupported", () => {
+    const markup = renderToStaticMarkup(React.createElement(ResearchForm, {
+      formState: createInitialResearchFormState(),
+      catalog: researchCatalog,
+      disabled: false,
+      fieldErrors: {
+        universityId: "The previously selected target is no longer supported. Choose a supported target again.",
+        programId: "The previously selected program is no longer supported. Choose a supported target again.",
+      },
+      serverErrorCode: "unsupported-target",
+      onPatch: vi.fn(),
+      onSelectUniversity: vi.fn(),
+      onSelectProgram: vi.fn(),
+      onClearTarget: vi.fn(),
+      onSubmit: vi.fn(),
+      onReset: vi.fn(),
+    }));
+
+    const search = elementWithId(markup, "research-search");
+    expect(search).toContain('aria-invalid="true"');
+    expect(search).toContain("research-university-error");
+    expect(search).toContain("research-program-error");
+    expect(markup).toContain('id="research-university-error"');
+    expect(markup).toContain('id="research-program-error"');
+  });
+
   it("marks only populated free-text controls invalid for a sensitive-input group error", () => {
     const markup = renderToStaticMarkup(React.createElement(ResearchForm, {
       formState: {

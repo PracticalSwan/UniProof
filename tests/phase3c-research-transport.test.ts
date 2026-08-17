@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { executeResearchRequest } from "@/lib/research/mode/client-transport";
+import {
+  executeResearchRequest,
+  RESEARCH_CLIENT_MAX_RESPONSE_BYTES,
+} from "@/lib/research/mode/client-transport";
 import {
   researchDossierSchema,
   researchModeRequestSchema,
@@ -133,6 +136,26 @@ function jsonResponse(body: string, status = 200): Response {
     status,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
+}
+
+function concatBytes(...parts: Uint8Array[]): Uint8Array {
+  const result = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    result.set(part, offset);
+    offset += part.byteLength;
+  }
+  return result;
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
 }
 
 function stubResponse(
@@ -329,6 +352,141 @@ describe("executeResearchRequest", () => {
 
     expect(result).toEqual(invalidResponse);
   });
+
+  it("rejects an actual response body over 4 MiB when Content-Length is absent", async () => {
+    const encoded = new TextEncoder().encode(successEnvelope);
+    const body = successEnvelope + " ".repeat(
+      RESEARCH_CLIENT_MAX_RESPONSE_BYTES + 1 - encoded.byteLength,
+    );
+
+    const result = await executeResearchRequest(
+      request,
+      new AbortController().signal,
+      vi.fn(async () => jsonResponse(body)),
+    );
+
+    expect(result).toEqual(invalidResponse);
+  });
+
+  it("rejects an actual response body over 4 MiB when Content-Length understates it", async () => {
+    const encoded = new TextEncoder().encode(successEnvelope);
+    const body = successEnvelope + " ".repeat(
+      RESEARCH_CLIENT_MAX_RESPONSE_BYTES + 1 - encoded.byteLength,
+    );
+    const response = new Response(body, {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(RESEARCH_CLIENT_MAX_RESPONSE_BYTES),
+      },
+    });
+
+    const result = await executeResearchRequest(
+      request,
+      new AbortController().signal,
+      vi.fn(async () => response),
+    );
+
+    expect(result).toEqual(invalidResponse);
+  });
+
+  it("accepts exactly 4 MiB without rejecting for size alone", async () => {
+    const encoded = new TextEncoder().encode(successEnvelope);
+    const body = successEnvelope + " ".repeat(
+      RESEARCH_CLIENT_MAX_RESPONSE_BYTES - encoded.byteLength,
+    );
+
+    const result = await executeResearchRequest(
+      request,
+      new AbortController().signal,
+      vi.fn(async () => jsonResponse(body)),
+    );
+
+    expect(result).toEqual({ kind: "dossier", dossier: validDossier });
+  });
+
+  it("rejects invalid UTF-8 bytes instead of trusting replacement-character decoding", async () => {
+    const encoder = new TextEncoder();
+    const bytes = concatBytes(
+      encoder.encode('{"ok":false,"error":{"code":"internal-error","message":"before '),
+      new Uint8Array([0xc3, 0x28]),
+      encoder.encode(' after"}}'),
+    );
+    const response = new Response(bytes.buffer as ArrayBuffer, {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+
+    const result = await executeResearchRequest(
+      request,
+      new AbortController().signal,
+      vi.fn(async () => response),
+    );
+
+    expect(result).toEqual(invalidResponse);
+  });
+
+  it("cancels while the next response stream chunk is pending", async () => {
+    const readPending = deferred();
+    const streamCancelled = deferred();
+    let pullCount = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        streamController.enqueue(new TextEncoder().encode("{"));
+      },
+      pull() {
+        pullCount += 1;
+        if (pullCount >= 2) readPending.resolve();
+      },
+      cancel() {
+        streamCancelled.resolve();
+      },
+    });
+    const response = new Response(stream, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+    const controller = new AbortController();
+
+    const resultPromise = executeResearchRequest(
+      request,
+      controller.signal,
+      vi.fn(async () => response),
+    );
+    await readPending.promise;
+    controller.abort();
+    await streamCancelled.promise;
+
+    await expect(resultPromise).resolves.toEqual({ kind: "cancelled" });
+  }, 1_000);
+
+  it("performs oversize stream cleanup best-effort without awaiting a hanging cancel", async () => {
+    let cancelCalls = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        streamController.enqueue(
+          new Uint8Array(RESEARCH_CLIENT_MAX_RESPONSE_BYTES + 1).fill(0x20),
+        );
+      },
+      cancel() {
+        cancelCalls += 1;
+        return new Promise<void>(() => {});
+      },
+    });
+    const response = new Response(stream, {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+
+    const result = await executeResearchRequest(
+      request,
+      new AbortController().signal,
+      vi.fn(async () => response),
+    );
+
+    expect(result).toEqual(invalidResponse);
+    expect(cancelCalls).toBe(1);
+  }, 1_000);
 
   it("sanitizes network failures without copying exception bodies", async () => {
     const result = await executeResearchRequest(

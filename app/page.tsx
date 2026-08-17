@@ -27,7 +27,7 @@ const modes = [
 
 export default function Home() {
   return (
-    <main className="mx-auto w-full max-w-[1440px] px-5 pt-12 sm:px-8 sm:pt-16 lg:px-[72px] lg:pt-[76px]">
+    <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-[1440px] px-5 pt-12 sm:px-8 sm:pt-16 lg:px-[72px] lg:pt-[76px]">
       <section className="grid items-start gap-12 lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-20">
         <div className="max-w-[760px]">
           <p className="text-[11px] font-semibold tracking-[0.08em] text-primary">

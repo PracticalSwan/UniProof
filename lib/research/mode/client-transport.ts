@@ -48,6 +48,143 @@ function declaredLengthWithinBound(response: Response): boolean {
   return Number.isFinite(length) && length >= 0 && length <= RESEARCH_CLIENT_MAX_RESPONSE_BYTES;
 }
 
+type BoundedResponseTextResult =
+  | { ok: true; text: string }
+  | { ok: false; kind: "cancelled" | "invalid-response" | "network-error" };
+
+function cancelReaderBestEffort(reader: ReadableStreamDefaultReader<Uint8Array>): void {
+  try {
+    void reader.cancel().catch(() => undefined);
+  } catch {
+    // Cleanup must never replace the sanitized transport outcome.
+  }
+}
+
+function cancelResponseBodyBestEffort(response: Response): void {
+  try {
+    if (response.body !== null) {
+      void response.body.cancel().catch(() => undefined);
+    }
+  } catch {
+    // Cleanup must never replace the sanitized transport outcome.
+  }
+}
+
+async function readChunkWithSignal(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal: AbortSignal,
+): Promise<
+  | { kind: "chunk"; result: ReadableStreamReadResult<Uint8Array> }
+  | { kind: "cancelled" }
+  | { kind: "network-error" }
+> {
+  if (signal.aborted) {
+    cancelReaderBestEffort(reader);
+    return { kind: "cancelled" };
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (
+      value:
+        | { kind: "chunk"; result: ReadableStreamReadResult<Uint8Array> }
+        | { kind: "cancelled" }
+        | { kind: "network-error" },
+    ) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      resolve(value);
+    };
+    const onAbort = () => {
+      cancelReaderBestEffort(reader);
+      finish({ kind: "cancelled" });
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    void reader.read().then(
+      (result) => {
+        if (signal.aborted) {
+          cancelReaderBestEffort(reader);
+          finish({ kind: "cancelled" });
+          return;
+        }
+        finish({ kind: "chunk", result });
+      },
+      () => {
+        if (signal.aborted) {
+          cancelReaderBestEffort(reader);
+          finish({ kind: "cancelled" });
+          return;
+        }
+        finish({ kind: "network-error" });
+      },
+    );
+  });
+}
+
+async function readBoundedResearchResponseText(
+  response: Response,
+  signal: AbortSignal,
+): Promise<BoundedResponseTextResult> {
+  if (signal.aborted) return { ok: false, kind: "cancelled" };
+
+  if (response.body === null || response.body === undefined) {
+    try {
+      const text = await response.text();
+      if (signal.aborted) return { ok: false, kind: "cancelled" };
+      if (new TextEncoder().encode(text).byteLength > RESEARCH_CLIENT_MAX_RESPONSE_BYTES) {
+        return { ok: false, kind: "invalid-response" };
+      }
+      return { ok: true, text };
+    } catch {
+      return signal.aborted
+        ? { ok: false, kind: "cancelled" }
+        : { ok: false, kind: "network-error" };
+    }
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let totalBytes = 0;
+  let text = "";
+
+  while (true) {
+    const chunk = await readChunkWithSignal(reader, signal);
+    if (chunk.kind !== "chunk") {
+      return { ok: false, kind: chunk.kind };
+    }
+    if (signal.aborted) {
+      cancelReaderBestEffort(reader);
+      return { ok: false, kind: "cancelled" };
+    }
+    if (chunk.result.done) {
+      try {
+        text += decoder.decode();
+      } catch {
+        cancelReaderBestEffort(reader);
+        return { ok: false, kind: "invalid-response" };
+      }
+      return signal.aborted
+        ? { ok: false, kind: "cancelled" }
+        : { ok: true, text };
+    }
+
+    totalBytes += chunk.result.value.byteLength;
+    if (totalBytes > RESEARCH_CLIENT_MAX_RESPONSE_BYTES) {
+      cancelReaderBestEffort(reader);
+      return { ok: false, kind: "invalid-response" };
+    }
+
+    try {
+      text += decoder.decode(chunk.result.value, { stream: true });
+    } catch {
+      cancelReaderBestEffort(reader);
+      return { ok: false, kind: "invalid-response" };
+    }
+  }
+}
+
 function responseMatchesSubmittedRequest(
   dossier: ResearchDossier,
   request: ResearchModeRequest,
@@ -93,19 +230,21 @@ export async function executeResearchRequest(
   if (signal.aborted) return { kind: "cancelled" };
 
   if (!isJsonContentType(response) || !declaredLengthWithinBound(response)) {
+    cancelResponseBodyBestEffort(response);
     return invalidResponse();
   }
 
-  let body: string;
-  try {
-    body = await response.text();
-  } catch {
-    return signal.aborted ? { kind: "cancelled" } : networkError();
+  const bodyResult = await readBoundedResearchResponseText(response, signal);
+  if (!bodyResult.ok) {
+    if (bodyResult.kind === "cancelled") return { kind: "cancelled" };
+    if (bodyResult.kind === "network-error") return networkError();
+    return invalidResponse();
   }
 
   if (signal.aborted) return { kind: "cancelled" };
 
   let parsed: unknown;
+  const body = bodyResult.text;
   try {
     parsed = JSON.parse(body);
   } catch {

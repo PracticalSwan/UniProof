@@ -15,6 +15,7 @@ Do not disclose suspected credentials, private user data, or exploitable details
 - Validate redirect destinations and bound outbound requests.
 - Sanitize external content before rendering and never execute retrieved scripts.
 - Validate structured AI output before persistence or display.
+- Validate Research responses again in the browser before display: require JSON, enforce the actual streamed <=4 MiB response bound independently of `Content-Length`, decode UTF-8 fatally, bind the dossier to the submitted target/program/categories, and treat cancellation as authoritative while reading.
 - Treat AI semantic reconciliation as untrusted interpretation and enforce source authority, freshness, and final evidence-state policy deterministically.
 - Use only public research content in the free AI/search provider chain; do not send applicant profiles or sensitive documents to those providers.
 - Preserve unknown/conflict/partial states rather than fabricating a result when the Tavily -> Brave discovery chain or Gemini -> Groq -> OpenRouter Free AI chain is exhausted.

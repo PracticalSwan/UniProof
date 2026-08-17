@@ -70,7 +70,7 @@ export function ResearchForm({
     ? undefined
     : catalog.programs.find((program) => program.id === formState.programId);
   const sensitiveInputError = serverErrorCode === "sensitive-input";
-  const programErrorVisible = selectedUniversity !== undefined && fieldErrors.programId !== undefined;
+  const programErrorVisible = fieldErrors.programId !== undefined;
   const searchErrorIds = [
     fieldErrors.universityId === undefined ? undefined : "research-university-error",
     programErrorVisible ? "research-program-error" : undefined,
@@ -248,9 +248,16 @@ export function ResearchForm({
           Selected target
         </p>
         {selectedUniversity === undefined ? (
-          <p className="mt-2 text-sm text-muted-foreground" id="research-university-error">
-            {fieldErrors.universityId ?? "No target selected yet."}
-          </p>
+          <>
+            <p className="mt-2 text-sm text-muted-foreground" id="research-university-error">
+              {fieldErrors.universityId ?? "No target selected yet."}
+            </p>
+            {fieldErrors.programId !== undefined ? (
+              <p id="research-program-error" className="mt-1 text-sm text-destructive">
+                {fieldErrors.programId}
+              </p>
+            ) : null}
+          </>
         ) : (
           <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">

@@ -27,6 +27,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en" className={inter.variable}>
       <body>
         <TooltipProvider>
+          <a
+            href="#main-content"
+            className="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:not-sr-only focus:rounded-md focus:bg-white focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-foreground focus:outline-2 focus:outline-offset-2 focus:outline-ring"
+          >
+            Skip to main content
+          </a>
           <SiteHeader />
           {children}
           <SiteFooter />

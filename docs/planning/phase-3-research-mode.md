@@ -1,6 +1,6 @@
 # Phase 3 — Research Mode Architecture and Execution Plan
 
-Status: Phase 3A and Phase 3B implemented, independently reviewed, and locally verified on 2026-08-17. Phase 3C interactive Research workspace is the next implementation batch, followed by Phase 3D browser/accessibility hardening. Phase 3 continues to preserve Phase 2 evidence semantics and remains in-memory; persistence and public deployment are still deferred.
+Status: Phase 3A, Phase 3B, and the Phase 3C interactive Research workspace are implemented. Phase 3C received an independent defect-first review on 2026-08-18 covering rendered accessibility, retry/result state composition, canonical target labeling, and refresh evidence behavior, with regressions added and deterministic browser verification repeated. Phase 3D browser/accessibility hardening remains the next Research-mode batch. Phase 3 continues to preserve Phase 2 evidence semantics and remains in-memory; persistence and public deployment are still deferred.
 
 Detailed implementation runbooks:
 
@@ -423,32 +423,42 @@ The server composer MUST:
 - not forward Phase 2 `warnings` verbatim;
 - validate the composed public dossier before returning it.
 
-## 10. Research UI state machine
+## 10. Research UI state, form, and transport boundaries
 
-Use one explicit reducer/controller rather than scattered booleans.
+Phase 3C uses four small client-safe seams rather than scattering correctness across React event handlers:
 
-Recommended states:
+1. `client-form.ts` owns catalog-aware target/program ownership, canonical category toggles, blank optional omission, target labels, and final `researchModeRequestSchema` validation.
+2. `client-state.ts` owns the pure reducer plus an immutable `ResearchSubmissionSnapshot` containing the exact validated public request and catalog-derived target label.
+3. `client-transport.ts` owns the single `/api/research` fetch, strict JSON/content-type/envelope validation, submitted target/program/category binding, sanitized network/invalid-response outcomes, and signal-authoritative cancellation.
+4. `format.ts` owns deterministic presentation-only formatting.
+
+Recommended run states keep form state separate and retain the submission that produced a dossier/error:
 
 ```ts
 type ResearchWorkspaceState =
-  | { kind: "idle" }
-  | { kind: "loading"; requestSequence: number; previous?: ResearchDossier }
-  | { kind: "result"; dossier: ResearchDossier }
-  | { kind: "error"; error: PublicResearchError; previous?: ResearchDossier };
+  | { kind: "idle"; notice?: string }
+  | { kind: "loading"; requestSequence: number; submission: ResearchSubmissionSnapshot; previous?: ResearchDossier }
+  | { kind: "result"; dossier: ResearchDossier; submission: ResearchSubmissionSnapshot; notice?: string }
+  | { kind: "error"; error: ResearchWorkspaceError; submission: ResearchSubmissionSnapshot; previous?: ResearchDossier };
 ```
 
 Rules:
 
 - form fields live separately and are not erased by run-state transitions;
+- blank/whitespace-only optional question/intake/year UI values are omitted from the request rather than serialized as empty strings that fail the public schema;
+- target/program selection is resolved only against the public catalog; selecting a program selects its owner and explicitly selecting university-only research clears program scope;
 - first submit -> loading skeleton/status;
-- repeat submit while loading is disabled; no second fetch is started;
-- explicit Cancel aborts the active controller and returns to the previous dossier if one exists, otherwise idle, plus an accessible cancellation notice;
-- a later request gets a monotonically increasing client sequence; a response with an old sequence is ignored even if abort failed to stop it;
-- when refreshing an existing dossier, keep the previous dossier visible and mark it as updating rather than blanking the page;
-- recoverable network/server error keeps prior dossier and form values;
-- a valid `failed` dossier is a result state, not a transport error;
-- malformed/unvalidated server response is a client-safe error and is never rendered partially;
-- no automatic retry of POST research requests; retry requires an explicit user action.
+- a synchronous active-request/controller ref is set before any async boundary so double-click/Enter in the same tick cannot start a second fetch before React disables controls;
+- the submitted request snapshot is immutable while active; mutable controls are disabled;
+- explicit Cancel aborts the exact active controller; the signal is authoritative even if a provider/server abort rejects without a DOM `AbortError`; cancellation wins any same-sequence response/parser race and starts no retry;
+- a later request gets a monotonically increasing client sequence; stale success/error/cancel outcomes cannot overwrite the current run;
+- when refreshing an existing dossier, keep the previous dossier visible and labeled with its original returned target until a newer fully validated dossier replaces it;
+- a response is renderable only after `researchModeResponseSchema` validation **and** exact binding to the submitted university ID, optional program ID/absence, and canonical category set; a schema-valid dossier for another submitted target/scope is `invalid-response`;
+- valid `run.status="failed"` dossiers remain result data, not transport errors;
+- HTTP status/envelope disagreement, missing/non-JSON content type, malformed JSON, or malformed dossier become sanitized client `invalid-response` without partial render or raw response text;
+- server `sensitive-input` is a free-text group/form error because Phase 3B checks question, intake, and academic year together; the client does not duplicate that detector;
+- `Retry this research` reuses the exact stored submission; normal Research uses current validated form values as a new request;
+- no automatic POST retry, local/session storage persistence, URL/query-string persistence, or background continuation is added.
 
 ## 11. Category/evidence presentation semantics
 
@@ -557,13 +567,16 @@ Minimum MVP controls:
 
 Deterministic behavior:
 
-- selecting a program selects/locks its owning university;
-- changing university clears an incompatible selected program immediately;
-- changing country/degree/subject filters must not silently retarget the active selection; if the active selection is filtered out, keep it visibly selected until the user clears/changes it, or explicitly clear it with an announced state change—choose one policy and test it consistently. Preferred MVP policy: filters affect search results, not the already-selected target;
+- selecting a program selects its owning university through the shared catalog helper;
+- selecting a university result explicitly switches to university-level research and clears any selected program, even when that program belongs to the same university; provide a distinct university-only/remove-program action so scope is never invisible;
+- changing country/degree/subject/search filters affects available matches only and must not silently retarget/hide the active selected-target panel;
+- render filtered matches as a semantic list of native buttons rather than claiming unsupported combobox/listbox keyboard semantics; no new combobox dependency is required for the small catalog;
+- use native category checkboxes and a textarea for focused question; Enter in the search filter must not submit expensive research and Enter in the textarea inserts a newline;
 - empty search result says "No supported matches" and does not offer arbitrary web research;
 - unsupported text never becomes a free-form target;
-- reset clears filters/form fields but does not fire research;
-- categories always remain in canonical order.
+- reset clears filters/form input/errors and restores all categories but does not fire research or relabel a previously returned dossier;
+- categories always remain in canonical order;
+- optional free-text controls may hold blank strings in UI state, but submit construction trims them and omits blank values before public-schema validation.
 
 ## 14. Formatting rules
 
@@ -648,20 +661,26 @@ The implementation and tests must cover at least the following.
 - boolean/number/string values stay type-correct;
 - no raw document/candidate/provider telemetry serialized.
 
-### Client concurrency/state
+### Client form/concurrency/transport
 
-- double-click submit;
-- Enter-key submit;
+- blank/whitespace optional question/intake/year omitted from request versus max/over-limit UTF-16 values, including astral boundary cases;
+- selected program ownership, explicit program -> university-only scope switch, unknown/mismatched target IDs, and filters that no longer match the selected target;
+- double-click submit and Enter-key submit from ordinary research controls produce exactly one active request;
+- Enter in catalog search does not submit; Enter/newline in focused-question textarea does not submit;
 - cancel first run;
 - cancel refresh with previous dossier;
-- retry after network error;
-- old response arrives after newer response;
+- cancellation after fetch resolves but before/during body decode/validation still wins for the exact signal/sequence;
+- retry after network/internal/invalid-response uses exact stored submission, while normal Research uses current form values;
+- old response/error/cancel arrives after newer response;
 - component unmount abort;
-- invalid response body;
-- non-JSON error body;
+- missing/non-JSON response content type, empty/malformed JSON, schema-invalid body, 2xx error envelope, non-2xx success envelope;
+- schema-valid dossier for the wrong submitted university/program/category set is rejected;
+- sensitive-input may originate from question, intake, or academic year and is presented as a free-text-group error without browser-side detector duplication;
+- unsupported-target invalidates selected target/program without fuzzy/first-result retargeting and preserves other form input;
 - form controls are disabled while a run is active, so the submitted request snapshot cannot be mutated mid-flight; keyboard/mouse attempts to change controls do not alter the captured request;
-- result remains associated with the submitted target from the server dossier, never reconstructed from mutable client labels;
-- when a prior dossier exists and the user starts a later run for a different target, the previous dossier remains visibly labeled with its original target during the update so old/new target context cannot be confused.
+- result remains associated with the submitted target from the server dossier and stored submission, never reconstructed from mutable client labels;
+- when a prior dossier exists and the user starts a later run for a different target, the previous dossier remains visibly labeled with its original target during the update so old/new target context cannot be confused;
+- starting/replacing/clearing a dossier closes any stale evidence sheet before the referenced claim disappears.
 
 ### Evidence UX
 
@@ -698,7 +717,7 @@ Use the existing Vitest stack plus Playwright Test for browser acceptance. The c
 
 Use:
 
-- Vitest for catalog schemas, request validation, pure formatter/state reducer, server handler via dependency injection, dossier composer, and public DTO invariants;
+- Vitest for catalog schemas, request validation, pure formatter/state reducer, server handler via dependency injection, dossier composer, public DTO invariants, and lightweight server-rendered Research UI regressions that do not require a browser;
 - `@playwright/test` for real rendered Research workspace behavior and accessibility/viewport flows;
 - Playwright network interception/fulfillment with validated dossier fixtures so browser tests make zero provider calls;
 - existing Phase 2 tests as non-regression coverage.
@@ -710,6 +729,10 @@ tests/phase3a-research-catalog.test.ts
 tests/phase3b-research-api.test.ts
 tests/phase3b-dossier-composer.test.ts
 tests/phase3c-research-state.test.ts
+tests/phase3c-research-form.test.ts
+tests/phase3c-research-transport.test.ts
+tests/phase3c-research-format.test.ts
+tests/phase3c-research-ui.test.ts
 tests/e2e/research-mode.spec.ts
 playwright.config.ts
 ```

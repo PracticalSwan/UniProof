@@ -36,6 +36,8 @@ Modify as defects are proven:
 ```text
 components/research/*.tsx
 lib/research/mode/client-state.ts
+lib/research/mode/client-form.ts
+lib/research/mode/client-transport.ts
 lib/research/mode/format.ts
 lib/research/mode/public-contracts.ts    # only if tests reveal a genuine contract hole
 lib/research/mode/handler.ts             # only if route tests reveal a genuine boundary hole
@@ -224,11 +226,13 @@ async function fulfillResearch(
 
 Also support:
 
-- [ ] non-JSON 500 response;
+- [ ] non-JSON 500 response and a nominally JSON response with wrong/missing `Content-Type`;
 - [ ] malformed 200 response deliberately **not** parsed by fixture helper so client rejection can be tested;
-- [ ] hanging/delayed request for Cancel flow;
-- [ ] ordered response queue (first 500, second 200) for retry;
-- [ ] request counter/body capture for single-flight/input snapshot assertions.
+- [ ] schema-valid 200 dossier for the wrong submitted university, wrong program scope, and wrong category set so Phase 3C's request/response binding is exercised independently of schema validation;
+- [ ] HTTP/envelope disagreement: 200 + `{ok:false}` and non-2xx + `{ok:true}`;
+- [ ] hanging/delayed request for Cancel flow plus a response/body completion race after Cancel;
+- [ ] ordered response queue (first 500, second 200) for explicit retry;
+- [ ] request counter/body capture for single-flight, blank-optional omission, immutable retry snapshot, and input snapshot assertions.
 
 Never add a production code path to inject these fixtures.
 
@@ -248,11 +252,12 @@ Never add a production code path to inject these fixtures.
 - [ ] Combined filters use AND semantics.
 - [ ] Empty result displays "No supported matches".
 - [ ] Empty result does not expose arbitrary URL/name submit.
-- [ ] Selecting university displays selected-target panel.
-- [ ] Selecting program sets correct university.
-- [ ] Changing university clears incompatible program with visible/announced message.
+- [ ] Selecting university displays selected-target panel and explicitly clears any prior program scope, including a program owned by that same university.
+- [ ] Selecting program sets the correct owning university.
+- [ ] Explicit university-only/remove-program and clear-target actions are distinct and accessible.
 - [ ] Filters changed after selection do not silently retarget or hide the selected-target panel.
-- [ ] Reset restores all seven categories and clears target/options without API call.
+- [ ] Enter in catalog search does not submit research; Enter in focused-question textarea inserts a newline.
+- [ ] Reset restores all seven categories and clears target/options/form errors without API call or relabeling an existing dossier.
 
 ### Request body assertion
 
@@ -269,15 +274,16 @@ Intercept submit and inspect POST JSON:
 
 - [ ] Submit with no target -> visible field error, zero API calls.
 - [ ] Submit with zero categories -> visible category error, zero API calls.
-- [ ] Over-limit focused question -> error, zero calls.
+- [ ] Blank/whitespace question/intake/academicYear controls are omitted from POST JSON rather than sent as empty strings.
+- [ ] Exact max-length optional values submit; over-limit values fail with zero calls; include at least one astral-character UTF-16 boundary case in the Phase 3C unit suite and one representative browser boundary here if practical.
 - [ ] Valid submit -> exactly one call.
 - [ ] Double-click Research -> exactly one call.
-- [ ] Enter-key form submit while button focused/input active -> exactly one call.
+- [ ] Enter-key form submit from an ordinary research control/button -> exactly one call; search/textarea Enter behavior follows Task 4 and produces zero accidental calls.
 - [ ] While loading, Research/Reset/form fields are disabled and Cancel is enabled.
-- [ ] Clicking disabled controls cannot mutate submitted request.
+- [ ] Clicking/typing into disabled controls cannot mutate submitted request.
 - [ ] Page indicates indeterminate loading without percentage/stage fiction.
 
-Capture `request.postDataJSON()` and assert it does not change after loading starts.
+Capture `request.postDataJSON()` and assert it contains only the public request fields, remains byte/semantic-equivalent to the immutable submission after loading starts, and excludes search/filter UI state.
 
 ---
 
@@ -301,12 +307,16 @@ Capture `request.postDataJSON()` and assert it does not change after loading sta
 - [ ] Previous dossier remains unchanged.
 - [ ] No new dossier/failed state replaces it.
 
-### Stale response after cancellation
+### Cancellation/response race and stale response
 
-Simulate a delayed first route handler that eventually tries to fulfill after Cancel, then start a second request that succeeds.
+Test both race classes:
 
-- [ ] Second dossier remains final state.
-- [ ] Late first response cannot overwrite it.
+1. the intercepted response headers resolve and Cancel occurs while body completion/validation is still delayed;
+2. a delayed first request is cancelled, then a second request succeeds before the first handler eventually tries to fulfill.
+
+- [ ] In the first case, Cancel wins: the just-arriving dossier/error is not rendered after the active signal becomes aborted.
+- [ ] In the second case, the second dossier remains final state and the late first response/error/cancel cannot overwrite it.
+- [ ] Cancel is idempotent and sends no automatic retry/replacement request.
 - [ ] No React state/update warning appears.
 
 ### Navigation/unmount
@@ -402,8 +412,8 @@ Verify UI can render:
 - [ ] representative source appears first.
 - [ ] additional sources listed once each.
 - [ ] source title/publisher/type/retrieved metadata visible.
-- [ ] external link has expected href, `_blank`, `noopener noreferrer`.
-- [ ] canonical official target link is separate.
+- [ ] external link has expected complete href, `_blank`, `noopener noreferrer`, and `referrerPolicy="no-referrer"` while long visible URL/title text wraps safely.
+- [ ] canonical official target link is separate and evidence-source UI never infers "Official" from source type alone.
 
 ### Keyboard flow
 
@@ -456,26 +466,45 @@ Specific flows:
 - [ ] no dossier fields rendered from malformed body;
 - [ ] generic invalid-response error.
 
-### retry sequence
+### retry sequence and immutable historical request
 
 - [ ] first route responds 500;
 - [ ] no automatic second call;
-- [ ] click Retry;
-- [ ] second call occurs once;
-- [ ] success dossier replaces error/previous only after validation.
+- [ ] if the failed refresh is displayed over a prior partial/failed dossier, exactly one `Retry this research` control is visible and it belongs to the newer failed submission; the preserved dossier's older retry is suppressed while that error is active;
+- [ ] edit one or more form controls after the failure without submitting;
+- [ ] click `Retry this research`;
+- [ ] second call occurs once and its POST body exactly matches the failed submission snapshot, not the edited current form;
+- [ ] separately click normal `Research` after editing and prove that request uses the new current validated form;
+- [ ] success dossier replaces error/previous only after full schema + submitted target/program/category binding;
+- [ ] `Clear result` over a preserved dossier plus refresh error clears the displayed result/error rather than merely restoring the same previous dossier.
+
+### request/response binding failures
+
+- [ ] schema-valid wrong-university dossier -> `invalid-response`, no dossier relabeling/partial render;
+- [ ] schema-valid wrong-program or unexpected program on university-only request -> `invalid-response`;
+- [ ] schema-valid wrong category partition -> `invalid-response`;
+- [ ] 200 + `{ok:false}`, non-2xx + `{ok:true}`, and wrong/missing JSON content type -> `invalid-response`;
+- [ ] if a prior dossier exists, all of these preserve that prior dossier with its original target label.
 
 ### unsupported target
 
 Mock server `unsupported-target` response:
 
-- [ ] question/categories/intake/year preserved;
-- [ ] target selection is clearly invalidated/reselection requested;
-- [ ] no invisible retarget to first catalog entry.
+- [ ] search/filters/question/categories/intake/year preserved;
+- [ ] selected university and program IDs are both clearly invalidated because the public error does not identify which ID is stale;
+- [ ] explicit reselection is required;
+- [ ] no invisible retarget to first catalog entry and no mutation of bundled catalog data;
+- [ ] prior dossier, if present, remains labeled with its own returned target.
 
 ### sensitive input
 
-- [ ] safe instruction to remove sensitive content;
-- [ ] raw submitted text not echoed into error detail beyond the input field the user already controls.
+Exercise `sensitive-input` with the sensitive-looking value separately in `question`, `intake`, and `academicYear`:
+
+- [ ] same safe free-text-group instruction appears in all three cases;
+- [ ] populated free-text controls reference the form/group guidance accessibly and are marked invalid, while blank optional free-text controls are not falsely marked invalid;
+- [ ] UI does not claim which field triggered detection and does not duplicate the sensitive detector client-side;
+- [ ] raw submitted text is not echoed into generated error detail beyond the editable input value the user already controls;
+- [ ] correction-required presentation does not blindly auto-retry the same rejected payload.
 
 ---
 

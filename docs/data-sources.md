@@ -40,6 +40,12 @@ Store, when available:
 
 Provider use must be re-checked against current documentation, API terms, licensing, privacy behavior, and rate limits before implementation. Discovery failover is sequential: Tavily -> Brave Search -> direct/structured providers. Phase 2F distinguishes a completed general-web query from degraded salvage: if Tavily fails but Brave completes (including a clean empty result), discovery may still complete; if both Tavily and Brave fail/unavailable, validated direct/ROR sources are retained as degraded provenance but the category remains operationally incomplete and is not eligible for a final evidence decision or category-level `unknown`. Clean bounded absence is valid only after the required general-web and bounded supplement work completed. Search queries must contain public research context only, not applicant profile or sensitive personal data.
 
+## Supported Research Catalog
+
+The checked-in catalog under `lib/research/catalog/` contains public identity and navigation metadata only. It currently identifies 10 universities and 14 verified computing programs across the United States, United Kingdom, and Thailand, including 10 bachelor-level and 4 taught-master-level entries. It contains no tuition, deadline, admission-threshold, scholarship, ranking, outcome, or other decision facts.
+
+Catalog university names, countries, official homepages, program names, degree levels, subject labels, and canonical official program URLs were checked against the owning university's official pages on 2026-08-17. Prefer stable current canonical course routes over year-specific archived routes when the university publishes both; the Phase 3A review replaced superseded year-specific Imperial Computing and UCL Computer Science links with their current stable official course routes. That date verifies catalog identity/navigation only; it is not evidence freshness for any factual research claim. The release process must re-check redirects, program currency, and broken official links before publication.
+
 ## Evidence Independence and Authority
 
 Evidence authority is claim-specific. An official university page may directly verify a normative admissions, tuition, deadline, or program rule, while a university-originated self-reported outcome/marketing claim may remain `university-reported` until independently supported.

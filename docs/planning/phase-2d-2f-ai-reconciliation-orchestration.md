@@ -736,24 +736,14 @@ In addition to the Phase 2F.3 fixtures, `tests/phase2f-orchestration.test.ts` mu
 
 All default tests remain deterministic/offline and use injected adapters/transports. No live Tavily/Brave/ROR/Gemini/Groq/OpenRouter/DNS/university/Supabase call is a completion requirement.
 
-## Phase 2F.7 — GLM-only final-review policy
+## Phase 2F.7 — Current model-specific review policy
 
-For this final Phase 2 batch, the main Codex agent performs all implementation, debugging, testing, requirements/security review, documentation, and fixes **inline**. Do not use implementation/research/test/security/docs/specialist subagents. The user will run the task under the z.ai Coding Plan `zai-coding/glm-5.3` OpenAI-compatible endpoint; treat the main model as capable and do not split work merely to accommodate a small/fast model.
+Phase 2F is complete. Any future rework follows the canonical delegation policy in `AGENTS.md`, which supersedes the historical Phase 2F reviewer rules that previously appeared here.
 
-The **only** allowed subagent is the looping read-only final reviewer after all local gates pass:
-
-1. use the installed GLM reviewer `C:\Users\LOQ\.codex\agents\code-reviewer-glm.toml`, agent name `code-reviewer-glm` (GLM-5.3 Max, read-only);
-2. GPT agents are unavailable for this batch: never dispatch a GPT reviewer or another substitute reviewer;
-3. one reviewer child at a time, one child per iteration, no parallelism/swarm;
-4. a parent wait window ending with no result and no error is **not** failure/timeout. Inspect child status; if still running/thinking, leave it alive and continue checking. Do not impose an arbitrary wall-clock cutoff on the slow GLM reviewer;
-5. if the GLM reviewer returns an explicit HTTP 429/API rate-limit response, close it, do not retry it, and **skip all further subagent review** for this task. Do not use another agent. The main agent still performs the mandatory final inline diff/invariant/security review;
-6. if GLM returns another explicit terminal dispatch/model/provider/malformed-result error, stop subagent use with no substitute and finish review inline;
-7. if GLM returns actionable findings, main agent independently validates/fixes valid defects, reruns focused + full required gates, then may invoke the same GLM reviewer again;
-8. stop on `No findings.`;
-9. maximum three **successful** GLM review iterations; after that complete remaining work inline;
-10. reviewer is read-only and may not edit, commit, push, deploy, publish, call live providers, or delegate.
-
-This Phase 2F policy supersedes the historical Phase 2E reviewer policy earlier in this same runbook for the Phase 2F implementation task. Do not inherit Phase 2E's old GPT fallback. This policy does not authorize commit/push/deployment/live smoke calls. Do not treat slow ongoing GLM reasoning as rate-limit failure.
+- When GLM-5.3 Max (`zai-coding/glm-5.3`) is the active main model, it performs planning, implementation, debugging, testing, requirements/security review, documentation, and final defect-first review entirely in the main agent with **zero subagents**, including no reviewer child.
+- When a native OpenAI GPT model is the active main model, it performs its own inline defect-first review and all local gates, then retains the final read-only `code-reviewer` step. Valid findings are fixed by the main GPT agent with regression coverage and affected/full gates rerun; the review may repeat up to three successful iterations and stops on no substantive findings.
+- Reviewer liveness/fallback rules apply only when subagents are permitted by `AGENTS.md`. Never infer a child result that was not actually returned, and never let historical GLM-reviewer instructions override the current model-specific policy.
+- This policy does not authorize commit, push, deployment, publication, or live provider calls; those actions still require their normal explicit authorization.
 
 ## Verification discipline
 

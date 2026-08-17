@@ -63,7 +63,7 @@ For every state-changing task:
 
 1. Read before editing and establish the exact affected boundary.
 2. Use the smallest active requirement or plan that covers the change.
-3. Check applicable global skills and specialist agents before implementation.
+3. Check applicable global skills and the model-specific delegation policy before implementation; use specialist agents only when that policy permits.
 4. Implement the smallest coherent change; avoid unrelated refactors or dependency additions.
 5. Validate the changed path, one representative failure path, and the nearest integration boundary when practical.
 6. Inspect final changes and update only the documentation or memory whose source of truth changed.
@@ -72,11 +72,31 @@ For every state-changing task:
 
 For bugs, prove the root cause before fixing it. For multi-stage work, write or update a plan before implementation. For UI work, inspect the rendered application rather than approving source code alone.
 
+## Model-Specific Delegation Policy
+
+This section is the canonical delegation rule for current and future UniProof work. It supersedes older phase-specific subagent instructions when they conflict.
+
+### GLM-5.3 Max / `zai-coding/glm-5.3`
+
+- The main GLM-5.3 Max agent performs the entire task itself: planning, research, implementation, debugging, testing, security/privacy review, documentation, requirements traceability, and final defect-first review.
+- Do **not** spawn any subagent when GLM-5.3 Max is the active main model. This includes specialist implementation agents and final code-review agents.
+- Installed-agent routing tables and older plans that mention reviewer/subagent dispatch do not apply to GLM-5.3 Max.
+- When a plan requests a delegated review, GLM-5.3 Max performs the equivalent review inline after all local gates and records that no child reviewer was used because of this model-specific policy.
+
+### Native OpenAI GPT models
+
+- Native GPT models retain access to the installed global agents when delegation materially helps and the active task does not forbid it.
+- For substantive state-changing implementation batches, a native GPT main agent must still perform its own defect-first inline review and, after all local gates pass, use one read-only final `code-reviewer` step.
+- If that reviewer returns valid findings, the main GPT agent fixes them, adds regression coverage where practical, reruns affected and full gates, and may repeat the read-only review up to three successful iterations, stopping on no substantive findings.
+- Do not substitute a GLM reviewer for the native GPT final reviewer unless the user explicitly requests that model/provider.
+
 ## Global Agent Routing
 
-Use the installed agents in `C:\Users\LOQ\.codex\agents` by reference; do not copy them into this repository.
+Use the installed agents in `C:\Users\LOQ\.codex\agents` by reference; do not copy them into this repository. The routing table below applies only when the model-specific delegation policy permits subagents.
 
 ### Subagent liveness and fallback
+
+These liveness rules apply only to models/tasks that are permitted to use subagents. They do not apply to GLM-5.3 Max because GLM-5.3 Max must not spawn children.
 
 - A bounded parent-side review wait ending without a child result or child error is **not** a timeout or failure. It means the child may still be working.
 - Before closing a child or switching models/providers, inspect the child/task status. If it is still running/ongoing, keep that child alive and continue checking/waiting; do not spawn a fallback reviewer merely because one wait window elapsed.

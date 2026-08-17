@@ -563,7 +563,7 @@ Mandatory integration rules:
 - `categoriesFailed` is always a subset of unprocessed; provider failures that later fall back successfully remain telemetry, not terminal category failures;
 - rebuild EvidenceSummary and explanations from final processed categories/final claims, then validate the complete `ResearchResult` at the return boundary.
 
-Phase 2F implementation uses no implementation subagents. Only the final looping read-only `code-reviewer-glm` may be used after all local gates pass. A still-running child is not timed out merely because one wait window elapsed. Explicit HTTP 429 means close the GLM reviewer and skip further subagent review with **no GPT fallback**; the main agent still completes its final inline review.
+Delegation for any future rework of this completed Phase 2F path follows the canonical model-specific policy in `AGENTS.md`: GLM-5.3 Max performs implementation and final review entirely in the main agent with zero subagents, while native OpenAI GPT models retain the final read-only `code-reviewer` step after their own inline review and local gates. Historical Phase 2F GLM-reviewer instructions are superseded and must not be reused.
 
 Only after these tests pass should Phase 3 connect `/research` to a live research endpoint and expose loading, partial, conflict, stale, unresolved-semantic, error, provider-fallback, and retry states.
 

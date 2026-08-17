@@ -109,18 +109,61 @@ Implement only after Phase 2B–2C passes its acceptance gate.
 - [x] Strengthen terminal lifecycle/failure contracts: succeeded/partial/failed only; exact monotonic timestamps/partial boolean; processed/unprocessed exact request partition; failed has zero processed; `categoriesFailed` subset unprocessed; truthful `cancelled` and run-level `normalization`; bounded deduplicated terminal failures only after fallback exhaustion.
 - [x] Rebuild EvidenceSummary from final processed categories/final claims only: exact coverage/statusCounts/totalClaims/conflict/outdated/unknown/failed sets, then validate explanations and complete `ResearchResult` cross-record provenance at the return boundary.
 - [x] Add the expanded offline `tests/phase2f-orchestration.test.ts` matrix covering category-order permutation, attempt ceilings, discovery empty-vs-failed, multi-category dedupe, retrieval redundancy/failure, extraction unfinished, all provider fallbacks/budgets, semantic overflow, explanation integrity/fallback, aborts, and succeeded/partial/failed lifecycle; keep all Phase 2A-E regressions green.
-- [x] Use **no implementation subagents**. After every local gate passes, the only allowed looping reviewer is installed read-only `code-reviewer-glm`; never use GPT/substitute reviewers. No-result/no-error means keep checking if still running. Explicit HTTP 429 closes GLM and skips further subagent review; other terminal GLM failure also ends subagent use. For this continuation, the ChatGPT/CodexPro host exposed no executable subagent-dispatch action, so no reviewer child was fabricated; the main agent completed the required defect-first inline diff/invariant/security review and fixed the findings it discovered.
+- [x] Apply the canonical model-specific delegation policy from `AGENTS.md` to any future Phase 2F rework: GLM-5.3 Max uses zero subagents and performs final review inline; native OpenAI GPT models retain the final read-only `code-reviewer` step after local gates. Historical Phase 2F GLM-reviewer instructions are superseded. The completed Phase 2F implementation itself was finalized through main-agent defect-first review because its active host exposed no executable child-dispatch action.
 - [x] Run focused security/secret/requirements traceability plus focused/full tests, typecheck, lint, build, audit, workspace verifier, Windows diff check, UTF-8/control scan, provider-secret/public-env scan, ignored `.env.local` verification, and final diff/status review. No live provider calls, deployment, persistence/RLS, or UI wiring were used; the user separately authorized the final Phase 2F commit and push after these gates pass.
 
 - [x] Keep pipeline correctness in memory; persistence remains a later explicit task after stable contracts/evidence semantics and RLS design.
 
 ## Phase 3 — Research Mode
 
-- [ ] Build university/program discovery and filters.
-- [ ] Build evidence-first dossier sections for admissions, tuition, scholarships, program structure, research, outcomes, and support.
-- [ ] Build claim/source drawer with freshness and evidence-state badges.
-- [ ] Implement loading, partial, conflict, stale, empty, and failure states.
-- [ ] Verify desktop and narrow/mobile layouts with keyboard navigation.
+Canonical architecture/edge-case plan: `docs/planning/phase-3-research-mode.md`.
+
+Execution policy follows `AGENTS.md`: GLM-5.3 Max performs all work and final review in the main agent with no subagents; native OpenAI GPT models retain the final read-only `code-reviewer` step after local gates.
+
+### Phase 3A — Supported catalog and browser-safe contracts
+
+Detailed runbook: `docs/superpowers/plans/2026-08-17-phase-3a-research-catalog-and-public-contracts.md`.
+
+- [x] Add strict browser-safe Research category/request/dossier/response schemas without importing server-only Phase 2 limits/contracts into client code; cross-test all duplicated public enums/bounds against Phase 2 so drift fails deterministically.
+- [x] Add a checked-in 10–15-university supported catalog across US/UK/Thailand with stable application IDs, HTTPS canonical university/program links, verified CS/AI/Data Science-related bachelor/taught-master coverage where official offerings exist, and no factual admissions/fee/deadline claims in catalog data.
+- [x] Verify every catalog identity/program/official URL against current official sources during implementation; use no guessed program names/URLs, and document verification date separately from evidence freshness.
+- [x] Add deterministic NFKC search/filter behavior for university/program/alias/subject plus country/degree/subject filters; no fuzzy silent retargeting of unsupported input, and every returned program search result carries its owning university in the same result set.
+- [x] Add a no-network catalog-backed Phase 2 target resolver as an explicit `server-only` module; keep the client catalog barrel free of resolver/Phase 2 server coupling.
+
+### Phase 3B — Bounded Research API and dossier composer
+
+Detailed runbook: `docs/superpowers/plans/2026-08-17-phase-3b-research-api-and-dossier-composer.md`.
+
+- [x] Add a Node-runtime same-origin `POST /api/research` handler with 16 KiB actual-body ceiling, strict UTF-8/JSON decoding, Origin/Sec-Fetch-Site guard, catalog membership/ownership validation, and sensitive-content rejection across `question`/`intake`/`academicYear` before provider dispatch.
+- [x] Call `runPhase2Research` exactly once per valid request with the exact request `AbortSignal` and catalog resolver; do not add automatic POST retries, durable-job fiction, polling, persistence, caller-supplied provider settings, or live-provider tests.
+- [x] Add a deterministic server-only `ResearchResult -> ResearchDossier` composer that exposes only final claims, their exact representative supporting text, final-claim referenced public sources, category explanations/lifecycle, catalog official links, and sanitized operational failures; never serialize documents/candidates/provider-attempt history/raw warnings, and fail closed unless final claim identity matches the selected catalog university/program scope.
+- [x] Preserve final scalar types/statuses and resolve the displayed representative source from exact candidate-backed supporting text rather than assuming the first source ID; fail closed on broken cross-record invariants instead of silently rewriting/truncating evidence. The public DTO rejects unused sources, contradictory terminal lifecycle status, and non-monotonic run timestamps.
+- [x] Validate every outgoing public response, keep it `no-store`, enforce a defensive 4 MiB serialized envelope without factual truncation, and map unexpected internal errors to a strict non-leaking error envelope.
+
+### Phase 3C — Interactive Research workspace and evidence UX
+
+Detailed runbook: `docs/superpowers/plans/2026-08-17-phase-3c-research-workspace-and-evidence-ui.md`.
+
+- [ ] Replace the illustrative `/research` preview with a catalog-driven server-to-client workspace; never mix example factual claims with live/fixture-backed results.
+- [ ] Implement accessible supported-target search/filter/select, seven canonical category controls, optional public question/intake/year, strict client validation, and explicit privacy guidance; initialize all seven categories selected and forbid zero-category submission.
+- [ ] Implement a pure request/result reducer plus synchronous in-flight guard so double-click/Enter races cannot start duplicate expensive POSTs; disable mutable form controls during a run, propagate Cancel through `AbortController`, ignore stale sequence responses, and use explicit retry only.
+- [ ] Render succeeded/partial/failed run banners and canonical ready/unknown/incomplete category sections without reinterpreting Phase 2 evidence; category-level `Unknown` must never represent operational incompleteness.
+- [ ] Render verified/corroborated/university-reported/conflicting/anecdotal/inferred/outdated claim badges exactly; never select a conflict winner, infer freshness from retrieval time, convert units/currency, parse numeric strings, or display removed claim confidence.
+- [ ] Build a keyboard/focus-managed claim evidence Sheet/Dialog showing exact supporting text, representative source first, all claim source links once, explicit period/retrieval metadata, and separate catalog-owned official target links; render retrieved text as React text only.
+
+### Phase 3D — Failure-state, accessibility, security, and browser acceptance
+
+Detailed runbook: `docs/superpowers/plans/2026-08-17-phase-3d-research-hardening-and-browser-qa.md`.
+
+- [ ] Align the dev-only Playwright Test runner at the existing 1.62.x version if the implementation-time manifest still has only the direct `playwright` package; avoid unrelated dependency upgrades and generated browser artifacts in Git.
+- [ ] Add strict public-schema-validated browser fixtures for all-ready, unknown, partial, failed, conflict, outdated, long-content, XSS-looking, malformed-response, and transport-error scenarios; browser tests intercept `/api/research` and make zero live provider calls.
+- [ ] Prove catalog search/selection, form validation, exact request body, single-flight submit, cancel/refresh/unmount/stale-response behavior, explicit retry, malformed/non-JSON response rejection, and unsupported/sensitive-input recovery.
+- [ ] Prove all evidence/lifecycle states, claim/source association, focus trap/return, text-only XSS handling, no browser provider calls/secrets/internal Phase 2 arrays, and zero unexpected console/page errors.
+- [ ] Verify 320/375/768/1024/1440 viewport matrix, no horizontal page overflow, long names/URLs/2000-character evidence text, keyboard-only flows, visible focus, form error associations, controlled live-region announcements, and reduced-motion behavior.
+- [ ] Run Phase 3 requirements traceability plus focused/full Vitest, Playwright, typecheck, lint, production build, audit, workspace verifier, authoritative Windows diff check, UTF-8/control scan, provider-secret/public-env/client-boundary scans, `.env.local` isolation, and final defect-first diff review while keeping every Phase 2 regression green.
+- [ ] Keep public deployment blocked until Phase 6 verifies current platform duration/cancellation behavior and a durable/deployment-layer rate limit for the expensive Research endpoint; local single-flight and Phase 2 attempt budgets are not a distributed abuse control.
+
+- [ ] Keep Research pipeline results in memory in Phase 3; Supabase persistence, migrations, RLS, saved history, background jobs/queues, and deployment remain later explicit work.
 
 ## Phase 4 — Comparison Mode
 

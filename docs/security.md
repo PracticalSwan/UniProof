@@ -9,6 +9,12 @@
 5. Retrieved external content to the claim-extraction model.
 6. Stored claims back to user-visible summaries and comparisons.
 
+## Research API Boundary
+
+`POST /api/research` is a same-origin Node-runtime route. It accepts only strict UTF-8 JSON of at most 16 KiB by both declared and actual streamed body size, rejects mismatched or malformed `Origin`/cross-site fetch metadata, validates stable supported-catalog IDs and program ownership, and rejects sensitive caller-supplied free-text research fields (`question`, `intake`, and `academicYear`) before provider work. A valid request dispatches `runPhase2Research` exactly once with the caller's exact `AbortSignal` and the catalog-backed target resolver; caller provider configuration is not accepted.
+
+Every response is `Cache-Control: no-store` and validates against the strict public response contract. The server composes only final claims, exact claim-referenced sources, category explanations/lifecycle, catalog official links, and sanitized failures into the browser dossier; documents, candidates, provider attempts, discovery telemetry, raw warnings, and model/provider identity remain server-side. The composer fails closed unless every final claim matches the selected application-owned university/program scope, and the public DTO requires every exposed source to be referenced by a final claim plus terminal run status/timestamps to agree with category lifecycle. A valid envelope larger than 4 MiB fails closed rather than truncating evidence. This boundary does not provide a durable distributed rate limit; public deployment remains blocked until that deployment-layer control is verified.
+
 ## Highest-Risk MVP Threats
 
 - Server-side request forgery through user-controlled or search-discovered URLs.

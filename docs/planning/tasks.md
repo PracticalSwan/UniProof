@@ -174,11 +174,34 @@ Detailed runbook: `docs/superpowers/plans/2026-08-17-phase-3d-research-hardening
 
 ## Phase 4 — Comparison Mode
 
-- [ ] Support comparison of two to four programs.
-- [ ] Add include/exclude controls for supported evidence categories.
-- [ ] Implement deterministic weighted user-fit scoring with visible inputs and coverage.
-- [ ] Keep missing evidence separate from poor fit.
-- [ ] Generate evidence-bounded trade-off explanations.
+Detailed architecture/acceptance specification: `docs/planning/phase-4-comparison-mode.md`.
+
+Detailed implementation runbook: `docs/superpowers/plans/2026-08-18-phase-4-comparison-mode.md`.
+
+Security/privacy threat model: `docs/security-threat-model.md`.
+
+- [x] Create and reconcile the complete one-batch Phase 4 specification/runbook against the reviewed Phase 3D baseline, including score formulas, target/result ownership, evidence eligibility, lifecycle/race behavior, accessibility/responsive acceptance, security/privacy controls, and the explicit zero-subagent execution policy.
+- [x] Freeze the Phase 3D implementation baseline and ten-file protected screenshot manifest before Phase 4 code changes; require the existing Research/type/lint/build/browser gates to be green before Comparison implementation proceeds.
+- [x] Add the browser-origin hardening layer first: Next.js 16 request-nonce CSP through `proxy.ts`, strict production script policy without `unsafe-inline`/`unsafe-eval`, no third-party runtime scripts, static security headers, framework disclosure removal, and real dev/built-browser CSP compatibility tests. Keep HSTS deferred until an authorized real HTTPS deployment is verified.
+- [x] Replace the static illustrative `/compare` preview with a catalog-driven accessible workspace for exactly two to four unique supported targets; reject mixed university/program scope and mixed program degree level; never silently retarget a selected option.
+- [x] Reuse only the hardened Phase 3 `POST /api/research` + validated `ResearchDossier` boundary for Comparison data. Dispatch selected targets sequentially under one synchronous single-flight guard and batch-owned `AbortController`; do not add `/api/compare`, browser fan-out, or a new scoring/explanation provider call.
+- [x] Add include/exclude controls for the seven canonical Research categories plus separate display-only ranking/student-opinion evidence filters. Ranking/anecdotal evidence may be shown on explicit opt-in but must never contribute to numeric fit.
+- [x] Add five visible integer priorities—Affordability, Research opportunities, Scholarships, Outcomes, and International-student support—with an exact total of 100, no hidden normalization, and explicit validation when a positive-weight dimension's backing Research category is excluded.
+- [x] Implement a closed application-owned comparison metric registry over exact normalized property aliases and compatible typed values. Never fuzzy/AI-match claim properties, parse numeric-looking strings, convert currency/units, infer effective periods from retrieval time, or select a conflict winner.
+- [x] Score only eligible verified/corroborated/university-reported evidence with an eligible non-ranking/non-anecdotal source. Preserve conflict/outdated/inferred/anecdotal/ranking-only/type/currency/unit/period/duplicate-inconsistency cases as explicit unscored reasons rather than zeros.
+- [x] Implement deterministic numeric/boolean/presence metric scoring, weighted evidence coverage, and overall user-fit. Relative numeric metrics require compatible peers; missing evidence reduces coverage; overall fit is suppressed below 50% coverage or with fewer than two positive-weight scored dimensions; result cards remain in immutable selection order rather than becoming a university ranking.
+- [x] Generate deterministic evidence-bound trade-offs and gaps with exact target-scoped supporting claim references across independent dossiers. Do not generate prestige, winner, admission-probability, causal-quality, or unsupported recommendation language.
+- [x] Implement immutable comparison submissions, truthful sequential target progress, cancellation/unmount/stale-response protection, preserved prior results, exact retry ownership, and literal Clear-result semantics. Retry only exact failed/incomplete targets from the immutable prior submission; a new Compare uses the current editable form.
+- [x] Reuse exact Research evidence/source inspection while preserving modal focus trap/Escape/return, safe external-link attributes, server-returned canonical target identity, and React-text-only rendering of untrusted evidence.
+- [x] Keep Phase 4 privacy-minimized: no free-form Compare question, applicant profile/private data, authentication, third-party analytics, Web Storage, IndexedDB, Cache Storage, cookies, URL/query persistence, service worker, database persistence, or saved comparison history.
+- [x] Verify complete keyboard/ARIA/live-region/reduced-motion behavior and 320/375/390/768/1024/1440 responsive layouts, including four-target long-content/Unicode/12-source/2,000-character evidence/high-claim-count stress without page-level horizontal overflow.
+- [x] Add complete Phase 4 Vitest and deterministic Playwright coverage for form/contracts, registry normalization, scoring/coverage/suppression, trade-offs/evidence references, lifecycle/races/retry ownership, accessibility, CSP/security headers, XSS-shaped data, no browser persistence/exfiltration, and responsive stress. Keep Playwright retries at zero and repeat the critical comparison lifecycle/race suite at least five times.
+- [x] Run the full Phase 2/3/4 final matrix: Vitest, dev Playwright, repeated Comparison races, TypeScript, ESLint, production build, `npm audit --omit=dev`, built-application Playwright, workspace verifier, `git diff --check`, UTF-8/control scan, real credential-value scan, client-boundary/storage/test-backdoor scans, `.env.local` isolation, dependency boundary, requirements traceability, and exact protected screenshot hash equality.
+- [x] Perform a separate final two-stage defect-first review inline in the main ChatGPT agent with **zero subagents/reviewer agents**: first Phase 4 specification compliance, then code/security/privacy quality. Fix every verified finding regression-first where practical and rerun affected plus full gates.
+- [x] Update README/design/security/tasks/append-only memory only from observed completed Phase 4 behavior and verification; add `LESSONS.md` only for a reusable correction actually discovered during implementation.
+- [x] Keep public deployment, persistence/auth/RLS, durable distributed Research rate limiting, live-provider smoke, Phase 5 Guide implementation, commit, and push outside Phase 4 unless separately explicitly authorized.
+- [x] Complete the independently requested post-implementation publication review: fix simultaneous conflict/outdated warning suppression, make trade-off evidence target-scoped when claim IDs are reused across dossiers, and prevent root TypeScript from discovering generated `output/playwright` snapshots. Fresh publication gates passed 346/346 Vitest, 121/121 dev Playwright, 70/70 five-repeat lifecycle executions, 121/121 built Playwright, type/lint/build/audit/workspace/diff/security-integrity checks, with zero live-provider/deployment activity.
+
 ## Phase 5 — Guide Mode
 
 - [ ] Build applicant profile input and validation.

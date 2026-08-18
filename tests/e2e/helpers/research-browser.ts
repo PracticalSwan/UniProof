@@ -8,7 +8,10 @@ import {
   type Route,
 } from "@playwright/test";
 
-import type { ResearchModeResponse } from "@/lib/research/mode/public-contracts";
+import {
+  researchModeResponseSchema,
+  type ResearchModeResponse,
+} from "@/lib/research/mode/public-contracts";
 import { fixtureTarget } from "@/tests/fixtures/research-dossiers";
 
 export type Deferred<T> = {
@@ -82,7 +85,8 @@ export class ResearchRouteController {
     status = 200,
     contentType = "application/json; charset=utf-8",
   ): void {
-    this.enqueueUnvalidatedJson(response, status, contentType);
+    const validated = researchModeResponseSchema.parse(response);
+    this.enqueueUnvalidatedJson(validated, status, contentType);
   }
 
   enqueueUnvalidatedJson(
@@ -137,6 +141,7 @@ export class ResearchRouteController {
     response: ResearchModeResponse,
     options: { status?: number; contentType?: string } = {},
   ): DeferredResearchReply {
+    const validated = researchModeResponseSchema.parse(response);
     const entered = deferred<CapturedResearchRequest>();
     const release = deferred<void>();
     this.pendingReleases.add(release);
@@ -145,7 +150,7 @@ export class ResearchRouteController {
         kind: "fulfill",
         status: options.status ?? 200,
         contentType: options.contentType ?? "application/json; charset=utf-8",
-        body: bodyAsJson(response),
+        body: bodyAsJson(validated),
       },
       entered,
       release,

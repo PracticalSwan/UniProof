@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { headers } from "next/headers";
+import Script from "next/script";
+import { connection } from "next/server";
 
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
+import { RuntimeStyleNonce } from "@/components/security/runtime-style-nonce";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import "./globals.css";
@@ -22,10 +26,20 @@ export const metadata: Metadata = {
     "Evidence-first university research, comparison, and application guidance for international students.",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  await connection();
+  const nonce = (await headers()).get("x-nonce");
+  if (nonce === null || nonce === "") {
+    throw new Error("CSP nonce is unavailable for this request.");
+  }
+
   return (
     <html lang="en" className={inter.variable}>
       <body>
+        <Script id="uniproof-zod-jitless" strategy="beforeInteractive" nonce={nonce}>
+          {"globalThis.__zod_globalConfig=globalThis.__zod_globalConfig||{};globalThis.__zod_globalConfig.jitless=true;"}
+        </Script>
+        <RuntimeStyleNonce nonce={nonce} />
         <TooltipProvider>
           <a
             href="#main-content"

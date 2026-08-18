@@ -42,6 +42,10 @@ Phase 2F finalization is implemented as a small in-memory category-state-driven 
 
 Phase 3 now implements the complete in-memory Research presentation/controller boundary without changing Phase 2 evidence semantics. A checked-in public catalog supplies stable university/program IDs and canonical official navigation links; deterministic search always returns the owning university alongside any matched program, while the catalog resolver stays `server-only`. `POST /api/research` validates bounded same-origin input, rejects sensitive content across all caller-controlled free-text research fields, resolves only supported catalog targets, and calls `runPhase2Research` exactly once with the caller signal. The server-only dossier composer re-validates the Phase 2 result, proves final claim identity against the selected catalog university/program scope, resolves representative supporting passages to their exact candidate-backed source, exposes only final-claim-referenced public sources, and emits a strict browser DTO whose terminal lifecycle/status/timestamps and source references are cross-record validated. The client transport then re-validates JSON content type and the public envelope, enforces the actual streamed response byte ceiling independently of `Content-Length`, decodes UTF-8 fatally, binds the dossier to the exact submitted target/program/category set, and treats cancellation as authoritative across stream reads. Full Phase 2 documents, candidates, provider history, raw warnings, and provider/model identity never cross the browser boundary.
 
+Phase 4 is implemented as a browser-memory-only deterministic consumer of the already-validated `ResearchDossier` boundary. It adds neither `/api/compare` nor a new model call: the Compare workspace captures one immutable two-to-four-target submission, dispatches the existing same-origin Research route sequentially under one batch-owned abort/single-flight boundary, validates each dossier through the existing client transport, then runs pure application-owned comparison modules. Server-rejected unsupported targets become explicit correction-required selections and are not blind-retry candidates. A closed metric registry maps only exact normalized claim-property aliases plus compatible typed values into affordability, research, scholarships, outcomes, and support dimensions. Relative numeric metrics require compatible peers and exact currency/unit/period semantics; booleans/presence use explicit absolute rules. Missing, conflicting, outdated, inferred, anecdotal, ranking-only, type-incompatible, or otherwise non-comparable evidence remains unscored and lowers visible weighted coverage rather than becoming zero. Overall fit is a user-priority compatibility measure and is suppressed when fewer than two positive-weight dimensions are scoreable or weighted coverage is below 50%. Trade-offs are deterministic templates carrying exact claim references; target cards remain in user selection order and are never converted into an institutional ranking.
+
+Phase 4 also implements the browser-origin hardening layer: a Next.js 16 request nonce/CSP in `proxy.ts`, a pure browser-policy builder under `lib/security/`, static security headers from `next.config.ts`, and a small client nonce bridge for Radix runtime style injection. `get-nonce` is now a direct dependency because the strict CSP path imports that nonce channel explicitly; it was already present transitively through the UI stack but direct use required direct declaration. The production script policy contains neither `unsafe-inline` nor `unsafe-eval`; development carries only the narrow compatibility exception exercised by the isolated dev browser suite. The project loads no third-party runtime analytics/scripts and keeps Compare state out of Web Storage, IndexedDB, cookies, URL state, or the database. HSTS remains a Phase 6 deployment decision because it must be validated on the real HTTPS domain/subdomain strategy. These runtime controls harden the application without imposing artificial repository/tool restrictions on the developing AI agent.
+
 The Phase 2B/2D implementation must provide a cross-platform setup command such as `npm run setup:providers`. The user should only obtain and paste API keys; the repository-owned setup flow handles `.env.local`, server environment validation, model/endpoints, fallback order, and safe defaults without echoing secrets.
 
 ## Primary Data Flow
@@ -61,15 +65,18 @@ ResearchRequest
         -> Phase 3 Research dossier projection for the supported Research API
         -> strict client-safe ResearchDossier
         -> Phase 3 evidence-aware Research UI + hardened client transport
+        -> Phase 4 Compare: sequential dossier acquisition -> closed metric registry
+             -> deterministic comparability gate -> weighted score/coverage
+             -> deterministic evidence-bound trade-offs
         -> optional later persistence after migrations/RLS/freshness policy
-        -> later Comparison / Guide composers
+        -> later Guide composer
 ```
 
 ## Core Server Modules
 
 - `research`: source discovery, retrieval policy, content cleaning, and research orchestration.
 - `claims`: structured extraction, deterministic normalization, AI semantic reconciliation, evidence-policy gating, freshness, conflict handling, and evidence-bounded explanation.
-- `comparison`: deterministic category normalization and weighted user-fit calculation.
+- `comparison`: Phase 4 browser-safe pure modules for strict target/form contracts, closed claim-property metric normalization, deterministic comparability gates, weighted user-fit/coverage calculation, and evidence-referenced trade-off templates. Because separate Research dossiers may legally reuse claim IDs, cross-target trade-off provenance is keyed by both comparison target identity and claim ID rather than by claim ID alone. The module consumes validated public `ResearchDossier` values only and performs no provider/network/storage work.
 - `guide`: applicant-to-requirement assessment, risk warnings, and task generation.
 - `integrations`: Gemini, Groq, OpenRouter, Tavily, Brave, Supabase, ROR, College Scorecard, and other approved providers behind project-owned adapters.
 - `security`: outbound URL policy, rate limits, input bounds, and safe logging.
@@ -112,9 +119,15 @@ The retrieval layer must:
 
 ## Fit Score
 
-The fit score is deterministic and explainable. It represents compatibility with the user's selected priorities, not institutional quality.
+The Phase 4 fit score is deterministic and explainable. It represents compatibility with the user's selected priorities inside the currently selected comparison set, not institutional quality, prestige, admission probability, or an objective university ranking.
 
-Missing evidence should lower confidence/coverage rather than automatically assign the worst category score. The UI must show category weights, supporting values, evidence coverage, and conflicts near the score.
+Phase 4 uses five explicit integer priority weights totaling exactly 100: affordability, research opportunities, scholarships, outcomes, and international-student support. A closed application-owned metric registry is the only bridge from free-form Research claim `property` strings into those score dimensions. It accepts only documented exact aliases after narrow deterministic normalization and exact compatible scalar types; it performs no fuzzy/semantic property matching, numeric-string parsing, currency/unit conversion, period guessing, or conflict winner selection.
+
+Relative numeric metrics use within-set min-max normalization only across mutually compatible facts. Annual tuition is lower-is-better and requires matching currency/annual semantics; employment rate is higher-is-better and requires compatible percentage/period semantics. Equal participating numeric values score 100. Boolean/presence metrics use explicit application-owned rules rather than relative peer normalization.
+
+Only verified, corroborated, or university-reported evidence with an eligible non-ranking/non-anecdotal source may contribute to numeric fit. Missing, unknown, incomplete, conflicting, outdated, inferred, anecdotal, ranking-only, unsupported-type, or incompatible-period/unit/currency evidence remains unscored. It never silently contributes zero.
+
+For each target, weighted evidence coverage is the sum of positive priority weights whose dimensions are scoreable. Overall fit is the weighted average over only scoreable positive-weight dimensions and is suppressed unless at least two positive-weight dimensions are scored and coverage is at least 50%. The UI must show weights, supporting facts, unscored reasons, coverage, evidence warnings, and exact claim evidence near the score. Result cards stay in immutable selection order rather than being automatically sorted into a ranking.
 
 ## Failure Model
 

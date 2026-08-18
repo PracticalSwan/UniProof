@@ -2,6 +2,15 @@ import path from "node:path";
 
 const SAFE_HARNESS_ID = /^[A-Za-z0-9_-]{1,80}$/;
 
+export const phase3dDevHarnessRootFiles = [
+  "next.config.ts",
+  "next-env.d.ts",
+  "package.json",
+  "postcss.config.mjs",
+  "proxy.ts",
+  "tsconfig.json",
+] as const;
+
 export type Phase3dDevHarness = {
   id: string;
   relative: string;

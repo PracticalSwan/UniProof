@@ -3,7 +3,10 @@ import path from "node:path";
 
 import { defineConfig } from "@playwright/test";
 
-import { resolvePhase3dDevHarness } from "./tests/e2e/helpers/playwright-harness";
+import {
+  phase3dDevHarnessRootFiles,
+  resolvePhase3dDevHarness,
+} from "./tests/e2e/helpers/playwright-harness";
 
 const port = 3102;
 const productionServer = process.env.UNIPROOF_E2E_PRODUCTION === "1";
@@ -24,13 +27,7 @@ if (devHarness !== undefined && inheritedDevHarnessId === undefined) {
   for (const directory of ["app", "components", "lib", "public", "types"]) {
     cpSync(path.join(projectRoot, directory), path.join(devHarness.root, directory), { recursive: true });
   }
-  for (const file of [
-    "next.config.ts",
-    "next-env.d.ts",
-    "package.json",
-    "postcss.config.mjs",
-    "tsconfig.json",
-  ]) {
+  for (const file of phase3dDevHarnessRootFiles) {
     cpSync(path.join(projectRoot, file), path.join(devHarness.root, file));
   }
 }
@@ -56,7 +53,7 @@ export default defineConfig({
   webServer: {
     command: productionServer
       ? `npm run start -- --hostname 127.0.0.1 --port ${port}`
-      : `npx next dev ${devHarness!.relative} --hostname 127.0.0.1 --port ${port}`,
+      : `npx next dev ${devHarness!.relative} --webpack --hostname 127.0.0.1 --port ${port}`,
     url: `http://127.0.0.1:${port}/research`,
     reuseExistingServer: false,
     timeout: 120_000,

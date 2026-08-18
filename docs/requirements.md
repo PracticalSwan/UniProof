@@ -27,11 +27,24 @@ The system shall:
 
 The system shall:
 
-- Compare two to four universities or programs.
-- Let users include or exclude categories such as rankings and student opinions.
-- Let users choose priority weights for affordability, research, scholarships, outcomes, and other supported categories.
-- Produce a transparent user-fit score rather than an objective university ranking.
-- Explain material trade-offs and evidence gaps behind the comparison.
+- Compare exactly two to four unique supported targets in one homogeneous scope: all university-only or all program targets; program comparisons shall use the same degree level.
+- Reuse the validated Research Mode dossier boundary for every selected target and shall not accept caller-supplied dossier data through a new comparison API.
+- Execute target research sequentially, not through browser fan-out, with one comparison-owned cancellation boundary and immutable request ownership.
+- Let users include or exclude the seven canonical Research categories. Rankings and student opinions shall be represented as explicit evidence-display filters because the current evidence model treats them as source/evidence classes rather than canonical categories.
+- Let users choose visible integer priority weights for affordability, research opportunities, scholarships, outcomes, and international-student support; the five weights shall sum exactly to 100 and shall never be normalized silently.
+- Use an application-owned closed metric registry over exact normalized claim-property aliases and compatible typed scalar values. The system shall not fuzzy-match properties, parse numeric-looking strings, convert currencies/units, infer effective periods from retrieval time, or choose a conflict winner for scoring.
+- Allow only verified, corroborated, or university-reported evidence from at least one non-ranking/non-anecdotal source to contribute to numeric fit. Conflicting, outdated, inferred, anecdotal, and ranking-only evidence shall remain visible when applicable but shall not contribute to Phase 4 fit.
+- Keep missing or unscorable evidence separate from poor fit. Missing dimensions shall reduce weighted evidence coverage instead of contributing a zero score.
+- Suppress an overall numeric fit when fewer than two positive-weight dimensions are scored or weighted evidence coverage is below 50%.
+- Produce a transparent user-priority compatibility score within the selected comparison set rather than an objective university ranking, winner label, prestige score, or admission probability.
+- Preserve result-card order by immutable user selection order rather than automatically sorting universities/programs by fit.
+- Generate material trade-offs and evidence-gap explanations deterministically from validated comparison facts, with exact target-scoped claim references for factual statements across independent dossiers and no additional AI scoring/explanation call.
+- Keep comparison weights, display filters, validated dossiers, and results in browser memory only for Phase 4; they shall not be persisted in Web Storage, IndexedDB, cookies, URL state, or a database.
+- Collect no applicant profile or other private personal information in Compare; optional intake/academic-year fields are public research context only.
+
+Detailed Phase 4 behavior, formulas, edge cases, security controls, and acceptance gates are defined in `docs/planning/phase-4-comparison-mode.md`.
+
+Implementation status (2026-08-18): the Phase 4 requirements above are locally implemented and passed the post-review unit, dev-browser, built-browser, type, lint, build, audit, security/privacy, and artifact-integrity matrix recorded in that specification. Public deployment, durable distributed Research rate limiting, authentication/persistence, and HSTS deployment policy remain Phase 6 work.
 
 ## Guide Mode
 
@@ -70,6 +83,10 @@ The MVP shall not require passports, national IDs, transcripts, bank statements,
 - Treat external content as untrusted and prevent retrieved text from controlling agent behavior.
 - Prevent server-side retrieval from reaching localhost, private networks, metadata endpoints, or unsupported protocols.
 - Keep secrets server-side and exclude local environment files from version control.
+- Enforce a strict browser content policy and security-header baseline for application HTML: production script execution shall use a request nonce/strict CSP without `unsafe-inline` or `unsafe-eval`; development-only framework exceptions shall never leak into production policy.
+- Load no third-party runtime scripts/analytics in the MVP and render retrieved/model-derived text only through safe React text interpolation, never executable HTML.
+- Minimize browser-resident sensitive data. Authentication/session credentials shall never be stored in Web Storage; Phase 4 shall use no durable browser persistence at all.
+- Treat secure-development references such as OWASP ASVS 5.0.0, OWASP API Security Top 10 2023, NIST SSDF 1.1, NIST Privacy Framework 1.0, and current Next.js security guidance as verification baselines rather than claims of formal certification.
 - Provide loading, empty, partial, conflict, stale-data, error, and retry states for core flows.
 - Support keyboard operation and responsive layouts for core tasks.
 - Preserve user input when recoverable errors occur.

@@ -20,7 +20,7 @@ import {
 import type { ResearchDossier } from "@/lib/research/mode/public-contracts";
 
 interface ClaimEvidenceSheetProps {
-  dossier: ResearchDossier;
+  dossier: ResearchDossier | null;
   selectedClaimId: string | null;
   triggerElement: HTMLButtonElement | null;
   onClose: () => void;
@@ -32,11 +32,11 @@ export function ClaimEvidenceSheet({
   triggerElement,
   onClose,
 }: ClaimEvidenceSheetProps) {
-  const selectedClaim = selectedClaimId === null
+  const selectedClaim = selectedClaimId === null || dossier === null
     ? undefined
     : dossier.categories.flatMap((row) => row.claims).find((claim) => claim.id === selectedClaimId);
   const sourcesById = React.useMemo(
-    () => new Map(dossier.sources.map((source) => [source.id, source])),
+    () => new Map((dossier?.sources ?? []).map((source) => [source.id, source])),
     [dossier],
   );
 
@@ -52,7 +52,7 @@ export function ClaimEvidenceSheet({
     return [representative, ...remaining] as ResearchDossier["sources"];
   }, [selectedClaim, sourcesById]);
 
-  const target = dossier.target;
+  const target = dossier?.target;
   const metadata: string[] = [];
   if (selectedClaim?.academicYear !== undefined) {
     metadata.push(`Academic year ${selectedClaim.academicYear}`);
@@ -168,33 +168,35 @@ export function ClaimEvidenceSheet({
                 )}
               </section>
 
-              <section aria-label="Official target links" className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                  Official target
-                </p>
-                <div className="flex flex-col gap-2">
-                  {target.program !== undefined ? (
+              {target === undefined ? null : (
+                <section aria-label="Official target links" className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                    Official target
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {target.program !== undefined ? (
+                      <a
+                        href={target.program.officialUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        referrerPolicy="no-referrer"
+                        className="inline-flex min-h-10 items-center break-all rounded-md border border-border bg-white px-3 py-2 text-[13px] font-semibold text-link underline underline-offset-4 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                      >
+                        Official program page: {target.program.name}
+                      </a>
+                    ) : null}
                     <a
-                      href={target.program.officialUrl}
+                      href={target.university.websiteUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       referrerPolicy="no-referrer"
                       className="inline-flex min-h-10 items-center break-all rounded-md border border-border bg-white px-3 py-2 text-[13px] font-semibold text-link underline underline-offset-4 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
                     >
-                      Official program page: {target.program.name}
+                      Official university website: {target.university.name}
                     </a>
-                  ) : null}
-                  <a
-                    href={target.university.websiteUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    referrerPolicy="no-referrer"
-                    className="inline-flex min-h-10 items-center break-all rounded-md border border-border bg-white px-3 py-2 text-[13px] font-semibold text-link underline underline-offset-4 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  >
-                    Official university website: {target.university.name}
-                  </a>
-                </div>
-              </section>
+                  </div>
+                </section>
+              )}
             </div>
           </>
         )}

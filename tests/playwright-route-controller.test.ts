@@ -11,4 +11,11 @@ describe("Phase 3D ResearchRouteController", () => {
 
     expect(() => controller.assertNoQueuedReplies()).toThrow(/unconsumed.*research repl/i);
   });
+
+  it("validates every trusted fixture queue path through the public Research response schema", () => {
+    const controller = new ResearchRouteController({} as Page);
+    const invalid = { ok: true, data: { unsafe: true } } as never;
+    expect(() => controller.enqueueJson(invalid)).toThrow();
+    expect(() => controller.enqueueDeferredJson(invalid)).toThrow();
+  });
 });

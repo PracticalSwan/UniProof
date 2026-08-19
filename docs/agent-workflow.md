@@ -86,6 +86,14 @@ For university/provider research:
 
 Use `docs-researcher` for versioned APIs/provider documentation and the `research`/`tavily-search` skills for bounded source work.
 
+## Platform CLI Workflow
+
+The host already provides the Windows Supabase, Vercel, and GitHub CLIs documented in `AGENTS.md`; agents should use those existing tools rather than adding duplicate project dependencies. Under CodexPro's WSL-mounted shell, invoke them through the Windows `cmd.exe` bridge when the direct Windows executable/toolchain is not resolvable; Supabase/Vercel use the Windows Node toolchain while `gh` is a native Windows CLI.
+
+Treat these CLIs as operator interfaces, not blanket permission. Start with read-only discovery that proves the exact account/project/repository and current configuration. Local disposable Supabase development/testing is allowed when the active implementation task authorizes it, but hosted project linking/migration/Auth changes, Vercel project/env/domain/firewall/deployment changes, GitHub remote mutations, live provider/quota use, and publication still require the explicit authorization defined in `AGENTS.md`. Never use the CLIs for credential extraction, destructive remote cleanup, unauthorized access, security/rate-limit bypass, malicious traffic, or any action outside the UniProof task. Do not print or persist secret-bearing CLI output.
+
+For Phase 6 specifically, use this progression: local Supabase migrations/Auth/RLS tests in 6A -> local production hardening/configuration/CI in 6B -> read-only remote target discovery, dry-run, separately authorized hosted changes, Preview, Production, and publication in 6C. A successful CLI command is execution evidence only for the exact action observed; it does not prove higher-level deployment/security acceptance by itself.
+
 ## Public Release Workflow
 
 Publication is a distinct phase and always requires explicit user authorization. Before a release, re-verify Devpost requirements, repository visibility, license, deployed URL, demo video, secrets scan, core E2E flow, responsive UI, and the exact commit/artifact being submitted.

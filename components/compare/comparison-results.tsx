@@ -13,7 +13,6 @@ interface ComparisonResultsProps {
 }
 
 export function ComparisonResults({ result, catalog, onEvidence }: ComparisonResultsProps) {
-  if (result.score === null) return null;
   const dossiers = result.outcomes
     .filter((outcome) => outcome.state === "dossier" && outcome.dossier.run.status !== "failed")
     .map((outcome) => outcome.state === "dossier" ? outcome.dossier : null)

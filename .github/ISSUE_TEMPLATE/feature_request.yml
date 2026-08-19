@@ -1,0 +1,65 @@
+name: Feature request
+description: Propose a scoped UniProof product or developer-experience improvement.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep proposals evidence-first and privacy-aware. Do not include credentials, private applicant data, sensitive documents, or vulnerability details.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or engineering problem should this solve?
+      placeholder: Describe the problem before proposing implementation details.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What observable behavior would make the problem solved?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Research
+        - Compare
+        - Guide
+        - Evidence / sources
+        - Accessibility / responsive UI
+        - Security / privacy
+        - Build / tests / developer tooling
+        - Documentation / repository experience
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or examples
+      description: Optional links, public examples, or invented scenarios that show the need. Do not include private user data.
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints and edge cases
+      description: Note evidence, privacy, provider, compatibility, accessibility, or failure-state considerations you already know about.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Describe simpler approaches or why existing behavior is insufficient.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I checked the current roadmap and existing issues for overlap.
+          required: true
+        - label: This proposal does not require exposing credentials or private applicant data.
+          required: true
+        - label: I understand architecture/security-sensitive changes may require design review before implementation.
+          required: true

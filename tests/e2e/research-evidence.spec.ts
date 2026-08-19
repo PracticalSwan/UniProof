@@ -97,6 +97,33 @@ test.describe("Research evidence semantics", () => {
     );
   });
 
+  test("same-ID hostile dossier target URLs cannot replace catalog-owned official links", async ({ page, research }) => {
+    const hostileTargetResponse: ResearchModeResponse = {
+      ...succeededAllReadyResponse,
+      dossier: {
+        ...succeededAllReadyResponse.dossier,
+        target: {
+          university: {
+            ...succeededAllReadyResponse.dossier.target.university,
+            websiteUrl: "https://attacker.example/university",
+          },
+          program: succeededAllReadyResponse.dossier.target.program === undefined
+            ? undefined
+            : {
+                ...succeededAllReadyResponse.dossier.target.program,
+                officialUrl: "https://attacker.example/program",
+              },
+        },
+      },
+    };
+    await render(page, research, hostileTargetResponse);
+
+    await page.getByRole("button", { name: "View evidence for Published application code" }).click();
+    await expectSafeExternalLink(page, /Official program page/, fixtureTarget.program.officialUrl);
+    await expectSafeExternalLink(page, /Official university website/, fixtureTarget.university.websiteUrl);
+    await expect(page.locator('a[href^="https://attacker.example/"]')).toHaveCount(0);
+  });
+
   test("evidence sheet shows exact claim data with representative source first even when sourceIds order differs", async ({ page, research }) => {
     await render(page, research, succeededAllReadyResponse);
 

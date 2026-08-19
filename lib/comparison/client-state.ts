@@ -1,11 +1,45 @@
+import { z } from "zod";
+
 import type { PublicResearchTransportError, ResearchDossier } from "@/lib/research/mode/public-contracts";
+import { researchDossierSchema } from "@/lib/research/mode/public-contracts";
 import {
+  comparisonSubmissionSchema,
+  comparisonTargetSchema,
   comparisonTargetKey,
   type ComparisonSubmission,
   type ComparisonTarget,
 } from "./contracts";
-import type { ComparisonScoreResult } from "./scoring";
-import type { ComparisonTradeoff } from "./tradeoffs";
+import { comparisonScoreResultSchema, type ComparisonScoreResult } from "./scoring";
+import { comparisonTradeoffSchema, type ComparisonTradeoff } from "./tradeoffs";
+
+const comparisonTransportErrorSchema = z.object({
+  code: z.enum([
+    "invalid-content-type",
+    "request-too-large",
+    "invalid-json",
+    "invalid-request",
+    "unsupported-target",
+    "sensitive-input",
+    "forbidden-origin",
+    "internal-error",
+    "network-error",
+    "invalid-response",
+  ]),
+  message: z.string().trim().min(1).max(300),
+}).strict();
+
+export const comparisonResearchOutcomeSchema = z.discriminatedUnion("state", [
+  z.object({
+    target: comparisonTargetSchema,
+    state: z.literal("dossier"),
+    dossier: researchDossierSchema,
+  }).strict(),
+  z.object({
+    target: comparisonTargetSchema,
+    state: z.literal("transport-error"),
+    error: comparisonTransportErrorSchema,
+  }).strict(),
+]);
 
 export type ComparisonTransportError = Readonly<{
   code: PublicResearchTransportError["code"] | "network-error" | "invalid-response";
@@ -20,9 +54,17 @@ export type ComparisonResult = Readonly<{
   submission: ComparisonSubmission;
   status: "complete" | "partial";
   outcomes: readonly ComparisonResearchOutcome[];
-  score: ComparisonScoreResult | null;
+  score: ComparisonScoreResult;
   tradeoffs: readonly ComparisonTradeoff[];
 }>;
+
+export const comparisonResultSchema = z.object({
+  submission: comparisonSubmissionSchema,
+  status: z.enum(["complete", "partial"]),
+  outcomes: z.array(comparisonResearchOutcomeSchema).min(2).max(4),
+  score: comparisonScoreResultSchema,
+  tradeoffs: z.array(comparisonTradeoffSchema).max(100),
+}).strict();
 
 export type ComparisonWorkspaceError = Readonly<{
   code: "insufficient-usable-targets" | "shared-request-error";
@@ -55,6 +97,7 @@ export type ComparisonWorkspaceAction =
   | { type: "complete"; sequence: number; result: ComparisonResult }
   | { type: "fail"; sequence: number; error: ComparisonWorkspaceError; completedTargets: readonly ComparisonResearchOutcome[] }
   | { type: "cancel"; sequence: number }
+  | { type: "restore"; sequence: number; result: ComparisonResult }
   | { type: "clear-result" };
 
 export function createComparisonWorkspaceState(): ComparisonWorkspaceState {
@@ -88,6 +131,16 @@ export function comparisonWorkspaceReducer(
       currentTargetIndex: 0,
       completedTargets: [],
       ...(previous === undefined ? {} : { previous }),
+    };
+  }
+
+  if (action.type === "restore") {
+    if (state.kind === "loading" || action.sequence <= stateSequence(state)) return state;
+    return {
+      kind: "result",
+      result: action.result,
+      notice: "Saved snapshot loaded.",
+      lastSequence: action.sequence,
     };
   }
 

@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { AccountMenu } from "@/components/auth/account-menu";
+import { useAuthSession } from "@/components/auth/auth-session-provider";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const navigation = [
+const coreNavigation = [
   { href: "/research", label: "Research" },
   { href: "/compare", label: "Compare" },
   { href: "/guide", label: "Guide" },
@@ -14,6 +16,10 @@ const navigation = [
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const { state: authState } = useAuthSession();
+  const navigation = authState.status === "signed-in"
+    ? [...coreNavigation, { href: "/saved", label: "Saved" }]
+    : coreNavigation;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-white">
@@ -47,11 +53,9 @@ export function SiteHeader() {
           </ul>
         </nav>
 
-        <div className="ml-6 flex items-center gap-2 md:ml-8">
-          <Button asChild variant="outline" className="hidden h-[42px] px-4 sm:inline-flex">
-            <Link href="/guide">My profile</Link>
-          </Button>
-          <Button asChild className="h-[42px] px-4">
+        <div className="ml-4 flex items-center gap-2 md:ml-8">
+          <AccountMenu />
+          <Button asChild className="hidden h-[42px] px-4 sm:inline-flex">
             <Link href="/research">New research</Link>
           </Button>
         </div>

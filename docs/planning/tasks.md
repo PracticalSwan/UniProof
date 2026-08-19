@@ -16,8 +16,8 @@ Deadline snapshot: 2026-08-22 16:00 UTC / 23:00 ICT. Re-verify Devpost before fi
 - [x] Configure Supabase client/server boundaries and environment validation.
 - [x] Define initial Zod schemas and TypeScript domain types for University, Program, Source, Claim, and evidence states.
 - [x] Implement the approved Figma-derived responsive Home, Research, Compare, and Guide UI foundation with reusable evidence states.
-- [ ] Extend domain contracts for ApplicantProfile, Comparison, and ApplicationPlan when their feature phases begin.
-- [ ] Create database migrations with Row Level Security for user-owned data before enabling persistence.
+- [x] Extend domain contracts for ApplicantProfile, Comparison, and ApplicationPlan in their feature phases.
+- [x] Create database migrations with Row Level Security before enabling user-owned persistence.
 - [ ] Seed a small deterministic university/program dataset for development and fallback demo use.
 
 ## Phase 2 — Evidence and Research Pipeline
@@ -204,23 +204,93 @@ Security/privacy threat model: `docs/security-threat-model.md`.
 
 ## Phase 5 — Guide Mode
 
-- [ ] Build applicant profile input and validation.
-- [ ] Implement requirement-to-profile assessment states.
-- [ ] Generate application checklist, timeline, official links, and risk warnings.
-- [ ] Prevent admission guarantees or fabricated numeric admission probabilities.
-- [ ] Test missing applicant data and unclear official requirements.
+Architecture/spec: `docs/planning/phase-5-guide-mode.md`
+
+Execution runbook: `docs/superpowers/plans/2026-08-18-phase-5-guide-mode.md`
+
+- [x] Replace the illustrative `/guide` preview with one supported-program Guide workspace; university-only assessment is out of scope.
+- [x] Implement strict browser-memory-only applicant profile/submission contracts with bounded citizenship/current country, qualification, optional GPA/scale, English test, optional budget/currency/scope, scholarship need, and optional public intake/year context.
+- [x] Prove applicant profile values never enter `/api/research`, provider/search/retrieval traffic, logs, URLs, Web Storage, IndexedDB, Cache Storage, cookies, service workers, or a database.
+- [x] Derive exactly one existing `ResearchModeRequest` from catalog target + optional intake/year + fixed `admissions`, `tuition`, and `scholarships` categories; omit free-form question and all profile data.
+- [x] Add a collision-safe one-entry in-memory validated dossier reuse path so profile-only reassessment performs zero provider request; target/intake/year changes and explicit refresh must research again; failed refresh may preserve reusable prior evidence, while a later `unsupported-target` invalidates reuse for that target and requires explicit correction.
+- [x] Implement a closed exact Guide requirement-property registry with collision checks; no fuzzy/substr/embedding/LLM matching or generic scalar coercion.
+- [x] Implement defense-in-depth evidence/applicability gates: only compatible verified/corroborated/university-reported evidence with eligible sources can drive definitive status; conflict/outdated/inferred/anecdotal/ranking/unknown/incomplete/incompatible/unrecognized evidence fails closed, and conflict + outdated render independently when both apply.
+- [x] Add one pure defense-in-depth Guide finalizer that revalidates submission/request/dossier/catalog target+category consistency, rejects failed/mismatched inputs, and maps invariant failures to a sanitized local workspace error without partially derived output.
+- [x] Implement all six requirement states: meets, probably meets, does not meet, missing applicant information, unclear requirement, manual confirmation required.
+- [x] Implement conservative qualification/subject logic; `probably meets` may represent only narrow application-owned broad-background rules and never formal equivalency.
+- [x] Implement same-scale GPA comparison only; no grade/GPA conversion.
+- [x] Implement same-test IELTS/TOEFL iBT/PTE threshold logic including component requirements where represented; no cross-test conversion or waiver inference.
+- [x] Implement exact currency + annual/total scope budget/tuition comparison only; no FX, duration/living-cost inference, or scope conversion.
+- [x] Implement scholarship-need risk/checklist semantics without changing admission status or inventing award probability.
+- [x] Capture one local-civil `assessmentDate` per accepted submission without UTC `toISOString()` rollover, then implement strict ISO date-only application/scholarship deadline handling with leap/past/today/30/31-day and profile-only day-rollover tests; ambiguous/rolling/non-ISO dates remain manual.
+- [x] Preserve unrecognized published admissions evidence in an evidence-linked manual-review section rather than silently dropping it.
+- [x] Generate deterministic risks, checklist, timeline, and official links without inventing documents, contacts, dates, fees, visa claims, or applicant readiness states.
+- [x] Scope every factual Guide evidence reference by both target key and dossier-local claim ID.
+- [x] Implement immutable submission/result ownership, synchronous single-flight guard, cancellation, preserved prior result, explicit retry/refresh, unmount abort, and stale-response rejection.
+- [x] Reuse the existing `ClaimEvidenceSheet`; catalog identity exclusively owns official program/university navigation URLs, while validated dossier sources own exact evidence links. Add a hostile same-ID dossier-canonical-URL regression and do not introduce a second evidence viewer or caller-supplied external URL boundary.
+- [x] Add accessible form/result behavior: labels/fieldsets/errors, one live status, complete keyboard flow, focus restoration, reduced-motion meaning, sticky-header focus visibility, and non-color-only states.
+- [x] Add Guide responsive/content-stress acceptance at 320x740, 375x812, 390x844, 768x1024, 1024x768, and 1440x900 including long Unicode text, all states, 12 sources, 2,000-character evidence, and high valid claim counts.
+- [x] Add security/privacy browser acceptance for request marker leakage, URL/history/storage/cookies/IndexedDB/Cache Storage/service workers, hostile text/XSS, CSP violations, external request guard, and provider/internal exposure.
+- [x] Repeat the complete Guide lifecycle/race suite at least five times with zero configured retries.
+- [x] Run full Phase 2–5 Vitest, TypeScript, ESLint, production build, production dependency audit, dev/built Playwright, workspace/diff/UTF-8/secret/client-boundary scans, protected screenshot integrity, and a two-stage defect-first review performed inline by the GLM-5.3 Max main agent with zero subagents before marking Phase 5 complete.
+- [x] Synchronize requirements/design/security/threat-model/README/CHANGELOG/memory from observed implementation only after verification; keep auth/persistence/RLS/deployment/release automation in Phase 6.
 
 ## Phase 6 — Hardening and Submission Readiness
 
-- [ ] Run full type, lint, unit/integration, and core Playwright E2E checks.
-- [ ] Run focused security review and pre-commit secret scan.
-- [ ] Run `requirements-traceability` against MVP requirements.
-- [ ] Verify responsive behavior, keyboard flows, source links, provider failures, and partial-result behavior.
-- [ ] Prepare README screenshots and architecture explanation only from verified live behavior.
-- [ ] Deploy only with explicit authorization, then run live smoke tests.
-- [ ] Re-check current Devpost rules, dates, and deliverables.
-- [ ] Prepare approximately three-minute demo covering problem, three modes, evidence verification, conflicts/unknowns, and meaningful AI use.
-- [ ] Submit to Devpost only with explicit authorization.
+Canonical specification: `docs/planning/phase-6-hardening-submission-readiness.md`.
+
+Phase 6 is split into three dependency-ordered batches because authentication/private persistence, production infrastructure, and publication are separate trust/rollback boundaries. Do not bypass a batch gate. External mutations remain authorization-gated even after local implementation is complete.
+
+### Phase 6A — Identity, Ownership, and Persistence
+
+Execution plan: `docs/superpowers/plans/2026-08-19-phase-6a-identity-persistence.md`.
+
+- [x] Keep Research, Compare, and Guide fully usable without an account; authentication adds optional private save/history behavior rather than an auth wall.
+- [x] Implement current Supabase SSR passwordless email/PKCE authentication with assurance-appropriate server identity; compose session refresh into the existing nonce/CSP `proxy.ts` rather than adding a competing middleware/proxy path, and require current Auth-server validation for private saved-artifact operations.
+- [x] Keep authentication/session material out of Web Storage and derive every private owner from server-validated identity, never caller-supplied user IDs/emails; do not claim local JWT claim verification alone gives immediate global revocation.
+- [x] Extend browser `connect-src` only with the exact validated `NEXT_PUBLIC_SUPABASE_URL` origin required for optional Auth/save (plus the existing development websocket); never add wildcard Supabase, generic `https:`, or Research/search/AI provider browser origins.
+- [x] Add reproducible local Supabase imperative migrations generated through the installed CLI for immutable versioned `saved_artifacts`; explicitly control table grants **and** RLS, deny anonymous private-table CRUD, expose no ordinary UPDATE path, and enforce the race-safe 20-artifact owner cap.
+- [x] Enforce strict version-1 saved-artifact schemas and byte bounds, server-derived presentation titles, stable descending bounded-list ordering, and fail-closed unknown/tampered snapshots without truncating evidence/results. With only 20 rows per owner, do not add cursor/offset pagination.
+- [x] Add same-origin, strict UTF-8/body-bounded, private/no-store saved-artifact APIs using current Auth-server-confirmed identity plus user-scoped Supabase/RLS; treat DB rows as untrusted persisted input, use the exact canonical persistence error vocabulary, do not use the service-role credential, and never blind-auto-retry non-idempotent Save/Delete after ambiguous transport completion.
+- [x] Centralize current-catalog ownership of official university/program navigation in one pure Research-dossier binder shared by Research/Compare/Guide; preserve source/evidence URLs and every target-scoped evidence ref, and fail saved restore when the target was removed/reassigned.
+- [x] Add explicit save/restore for profiles, Research, Comparison, and Guide through one account-bound **memory-only cross-route restore handoff**; no query/hash/Web Storage/IndexedDB/Cache/service-worker/cookie restore channel. Saved results remain historical snapshots; refresh/re-run/reassess is explicit.
+- [x] Preserve all post-Phase-5 audit invariants through round-trip: immutable request/target ownership, unsupported-target correction, previous-result preservation, Guide intake/year/category finalizer binding, closed alias/GPA/currency/context rules, context-rejected evidence visibility, all competing evidence refs, and cancellation re-check after presentation awaits. A restored Guide dossier does not seed current-session `reusableDossier`.
+- [x] Verify account switch/local-scope sign-out races, cross-user RLS/grants, own-row tampering rejection, restore/new-run stale races, ambiguous mutation reconciliation, persistence limits, applicant-provider non-transmission, accessibility/responsive behavior, CSP/cache/session coexistence, and anonymous degradation when Supabase is unavailable. Hosted token-refresh/revocation behavior remains a Phase 6C live boundary.
+- [x] Develop and verify Phase 6A against the local Supabase CLI stack (`db reset`, lint, DB advisor, pgTAP, local Auth/Mailpit) only; hosted project linking/migration remains Phase 6C.
+- [x] Run the complete Phase 0–6A unit/type/lint/build/dev-browser/built-browser/security/privacy/lifecycle matrix, preserve all reviewed pre-6A regressions, and perform a **main-agent-only two-pass final review with zero subagents** before closing 6A. Authenticated built-mode against local HTTP Supabase is intentionally not claimed because production CSP requires an HTTPS Supabase origin; authenticated local-stack evidence is recorded separately.
+
+### Phase 6B — Production Hardening
+
+Execution plan: `docs/superpowers/plans/2026-08-19-phase-6b-production-hardening.md`.
+
+- [ ] Re-verify current Vercel/provider/Supabase platform limits and policies before implementation; update the Phase 6 specification first if mutable assumptions changed.
+- [ ] Add one application-owned whole-Research deadline below the hosting hard limit, propagate terminal cancellation through all stages, stop new retries/fallback work after expiry, and preserve already validated partial evidence.
+- [ ] Handle deployment-generated 429/504/non-JSON failures as sanitized first-class Research/Compare/Guide outcomes without retry storms or loss of prior results.
+- [ ] Define and locally exercise the durable Vercel WAF contract for only `POST /api/research`; do not substitute an in-memory limiter for distributed abuse control or claim the WAF is active before deployment.
+- [ ] Finalize production environment separation, secret/client-boundary checks, canonical HTTPS/CSP/header behavior, and a conservative HSTS policy without `includeSubDomains`/`preload` by default.
+- [ ] Add least-privilege GitHub Actions CI with no live providers, hosted database mutations, production secrets, or automatic deployment.
+- [ ] Create requirement-to-code/test/deployment traceability for every MVP requirement; leave deployment-only requirements unverified until Phase 6C.
+- [ ] Re-check provider endpoints/models/free-route/privacy assumptions from official sources and block release rather than silently weakening privacy/capability constraints.
+- [ ] Run full Phase 0–6B dev/built browser, lifecycle stress, local Supabase, static/build/audit, secret/privacy/client-boundary, protected-artifact, and final security/over-engineering review gates.
+
+### Phase 6C — Deployment and Submission
+
+Execution plan: `docs/superpowers/plans/2026-08-19-phase-6c-deployment-submission.md`.
+
+- [ ] Re-check live Devpost rules/schedule/deliverables and all mutable hosting/provider assumptions immediately before release.
+- [ ] Use installed Supabase/Vercel/GitHub CLIs read-only first to prove exact accounts/projects/repository; never guess a similarly named target.
+- [ ] Link the exact hosted Supabase project only after explicit authorization, run remote migration dry-run first, and apply only the reviewed migration set after separate database-mutation authorization; never use remote reset or migration-history repair as routine release steps.
+- [ ] Configure and verify production Auth URLs/email delivery/RLS with invented accounts only if authentication is enabled; if production email cannot be made reliable, preserve anonymous judge flows and do not present broken account/save behavior as ready.
+- [ ] Link/create/configure the exact Vercel project and environment only after authorization; verify Git integration side effects, runtime duration, secrets, canonical origin, and rollback target before deployment.
+- [ ] Publish the exact `POST /api/research` WAF rule in Log mode, observe normal judge traffic, then enable rate limiting only after explicit authorization for the final rule/any billable use; verify the resulting 429 path.
+- [ ] Deploy an authorized Preview first and pass deployed functional/security/auth/privacy/responsive acceptance before any Production promotion.
+- [ ] Deploy/promote the exact verified candidate to Production only after explicit authorization, then verify TLS/HSTS/CSP/headers/cache/session behavior and durable rate limiting on the canonical origin.
+- [ ] Run a deliberately bounded authorized live-provider smoke using public research context and invented applicant markers; do not force provider fallbacks, exhaust quotas, fan out, or generate abusive load.
+- [ ] Verify hosted auth/save/load/delete/cross-user isolation with exact invented test records where production auth is enabled, then remove only those test records/accounts when authorized.
+- [ ] Bind the tested Production deployment to the exact public Git source; run final staged/publication secret checks and observe CI on the exact authorized pushed commit.
+- [ ] Prepare README architecture/screenshots and the approximately three-minute demo only from verified deployed behavior; keep release screenshots outside protected `ui-flow-screenshots/`.
+- [ ] Draft the exact Devpost submission for user review, run a final production/repository/video/rules audit, and submit only after final explicit authorization.
+- [ ] Verify the submitted project and live links afterward and synchronize final Phase 6 evidence without overstating any skipped/unobserved external check.
 
 ## Scope Control
 

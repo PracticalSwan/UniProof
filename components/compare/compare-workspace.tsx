@@ -1,9 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import * as React from "react";
 
+import { useAuthSession } from "@/components/auth/auth-session-provider";
+import { useSavedRestore } from "@/components/saved/saved-restore-provider";
 import { Button } from "@/components/ui/button";
+import { saveSavedArtifact } from "@/lib/persistence/client";
+import { SAVED_ARTIFACT_SCHEMA_VERSION } from "@/lib/persistence/contracts";
 import { ClaimEvidenceSheet } from "@/components/research/claim-evidence-sheet";
+import { bindCatalogOwnedResearchTarget } from "@/lib/research/catalog/presentation";
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import { executeResearchRequest, type ResearchClientTransportResult } from "@/lib/research/mode/client-transport";
 import type { ResearchDossier, ResearchModeRequest } from "@/lib/research/mode/public-contracts";
@@ -77,25 +83,6 @@ function transportOutcome(target: ComparisonTarget, result: Exclude<ResearchClie
   };
 }
 
-function bindEvidenceOfficialLinks(dossier: ResearchDossier, catalog: ResearchCatalog): ResearchDossier {
-  const university = catalog.universities.find((item) => item.id === dossier.target.university.id);
-  const program = dossier.target.program === undefined
-    ? undefined
-    : catalog.programs.find((item) => item.id === dossier.target.program!.id);
-  if (university === undefined || (dossier.target.program !== undefined && (program === undefined || program.universityId !== university.id))) {
-    throw new Error("Comparison evidence target no longer resolves in the public catalog.");
-  }
-  return {
-    ...dossier,
-    target: {
-      university: { ...dossier.target.university, websiteUrl: university.websiteUrl },
-      ...(dossier.target.program === undefined ? {} : {
-        program: { ...dossier.target.program, officialUrl: program!.officialUrl },
-      }),
-    },
-  };
-}
-
 const unsupportedTargetCorrectionMessage = "Remove or replace each target Research reported as unsupported before starting a new comparison.";
 
 function firstInvalidControl(errors: Partial<Record<ComparisonFormField, string>>): string | undefined {
@@ -111,6 +98,15 @@ function firstInvalidControl(errors: Partial<Record<ComparisonFormField, string>
 }
 
 export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
+  const { state: authState } = useAuthSession();
+  const { consume } = useSavedRestore();
+  const authAccountId = authState.status === "signed-in" ? authState.userId : null;
+  const authAccountRef = React.useRef<string | null>(authAccountId);
+  const restoredAccountRef = React.useRef<string | null>(null);
+  const mountedRef = React.useRef(true);
+  const [saveStatus, setSaveStatus] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const saveSequenceRef = React.useRef(0);
   const [formState, setFormState] = React.useState(createInitialComparisonFormState);
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<ComparisonFormField, string>>>({});
   const [unsupportedTargetKeys, setUnsupportedTargetKeys] = React.useState<readonly string[]>([]);
@@ -120,11 +116,50 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
   const activeBatchRef = React.useRef<ActiveBatch | null>(null);
   const sequenceRef = React.useRef(0);
 
-  React.useEffect(() => () => {
-    const active = activeBatchRef.current;
-    activeBatchRef.current = null;
-    active?.controller.abort();
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      saveSequenceRef.current += 1;
+      const active = activeBatchRef.current;
+      activeBatchRef.current = null;
+      active?.controller.abort();
+    };
   }, []);
+
+  React.useEffect(() => {
+    if (authAccountRef.current === authAccountId) return;
+    authAccountRef.current = authAccountId;
+    saveSequenceRef.current += 1;
+    setSaving(false);
+    setSaveStatus("");
+    if (restoredAccountRef.current !== null) {
+      restoredAccountRef.current = null;
+      const active = activeBatchRef.current;
+      activeBatchRef.current = null;
+      active?.controller.abort();
+      setEvidence(null);
+      setLastEvidenceTrigger(null);
+      dispatch({ type: "clear-result" });
+    }
+  }, [authAccountId]);
+
+  React.useEffect(() => {
+    if (authAccountId === null || activeBatchRef.current !== null) return;
+    const restored = consume("comparison");
+    if (restored === null) return;
+    const owner = authAccountId;
+    const sequence = sequenceRef.current + 1;
+    sequenceRef.current = sequence;
+    queueMicrotask(() => {
+      if (!mountedRef.current || authAccountRef.current !== owner || activeBatchRef.current !== null || sequence !== sequenceRef.current) return;
+      setEvidence(null);
+      setLastEvidenceTrigger(null);
+      restoredAccountRef.current = owner;
+      dispatch({ type: "restore", sequence, result: restored.payload });
+      setSaveStatus("Saved comparison snapshot loaded. Re-run explicitly for current evidence.");
+    });
+  }, [authAccountId, consume]);
 
   const runBatch = React.useCallback(async (
     submission: ComparisonSubmission,
@@ -132,6 +167,9 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
   ) => {
     if (activeBatchRef.current !== null) return;
 
+    saveSequenceRef.current += 1;
+    setSaving(false);
+    setSaveStatus("");
     const sequence = sequenceRef.current + 1;
     sequenceRef.current = sequence;
     const controller = new AbortController();
@@ -220,6 +258,7 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
         score,
         tradeoffs,
       };
+      restoredAccountRef.current = null;
       dispatch({ type: "complete", sequence, result });
     } finally {
       if (activeBatchRef.current === active) activeBatchRef.current = null;
@@ -269,10 +308,39 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
       : undefined;
 
   const openEvidence = React.useCallback((dossier: ResearchDossier, claimId: string, trigger: HTMLButtonElement) => {
+    const boundDossier = bindCatalogOwnedResearchTarget(dossier, catalog);
+    if (boundDossier === null) {
+      throw new Error("Comparison evidence target no longer resolves in the public catalog.");
+    }
     setLastEvidenceTrigger(trigger);
-    setEvidence({ dossier: bindEvidenceOfficialLinks(dossier, catalog), claimId, trigger });
+    setEvidence({ dossier: boundDossier, claimId, trigger });
   }, [catalog]);
 
+  const handleSave = React.useCallback(async () => {
+    if (workspace.kind !== "result" || workspace.notice === "Saved snapshot loaded." || authAccountId === null || saving) return;
+    const sequence = saveSequenceRef.current + 1;
+    saveSequenceRef.current = sequence;
+    const owner = authAccountId;
+    const snapshot = workspace.result;
+    setSaving(true);
+    setSaveStatus("");
+    const result = await saveSavedArtifact({
+      kind: "comparison",
+      schemaVersion: SAVED_ARTIFACT_SCHEMA_VERSION,
+      payload: snapshot,
+    });
+    if (!mountedRef.current || sequence !== saveSequenceRef.current || authAccountRef.current !== owner) return;
+    setSaving(false);
+    if (!result.ok) {
+      setSaveStatus(result.ambiguousMutation
+        ? "The save outcome is unknown. Open Saved snapshots and refresh the list before trying again."
+        : result.error.message);
+      return;
+    }
+    setSaveStatus("Comparison snapshot saved privately.");
+  }, [authAccountId, saving, workspace]);
+
+  const restoredHistorical = workspace.kind === "result" && workspace.notice === "Saved snapshot loaded.";
   const loadingTarget = workspace.kind === "loading"
     ? workspace.submission.targets[Math.min(workspace.currentTargetIndex, workspace.submission.targets.length - 1)]
     : undefined;
@@ -313,23 +381,39 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
       ) : null}
 
       {workspace.kind !== "loading" && (retryContext !== undefined || workspace.kind === "result" || workspace.kind === "error") ? (
-        <div className="mt-5 flex flex-wrap gap-3" aria-label="Comparison result actions">
-          {retryContext === undefined ? null : (
+        <div className="mt-5 flex flex-wrap items-center gap-3" aria-label="Comparison result actions">
+          {restoredHistorical && workspace.kind === "result" ? (
+            <Button type="button" className="min-h-10" onClick={() => void runBatch(workspace.result.submission)}>
+              Re-run comparison
+            </Button>
+          ) : retryContext === undefined ? null : (
             <Button type="button" variant="outline" className="min-h-10" onClick={() => void runBatch(retryContext.submission, retryContext)}>
               Retry incomplete/failed research
             </Button>
           )}
+          {workspace.kind === "result" && !restoredHistorical ? (
+            authState.status === "signed-in" ? (
+              <Button type="button" variant="outline" className="min-h-10" disabled={saving} onClick={() => void handleSave()}>
+                {saving ? "Saving…" : "Save snapshot"}
+              </Button>
+            ) : authState.status === "signed-out" && authState.configured ? (
+              <Button asChild variant="outline" className="min-h-10"><Link href="/auth">Sign in to save</Link></Button>
+            ) : null
+          ) : null}
           <Button
             type="button"
             variant="outline"
             className="min-h-10"
             onClick={() => {
+              restoredAccountRef.current = null;
               setEvidence(null);
+              setSaveStatus("");
               dispatch({ type: "clear-result" });
             }}
           >
             Clear result
           </Button>
+          <p aria-live="polite" className="text-sm text-muted-foreground">{saveStatus}</p>
         </div>
       ) : null}
 

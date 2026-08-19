@@ -15,6 +15,7 @@ import {
   comparisonTargetKey,
   type ComparisonTarget,
 } from "@/lib/comparison/contracts";
+import { scoreComparison } from "@/lib/comparison/scoring";
 import { makeComparisonDossier } from "@/tests/fixtures/comparison-dossiers";
 
 const targetA = { universityId: "university-mit", programId: "program-mit-artificial-intelligence-decision-making-bs" } as const;
@@ -60,11 +61,25 @@ function transport(target: typeof targetA | typeof targetB | typeof targetC): Co
 }
 
 function resultFor(s = submission()): ComparisonResult {
+  const available = new Map([
+    [comparisonTargetKey(targetA), usable(targetA)],
+    [comparisonTargetKey(targetB), usable(targetB)],
+    [comparisonTargetKey(targetC), usable(targetC)],
+  ]);
+  const outcomes = s.targets.map((target) => {
+    const outcome = available.get(comparisonTargetKey(target));
+    if (outcome === undefined) throw new Error("Test submission contains an unsupported target fixture.");
+    return outcome;
+  });
+  const dossiers = outcomes.map((outcome) => {
+    if (outcome.state !== "dossier") throw new Error("Test result fixture expected a dossier outcome.");
+    return outcome.dossier;
+  });
   return {
     submission: s,
     status: "complete",
-    outcomes: [usable(targetA), usable(targetB), usable(targetC)],
-    score: null,
+    outcomes,
+    score: scoreComparison(s, dossiers),
     tradeoffs: [],
   };
 }
@@ -100,6 +115,31 @@ describe("Phase 4 comparison workspace state", () => {
       expect(state.currentTargetIndex).toBe(1);
       expect(state.completedTargets).toHaveLength(1);
     }
+  });
+
+  it("restores only a newer historical result and preserves it through re-run cancellation", () => {
+    const saved = resultFor(submission([targetA, targetB]));
+    const state = comparisonWorkspaceReducer(createComparisonWorkspaceState(), {
+      type: "restore",
+      sequence: 4,
+      result: saved,
+    });
+    expect(state).toEqual({
+      kind: "result",
+      result: saved,
+      notice: "Saved snapshot loaded.",
+      lastSequence: 4,
+    });
+
+    const loading = comparisonWorkspaceReducer(state, { type: "start", sequence: 5, submission: saved.submission });
+    const ignored = comparisonWorkspaceReducer(loading, { type: "restore", sequence: 6, result: resultFor() });
+    expect(ignored).toBe(loading);
+    expect(comparisonWorkspaceReducer(loading, { type: "cancel", sequence: 5 })).toEqual({
+      kind: "result",
+      result: saved,
+      notice: "Comparison cancelled.",
+      lastSequence: 5,
+    });
   });
 
   it("preserves prior result through start/cancel/error and clear-result removes result/error only", () => {

@@ -50,11 +50,53 @@ Implementation status (2026-08-18): the Phase 4 requirements above are locally i
 
 The system shall:
 
-- Compare applicant-provided qualifications and constraints with published program requirements.
-- Classify each requirement as meets, probably meets, does not meet, missing applicant information, unclear requirement, or manual confirmation required.
-- Generate an application checklist and timeline from published requirements and deadlines.
-- Surface risks such as deadline conflicts, stale fees, unclear qualification equivalency, or scholarship uncertainty.
-- Never guarantee admission or fabricate a numeric admission probability.
+- Assess exactly one supported program target at a time; Guide shall not assess university-only targets because admissions requirements are program/degree-specific.
+- Keep applicant profile values ephemeral by default. Applicant GPA, citizenship/current country, qualification details, English-test results, budget, and scholarship need shall not be sent to `/api/research`, search/AI providers, public URLs, or browser-persistent storage. Phase 6A may persist the validated profile only through an explicit signed-in private-save action behind server-derived ownership and RLS.
+- Reuse the hardened Phase 3 Research boundary using only public target identity plus optional intake/academic-year context and the fixed Research categories `admissions`, `tuition`, and `scholarships`; Guide shall not add `/api/guide` or a profile-aware model call.
+- Compare applicant-provided qualifications and constraints with the validated browser-safe `ResearchDossier` through application-owned deterministic rules.
+- Map free-form Research claim properties into Guide semantics only through a closed exact alias registry with strict scalar/unit/currency/period/evidence eligibility; never fuzzy-match, coerce numeric-looking strings, convert GPA scales/tests/currencies/units, infer effective periods from retrieval time, or choose a conflict winner.
+- Classify each machine-assessed requirement as exactly one of meets, probably meets, does not meet, missing applicant information, unclear requirement, or manual confirmation required.
+- Reserve definitive meets/does-not-meet outcomes for compatible deterministic comparisons. `Probably meets` is limited to deliberately narrow broad-background rules and shall not claim formal qualification equivalency.
+- Preserve conflicting, outdated, inferred, anecdotal, ranking-only, unknown, operationally incomplete, incompatible, duplicate-inconsistent, and unrecognized evidence as explicit unclear/manual states rather than positive or negative applicant outcomes.
+- Generate deterministic application risks, checklist items, and a timeline only from the immutable applicant submission, validated published evidence, and clearly labeled generic manual actions. Factual tasks/deadlines/fees shall retain exact evidence references.
+- Machine-schedule only strict valid ISO calendar dates. Ambiguous/rolling/non-ISO dates remain manual; past deadlines become risks/next-cycle checks rather than future due dates.
+- Compare budget with tuition only when numeric value, currency, and annual/total scope are exactly compatible. Scholarship need may affect funding risks/checklist but never admission status or award probability.
+- Preserve immutable submission/request ownership, cancellation, stale-response protection, prior-result preservation, explicit retry/refresh semantics, and one-entry in-memory dossier reuse for profile-only reassessment.
+- Generate an application checklist and timeline from published requirements and deadlines without inventing documents, contacts, dates, fees, or readiness states.
+- Surface risks such as missed/near deadlines, published unmet thresholds, stale/conflicting requirements or fees, unclear qualification equivalency, incomparable budget, and scholarship uncertainty.
+- Provide exact evidence inspection and official program/university links through the existing validated dossier/catalog URL boundary.
+- Never guarantee admission, fabricate a numeric admission probability, rank the applicant, or imply that meeting published thresholds establishes admission.
+
+Detailed Phase 5 contracts, edge cases, security boundaries, and acceptance gates are defined in `docs/planning/phase-5-guide-mode.md`.
+
+Implementation status (2026-08-19): Phase 5 Guide Mode is implemented and locally browser-verified against deterministic/schema-valid Research fixtures. Phase 6A now adds optional authenticated private profile/result snapshots without changing Guide's public-provider boundary; durable public rate limiting, hosted Auth/RLS verification, live provider/deployment smoke, HSTS, and release automation remain Phase 6B/6C work.
+
+## Phase 6 — Hardening and Submission Readiness
+
+Phase 6 shall preserve the complete anonymous Research/Comparison/Guide judge flow while adding only optional authenticated private persistence and the production/release controls required to deploy the existing MVP safely.
+
+The system shall:
+
+- Keep account creation/sign-in optional. Authentication shall add private save/history capabilities and shall not gate Research, Comparison, or Guide.
+- Use the current supported Supabase SSR cookie/PKCE session model with verified server identity and shall never authorize from a caller-supplied user ID/email or a client-only session object. Normal SSR rendering may use cryptographically verified claims, while private saved-artifact reads/writes/deletes shall require the current Auth-server validation path before exposing or mutating private data. Authentication/session credentials shall not be stored in Web Storage, IndexedDB, Cache Storage, service-worker state, or URL state.
+- Compose authentication refresh with the existing nonce/CSP Next.js Proxy so session cookies, request nonce, response CSP, and downstream request state cannot overwrite or desynchronize one another.
+- Keep browser CSP connectivity closed: when optional Supabase Auth/save is configured, `connect-src` shall add only the exact validated origin parsed from `NEXT_PUBLIC_SUPABASE_URL` (plus the existing exact development websocket source). The browser shall never receive wildcard Supabase connectivity, generic `https:` connectivity, or Tavily/Brave/Gemini/Groq/OpenRouter origins; malformed/credential-bearing CSP configuration shall fail closed.
+- Persist only explicit user-requested, application-owned, versioned private snapshots behind minimum authenticated table grants **and** Supabase RLS: bounded Guide profile snapshots and validated Research/Comparison/Guide result snapshots. Ordinary user CRUD shall use user-scoped authorization/RLS rather than a service-role bypass; anonymous private-table CRUD and ordinary UPDATE shall not exist.
+- Treat every saved result as a historical immutable snapshot. Loading saved evidence shall preserve its original retrieval/assessment state and shall never silently make it current, re-score/reassess it under changed logic, seed current-session Guide dossier reuse, or trigger providers. Refresh/re-run/reassess shall be an explicit new operation.
+- Move a fetched saved artifact from `/saved` to Research/Comparison/Guide only through one account-bound memory-only single-consume handoff. Private payloads/restore identifiers shall not use query/hash state, Web Storage, IndexedDB, Cache Storage, service workers, or a second cookie persistence channel, and shall be cleared on account change/signout.
+- Validate saved snapshot schemas, ownership, internal evidence/result bindings, and current catalog target identity on both write and read. Database ownership/RLS shall not be treated as content integrity: owner-modified malformed/inconsistent rows shall fail closed. Current catalog data owns university/program navigation, while dossier source/evidence URLs and complete target-scoped evidence refs remain provenance-owned. Enforce bounded payload/list/capacity limits and prevent cross-user read/write/delete or existence disclosure.
+- Preserve the Phase 5 provider-privacy invariant: applicant academic/financial/profile/account data shall not enter `/api/research`, search/AI provider requests, arbitrary source retrieval, or public URL state. Explicit private Supabase persistence is a separate user-authorized data boundary.
+- Bound the whole Research run below the selected hosting platform's hard function duration, stop new retries/fallback work after cancellation/deadline, and retain already validated evidence as truthful partial results where contracts permit.
+- Require a durable/deployment-layer distributed abuse control for the expensive public Research endpoint before public release; local process memory, browser single-flight behavior, and provider attempt budgets do not satisfy this requirement.
+- Treat hosting-generated rate-limit/timeout failures as sanitized first-class client outcomes without automatic retry storms or loss of recoverable prior results.
+- Maintain least-privilege CI that uses deterministic fixtures/local Supabase and no production provider/database/deployment secrets or automatic production deployment.
+- Verify the final production origin's TLS, CSP/security headers, cache/session isolation, secret configuration, provider/privacy assumptions, and conservative HSTS policy before declaring the site release-ready.
+- Deploy, mutate hosted Supabase/Vercel/GitHub state, consume an authorized live-provider smoke budget, publish release assets, and submit to Devpost only through the explicit external-action gates in `AGENTS.md` and the Phase 6 release plan.
+- Bind the final deployed application, public repository, CI evidence, README/screenshots/demo, and Devpost claims to the exact verified implementation; do not claim deployment/live verification from local tests alone.
+
+Detailed Phase 6 architecture, edge cases, authorization boundaries, and completion gates are defined in `docs/planning/phase-6-hardening-submission-readiness.md` and its Phase 6A/6B/6C execution plans.
+
+Implementation status (2026-08-19): Phase 6A identity/ownership/persistence is implemented and locally verified with local Supabase Auth/Mailpit, RLS/pgTAP, strict private APIs, explicit profile/Research/Comparison/Guide snapshot save/restore, account-bound memory-only restore handoff, anonymous degradation, and full Phase 0–6A regression coverage. Hosted Supabase, durable distributed rate limiting, production Auth/email, deployment, live-provider smoke, GitHub release/publication, and Devpost submission remain Phase 6B/6C work and are not claimed by local Phase 6A evidence.
 
 ## Evidence Requirements
 
@@ -71,9 +113,11 @@ Allowed user-facing evidence states are defined in `AGENTS.md`.
 
 ## Applicant Profile
 
-Minimum useful fields are citizenship/current country, target degree/subject, qualification and GPA/scale, English test result when available, preferred destinations, tuition/total budget, scholarship need, intake, and priority weights.
+Phase 5 uses a strict ephemeral profile containing citizenship/current country, qualification level/title/subject, optional GPA with explicit scale, English-test state/results, optional budget with explicit currency and annual/total scope, and scholarship need. Optional intake and academic year are public Research context rather than private profile values.
 
-The MVP shall not require passports, national IDs, transcripts, bank statements, visa documents, or recommendation letters.
+The selected supported program supplies target university, degree level, and subject. Preferred destinations are represented by explicit target selection, and Comparison-style priority weights are not separately collected in one-program Guide because they do not change deterministic requirement assessment.
+
+The applicant profile remains browser-memory-only by default and intentionally excludes applicant name, date of birth, email, phone, address, free-form personal notes, account identifiers, and document uploads. Phase 6A adds an explicit signed-in **Save profile** action for this same bounded validated profile; account identity is not copied into the profile, and restore remains private/account-bound. The MVP shall not require passports, national IDs, transcripts, bank statements, visa documents, recommendation letters, or similar sensitive documents.
 
 ## Quality and Safety Requirements
 

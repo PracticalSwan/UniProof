@@ -1,5 +1,8 @@
+import { z } from "zod";
+
 import type { ResearchDossier } from "@/lib/research/mode/public-contracts";
 import {
+  comparisonPrioritySchema,
   comparisonPriorityCategory,
   comparisonPriorityOrder,
   comparisonTargetKey,
@@ -10,6 +13,11 @@ import type {
   ComparisonScoreResult,
   ComparisonUnscoredReason,
 } from "./scoring";
+
+export const comparisonTradeoffEvidenceRefSchema = z.object({
+  targetKey: z.string().trim().min(1).max(245),
+  claimId: z.string().trim().min(1).max(120),
+}).strict();
 
 export type ComparisonTradeoffEvidenceRef = Readonly<{
   targetKey: string;
@@ -22,9 +30,17 @@ export type ComparisonTradeoff = Readonly<{
   kind: "relative" | "tie" | "gap" | "warning";
   summary: string;
   targetKeys: readonly string[];
-  claimIds: readonly string[];
   evidenceRefs: readonly ComparisonTradeoffEvidenceRef[];
 }>;
+
+export const comparisonTradeoffSchema = z.object({
+  id: z.string().trim().min(1).max(200),
+  dimension: comparisonPrioritySchema,
+  kind: z.enum(["relative", "tie", "gap", "warning"]),
+  summary: z.string().trim().min(1).max(600),
+  targetKeys: z.array(z.string().trim().min(1).max(245)).min(1).max(4),
+  evidenceRefs: z.array(comparisonTradeoffEvidenceRefSchema).max(24),
+}).strict();
 
 const dimensionLabels: Record<ComparisonPriority, string> = {
   affordability: "Affordability",
@@ -151,7 +167,6 @@ export function buildComparisonTradeoffs(
       assertFactualReferences(scoreResult, dossiers, dimension);
       const scores = scored.map((item) => item.outcome.state === "scored" ? item.outcome.score : 0);
       const evidenceRefs = factualEvidenceRefs(scoreResult, dimension);
-      const claimIds = evidenceRefs.map((reference) => reference.claimId);
       const targetKeys = scored.map((item) => item.key);
       if (new Set(scores).size === 1) {
         tradeoffs.push({
@@ -160,7 +175,6 @@ export function buildComparisonTradeoffs(
           kind: "tie",
           summary: `${dimensionLabels[dimension]} has an equal comparable score for ${scored.map((item) => `option ${item.index + 1}`).join(" and ")}.`,
           targetKeys,
-          claimIds,
           evidenceRefs,
         });
       } else {
@@ -172,7 +186,6 @@ export function buildComparisonTradeoffs(
           kind: "relative",
           summary: `${dimensionLabels[dimension]} gives ${leading.map((item) => `option ${item.index + 1}`).join(" and ")} the higher within-set compatible score from the published facts that can be compared directly.`,
           targetKeys,
-          claimIds,
           evidenceRefs,
         });
       }
@@ -186,7 +199,6 @@ export function buildComparisonTradeoffs(
         kind: warningReasons.has(item.outcome.reason) ? "warning" : "gap",
         summary: `${dimensionLabels[dimension]} for option ${item.index + 1} is unscored because ${reasonText[item.outcome.reason]}.`,
         targetKeys: [item.key],
-        claimIds: [...item.outcome.claimIds],
         evidenceRefs: item.outcome.claimIds.map((claimId) => ({ targetKey: item.key, claimId })),
       });
     }

@@ -3,6 +3,7 @@ export type ContentSecurityPolicyInput = {
   isDevelopment: boolean;
   requestUrl: string;
   requestHost?: string;
+  supabaseConnectOrigin?: string;
 };
 
 const CSP_NONCE = /^[A-Za-z0-9+/_=-]{1,256}$/;
@@ -41,6 +42,9 @@ export function buildContentSecurityPolicy(input: ContentSecurityPolicyInput): s
     ? developmentWebSocketSource(input.requestUrl, input.requestHost)
     : undefined;
   const connectSources = ["'self'", ...(websocketSource === undefined ? [] : [websocketSource])];
+  if (input.supabaseConnectOrigin !== undefined) {
+    connectSources.push(input.supabaseConnectOrigin);
+  }
 
   return [
     "default-src 'self'",
@@ -58,7 +62,55 @@ export function buildContentSecurityPolicy(input: ContentSecurityPolicyInput): s
     "frame-src 'none'",
     "media-src 'none'",
     "manifest-src 'self'",
-  ].join("; ");
+].join("; ");
+}
+
+export function parseSupabaseConnectOrigin(
+  value: string,
+  allowLocalHttp: boolean,
+): string {
+  if (
+    value.trim() !== value ||
+    value === "" ||
+    /[\u0000-\u0020]/u.test(value) ||
+    value.includes("\\")
+  ) {
+    throw new Error("Supabase browser origin contains unsupported characters.");
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("Supabase browser origin must be a valid absolute URL.");
+  }
+
+  if (
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    parsed.pathname !== "/" ||
+    parsed.search !== "" ||
+    parsed.hash !== "" ||
+    parsed.hostname.includes("*")
+  ) {
+    throw new Error("Supabase browser origin must be an exact credential-free origin.");
+  }
+
+  const isLoopback = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost" || parsed.hostname === "[::1]";
+  if (parsed.protocol === "https:") {
+    // Production exact HTTPS origin.
+  } else if (parsed.protocol === "http:" && allowLocalHttp && isLoopback) {
+    // Local CLI stack exact origin.
+  } else {
+    throw new Error("Supabase browser origin uses an unsupported scheme for this environment.");
+  }
+
+  const origin = parsed.origin;
+  const roundTrip = new URL(origin);
+  if (roundTrip.origin !== origin) {
+    throw new Error("Supabase browser origin did not round-trip canonically.");
+  }
+  return origin;
 }
 
 export const staticSecurityHeaders = [

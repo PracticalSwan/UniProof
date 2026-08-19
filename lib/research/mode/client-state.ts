@@ -46,6 +46,7 @@ export type ResearchWorkspaceAction =
   | { type: "result"; sequence: number; dossier: ResearchDossier }
   | { type: "error"; sequence: number; error: ResearchWorkspaceError }
   | { type: "cancelled"; sequence: number }
+  | { type: "restore"; dossier: ResearchDossier; submission: ResearchSubmissionSnapshot }
   | { type: "clear-result" }
   | { type: "dismiss-notice" };
 
@@ -126,6 +127,15 @@ export function researchWorkspaceReducer(
         dossier: state.previous.dossier,
         submission: state.previous.submission,
         notice: RESEARCH_CANCEL_NOTICE,
+      };
+    }
+    case "restore": {
+      if (state.kind === "loading") return state;
+      return {
+        kind: "result",
+        dossier: action.dossier,
+        submission: freezeResearchSubmission(action.submission),
+        notice: "Saved snapshot loaded.",
       };
     }
     case "clear-result": {

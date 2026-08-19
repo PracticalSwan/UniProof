@@ -1,10 +1,10 @@
 # Pixel Forge AI Hackathon Constraints
 
-Source of truth: Pixel Forge AI Hackathon Devpost data re-verified on 2026-08-16.
+Source of truth: Pixel Forge AI Hackathon Devpost overview/rules/schedule re-verified on 2026-08-19. Event metadata is mutable; re-check the live pages again immediately before any final publication/submission action.
 
 ## Current Event State
 
-- Current Devpost title: `Pixel Forge AI Hackathon ($18,000+ in Prizes)`.
+- Current Devpost title observed on 2026-08-19: `Pixel Forge AI Hackathon ($13,000+ in Prizes)`.
 - Current phase: submissions open.
 - Submission window opened: 2026-08-15 04:00 UTC.
 - Submission deadline: 2026-08-22 16:00 UTC.
@@ -13,7 +13,9 @@ Source of truth: Pixel Forge AI Hackathon Devpost data re-verified on 2026-08-16
 - Public voting: 2026-08-23 04:00 UTC through 2026-08-29 04:00 UTC.
 - Winners announced: 2026-09-03 16:00 UTC.
 
-## Build Rules That Affect This Repository
+## Eligibility and Build Rules That Affect This Repository
+
+The current overview lists participation as ages 13+, students only, companies/professional organizations excluded, and countries/territories subject to Devpost's standard exceptions. Re-check the exact participant/account eligibility immediately before submission rather than assuming eligibility from repository work alone.
 
 Devpost currently states: "All projects must be created during the hackathon period. You may brainstorm ideas and plan ahead, but the actual development work should begin once the event starts."
 
@@ -32,7 +34,7 @@ Repository/application work for UniProof began on 2026-08-16, inside the active 
 | Potential Impact | How big of an impact could the project have on target communities? |
 | Technological Implementation | Does the project demonstrate quality software development? |
 
-The judging scale is currently five points per criterion. No judging tracks are currently listed.
+No judging tracks or per-criterion numeric scoring scale were visible in the re-opened public overview on 2026-08-19; re-check the live judging section before final submission rather than relying on an older scoring snapshot.
 
 ## Required Submission Assets
 

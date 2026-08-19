@@ -151,6 +151,24 @@ Do not use repository-irrelevant skills merely because they are installed. In pa
 - Never publish, deploy, submit to Devpost, create a remote repository, change repository visibility, or upload user data without explicit authorization.
 - Never delete or overwrite user work without explicit authorization and exact-path verification.
 
+## Installed Platform CLIs and Safe Use
+
+The Windows development environment already provides the following operator CLIs. Do not add duplicate project dependencies merely to obtain these command-line tools:
+
+- Supabase CLI (`supabase`), verified at `2.114.0` on 2026-08-19.
+- Vercel CLI (`vercel`), verified at `59.1.4` on 2026-08-19.
+- GitHub CLI (`gh`), verified at `2.97.0` on 2026-08-19.
+
+CodexPro executes its shell from a WSL-mounted environment while these are installed as Windows-host operator tools; Supabase/Vercel in particular depend on the Windows Node toolchain, while `gh` is a native Windows CLI. If direct invocation fails because the Windows executable/toolchain is not resolvable from WSL, invoke the existing Windows CLI through `C:\Windows\System32\cmd.exe` (WSL path `/mnt/c/Windows/System32/cmd.exe`) instead of reinstalling or modifying the host toolchain.
+
+Treat CLI access as an operator capability, not blanket authorization. Read-only inspection is allowed when relevant to the active task, but any command that creates, changes, publishes, deploys, links, migrates, deletes, rotates, uploads, submits, changes visibility/access, or otherwise mutates local persistent data or an external account/service requires the authorization already demanded by the applicable project rule. In particular:
+
+- Supabase: local disposable development stacks and local migration tests may be used when the task authorizes implementation/testing. Linking a hosted project, applying/repairing remote migrations, changing Auth/provider settings, secrets, RLS/policies, production data, or project resources is an external mutation and requires explicit authorization. Never run `db reset --linked`, broad remote cleanup, or migration-history repair as routine verification. Prefer migration files, local `db reset`, local pgTAP tests, and remote `db push --dry-run` before any separately authorized `db push`.
+- Vercel: project/deployment inspection may be used when relevant. Creating/linking projects, changing environment variables/domains/firewall/project settings, deploying/promoting/aliasing/rolling back, or deleting resources requires explicit authorization. Never pull or print secret values merely for inspection; prefer variable-name/configuration checks and secret-presence validation.
+- GitHub: repository/status/workflow inspection may be used when relevant. Creating/modifying issues, PRs, releases, Actions secrets/variables, repository settings/visibility, branches/tags, merges, or other remote state requires explicit authorization. Git publication still follows the separate Git rules below.
+
+No agent may use these CLIs for credential harvesting or exfiltration, hidden persistence or remote access, unauthorized account/repository/project takeover, destructive database/project/repository operations, bypassing security or rate limits, spam/deception, malicious traffic, or any action outside the user's stated project purpose. Never expose access tokens, API keys, database passwords, connection strings, session cookies, or secret-bearing command output in chat, logs, screenshots, fixtures, plans, or committed files.
+
 ## Deletion, Cleanup, and Destructive Operations
 
 The user has granted standing project authorization to remove task-local disposable test residue after its purpose is complete. This standing authorization is narrow: it applies only inside the UniProof workspace to artifacts that are clearly temporary, created for the current task or verification, and safely reproducible. Preserve anything that has clear regression, debugging, reproducibility, acceptance-evidence, or future-session value.

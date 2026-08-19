@@ -1,4 +1,5 @@
 export { researchCatalog } from "./data";
+export { bindCatalogOwnedResearchTarget } from "./presentation";
 export { searchResearchCatalog } from "./search";
 export {
   researchCatalogProgramSchema,

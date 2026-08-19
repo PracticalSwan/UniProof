@@ -539,7 +539,7 @@ export type ComparisonTradeoff = {
   kind: "relative" | "tie" | "gap" | "warning";
   summary: string;
   targetKeys: readonly string[];
-  claimIds: readonly string[];
+  evidenceRefs: readonly { targetKey: string; claimId: string }[];
 };
 
 export function buildComparisonTradeoffs(
@@ -551,7 +551,7 @@ export function buildComparisonTradeoffs(
 
 - [x] **Step 1: Write RED exact-reference tests**
 
-Every factual relative/tie trade-off must carry claim IDs that resolve inside the correct target dossier and priority category. Gap-only text may have zero claims when no evidence exists.
+Every factual relative/tie trade-off must carry target-scoped evidence references that resolve inside the correct target dossier and priority category. Gap-only text may have zero evidence references when no evidence exists.
 
 - [x] **Step 2: Write RED language-safety tests**
 

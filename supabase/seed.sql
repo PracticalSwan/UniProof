@@ -1,0 +1,2 @@
+-- Phase 6A intentionally has no persistent seed data.
+-- Local tests create invented users and saved artifacts explicitly.

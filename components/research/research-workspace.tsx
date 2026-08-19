@@ -1,8 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import * as React from "react";
 
+import { useAuthSession } from "@/components/auth/auth-session-provider";
+import { useSavedRestore } from "@/components/saved/saved-restore-provider";
 import { Button } from "@/components/ui/button";
+import { saveSavedArtifact } from "@/lib/persistence/client";
+import { SAVED_ARTIFACT_SCHEMA_VERSION } from "@/lib/persistence/contracts";
+import { bindCatalogOwnedResearchTarget } from "@/lib/research/catalog/presentation";
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import {
   buildResearchSubmission,
@@ -55,7 +61,22 @@ interface ResearchWorkspaceProps {
   catalog: ResearchCatalog;
 }
 
+function catalogTargetLabel(catalog: ResearchCatalog, universityId: string, programId?: string): string | null {
+  const university = catalog.universities.find((item) => item.id === universityId);
+  if (university === undefined) return null;
+  if (programId === undefined) return university.name;
+  const program = catalog.programs.find((item) => item.id === programId && item.universityId === universityId);
+  return program === undefined ? null : `${program.name} — ${university.name}`;
+}
+
 export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
+  const { state: authState } = useAuthSession();
+  const { consume } = useSavedRestore();
+  const [saveStatus, setSaveStatus] = React.useState("");
+  const [saving, setSaving] = React.useState(false);
+  const saveSequenceRef = React.useRef(0);
+  const authAccountId = authState.status === "signed-in" ? authState.userId : null;
+  const authAccountRef = React.useRef<string | null>(authAccountId);
   const [formState, setFormState] = React.useState<ResearchFormState>(() =>
     createInitialResearchFormState(),
   );
@@ -75,12 +96,57 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
   const mountedRef = React.useRef(true);
 
   React.useEffect(() => {
+    if (authAccountRef.current !== authAccountId) {
+      authAccountRef.current = authAccountId;
+      saveSequenceRef.current += 1;
+      setSaving(false);
+      setSaveStatus("");
+    }
+  }, [authAccountId]);
+
+  React.useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       activeRequestRef.current?.controller.abort();
+      saveSequenceRef.current += 1;
     };
   }, []);
+
+  React.useEffect(() => {
+    if (authState.status !== "signed-in" || activeRequestRef.current !== null) return;
+    const restored = consume("research");
+    if (restored === null) return;
+    const owner = authState.userId;
+    const { request, dossier } = restored.payload;
+    const bound = bindCatalogOwnedResearchTarget(dossier, catalog);
+    const targetLabel = catalogTargetLabel(catalog, request.universityId, request.programId);
+    queueMicrotask(() => {
+      if (!mountedRef.current || authAccountRef.current !== owner || activeRequestRef.current !== null) return;
+      if (bound === null || targetLabel === null) {
+        setSaveStatus("This saved snapshot no longer resolves in the current catalog.");
+        return;
+      }
+      setSelectedClaimId(null);
+      setClaimTrigger(null);
+      setFieldErrors({});
+      setFormState({
+        search: targetLabel,
+        universityId: request.universityId,
+        ...(request.programId === undefined ? {} : { programId: request.programId }),
+        categories: [...request.categories],
+        question: request.question ?? "",
+        intake: request.intake ?? "",
+        academicYear: request.academicYear ?? "",
+      });
+      dispatch({
+        type: "restore",
+        dossier: bound,
+        submission: { request, targetLabel },
+      });
+      setSaveStatus("Saved snapshot loaded. Refresh research explicitly for current evidence.");
+    });
+  }, [authState, catalog, consume]);
 
   const isLoading = runState.kind === "loading";
   const displayedResult = runState.kind === "result"
@@ -125,6 +191,9 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
     async (submission: ResearchSubmissionSnapshot) => {
       if (activeRequestRef.current !== null) return;
 
+      saveSequenceRef.current += 1;
+      setSaving(false);
+      setSaveStatus("");
       const sequence = nextSequenceRef.current;
       nextSequenceRef.current += 1;
       const controller = new AbortController();
@@ -149,9 +218,18 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
         }
 
         if (outcome.kind === "dossier") {
+          const presentationDossier = bindCatalogOwnedResearchTarget(outcome.dossier, catalog);
+          if (presentationDossier === null) {
+            dispatch({
+              type: "error",
+              sequence,
+              error: { code: "invalid-response", message: clientErrorMessages["invalid-response"] },
+            });
+            return;
+          }
           setSelectedClaimId(null);
           setClaimTrigger(null);
-          dispatch({ type: "result", sequence, dossier: outcome.dossier });
+          dispatch({ type: "result", sequence, dossier: presentationDossier });
           return;
         }
 
@@ -175,7 +253,7 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
         }
       }
     },
-    [],
+    [catalog],
   );
 
   const handleSubmit = React.useCallback(
@@ -242,6 +320,33 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
     setClaimTrigger(trigger);
   }, []);
 
+  const handleSave = React.useCallback(async () => {
+    if (runState.kind !== "result" || authAccountId === null || isLoading || saving) return;
+    const sequence = saveSequenceRef.current + 1;
+    saveSequenceRef.current = sequence;
+    const owner = authAccountId;
+    const resultSnapshot = runState;
+    setSaving(true);
+    setSaveStatus("");
+    const outcome = await saveSavedArtifact({
+      kind: "research",
+      schemaVersion: SAVED_ARTIFACT_SCHEMA_VERSION,
+      payload: {
+        request: resultSnapshot.submission.request,
+        dossier: resultSnapshot.dossier,
+      },
+    });
+    if (!mountedRef.current || sequence !== saveSequenceRef.current || authAccountRef.current !== owner) return;
+    setSaving(false);
+    if (!outcome.ok) {
+      setSaveStatus(outcome.ambiguousMutation
+        ? "The save outcome is unknown. Open Saved snapshots and refresh the list before trying again."
+        : outcome.error.message);
+      return;
+    }
+    setSaveStatus("Research snapshot saved privately.");
+  }, [authAccountId, isLoading, runState, saving]);
+
   const formMatchesSubmission = React.useMemo(() => {
     if (displayedResult === null) return true;
     const current = buildResearchSubmission(formState, catalog);
@@ -255,6 +360,7 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
 
   const serverErrorCode = runState.kind === "error" ? runState.error.code : null;
   const activeError = runState.kind === "error" ? runState.error : null;
+  const restoredHistorical = runState.kind === "result" && runState.notice === "Saved snapshot loaded.";
   const statusMessage = isLoading
     ? displayedResult === null
       ? "Researching sources and evidence. This may take a while; you can cancel this request."
@@ -294,6 +400,21 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
           </Button>
         ) : null}
       </div>
+
+      {runState.kind === "result" && !isLoading ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-muted/20 p-4">
+          {restoredHistorical ? (
+            <Button type="button" onClick={() => handleRetry(runState.submission)}>Refresh research</Button>
+          ) : authState.status === "signed-in" ? (
+            <Button type="button" variant="outline" disabled={saving} onClick={() => void handleSave()}>
+              {saving ? "Saving…" : "Save snapshot"}
+            </Button>
+          ) : authState.status === "signed-out" && authState.configured ? (
+            <Button asChild variant="outline"><Link href="/auth">Sign in to save</Link></Button>
+          ) : null}
+          <p aria-live="polite" className="text-sm text-muted-foreground">{saveStatus}</p>
+        </div>
+      ) : null}
 
       {activeError !== null ? (
         <section

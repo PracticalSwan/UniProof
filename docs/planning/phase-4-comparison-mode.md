@@ -751,7 +751,7 @@ No browser acceptance test should actually navigate to an external site.
 - No third-party script can read comparison state because no third-party script is loaded.
 - A compromised OS/browser extension/infostealer can still read data visible in memory while the user is using the app; the application cannot guarantee protection from a compromised endpoint. The Phase 4 design minimizes what exists to steal.
 
-Future authentication must use framework/server-managed sessions with `HttpOnly`, `Secure`, appropriate `SameSite` cookies and server-derived ownership; never put credentials/session/JWT/refresh tokens in Web Storage.
+Historical Phase 4 note: future authentication was originally expected to use `HttpOnly`/`Secure`/appropriate-`SameSite` server-managed cookies plus server-derived ownership and no Web Storage credentials. Phase 6 planning supersedes the blanket `HttpOnly` assumption for the selected Supabase SSR rich-client architecture: standard Supabase SSR cookies must not be falsely described as `HttpOnly`; the enduring controls are no Web Storage/IndexedDB/Cache Storage/URL credential persistence, strict CSP/no third-party scripts, supported production cookie attributes, verified server claims, server-derived ownership, and RLS.
 
 ### 26.6 API/resource abuse
 

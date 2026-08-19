@@ -1,0 +1,78 @@
+name: Bug report
+description: Report a reproducible UniProof defect or regression.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a defect. Do not include credentials, private applicant data, sensitive documents, or vulnerability/exploit details here. Follow SECURITY.md for security reports.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is wrong, and what did you expect instead?
+      placeholder: Describe the observable defect concisely.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Research
+        - Compare
+        - Guide
+        - Evidence / sources
+        - Accessibility / responsive UI
+        - Security / privacy (non-sensitive product behavior only)
+        - Build / tests / developer tooling
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest deterministic sequence that reproduces the issue. Use invented data.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Click ...
+        4. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser/OS, commit or branch if known, and whether this was deterministic test data or a live-provider run. Do not paste keys or .env contents.
+      placeholder: Windows 11, Chrome ..., main @ <commit>, deterministic mocked Research response
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Safe logs or screenshots
+      description: Optional. Redact secrets/private data and do not upload protected project screenshots unless explicitly authorized.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues for the same defect.
+          required: true
+        - label: I used only invented/non-private applicant data in this report.
+          required: true
+        - label: This report does not disclose credentials, private data, or exploitable security details.
+          required: true

@@ -25,6 +25,8 @@ export const comparisonPriorityCategory: Readonly<Record<ComparisonPriority, Res
   support: "support",
 };
 
+export const comparisonPrioritySchema = z.enum(comparisonPriorityOrder);
+
 export const comparisonDefaultWeights = {
   affordability: 30,
   research: 30,

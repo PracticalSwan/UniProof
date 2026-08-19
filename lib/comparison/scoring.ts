@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   researchDossierSchema,
   type PublicResearchClaim,
@@ -8,6 +10,7 @@ import {
   comparisonPriorityOrder,
   comparisonSubmissionSchema,
   comparisonTargetKey,
+  comparisonTargetSchema,
   type ComparisonPriority,
   type ComparisonSubmission,
   type ComparisonTarget,
@@ -19,6 +22,33 @@ import {
   type ComparisonMetricDefinition,
   type ComparisonMetricId,
 } from "./metric-registry";
+
+export const comparisonMetricIdSchema = z.enum([
+  "annual-tuition",
+  "scholarship-availability",
+  "scholarship-presence",
+  "research-opportunity-availability",
+  "employment-rate",
+  "international-support-availability",
+]);
+
+export const comparisonUnscoredReasonSchema = z.enum([
+  "category-not-researched",
+  "category-unknown",
+  "category-incomplete",
+  "no-eligible-metric",
+  "unsupported-value-type",
+  "conflicting",
+  "outdated",
+  "inferred-only",
+  "anecdotal-only",
+  "ranking-only",
+  "duplicate-inconsistent-values",
+  "currency-mismatch",
+  "unit-mismatch",
+  "period-mismatch",
+  "insufficient-peers",
+]);
 
 export type ComparisonUnscoredReason =
   | "category-not-researched"
@@ -76,6 +106,51 @@ export type ComparisonScoreResult = Readonly<{
   submission: ComparisonSubmission;
   targets: readonly ComparisonTargetScore[];
 }>;
+
+export const comparisonMetricFactSchema = z.object({
+  metricId: comparisonMetricIdSchema,
+  value: z.union([z.number().finite(), z.boolean(), z.string().trim().min(1).max(500)]),
+  claimIds: z.array(z.string().trim().min(1).max(120)).min(1).max(12),
+  sourceIds: z.array(z.string().trim().min(1).max(120)).min(1).max(12),
+  currency: z.string().trim().length(3).transform((value) => value.toUpperCase()).optional(),
+  unit: z.string().trim().min(1).max(80).optional(),
+  academicYear: z.string().trim().min(1).max(40).optional(),
+  effectiveDate: z.iso.date().optional(),
+  intake: z.string().trim().min(1).max(40).optional(),
+}).strict();
+
+export const comparisonDimensionResultSchema = z.discriminatedUnion("state", [
+  z.object({
+    state: z.literal("scored"),
+    score: z.number().finite().min(0).max(100),
+    metricId: comparisonMetricIdSchema,
+    claimIds: z.array(z.string().trim().min(1).max(120)).min(1).max(12),
+    fact: comparisonMetricFactSchema,
+  }).strict(),
+  z.object({
+    state: z.literal("unscored"),
+    reason: comparisonUnscoredReasonSchema,
+    claimIds: z.array(z.string().trim().min(1).max(120)).max(12),
+  }).strict(),
+]);
+
+export const comparisonTargetScoreSchema = z.object({
+  target: comparisonTargetSchema,
+  dossier: researchDossierSchema.nullable(),
+  dimensions: z.strictObject(
+    Object.fromEntries(
+      comparisonPriorityOrder.map((priority) => [priority, comparisonDimensionResultSchema]),
+    ) as Record<ComparisonPriority, typeof comparisonDimensionResultSchema>,
+  ),
+  evidenceCoverage: z.number().int().min(0).max(100),
+  fitScore: z.number().finite().min(0).max(100).nullable(),
+  fitSuppressed: z.boolean(),
+}).strict();
+
+export const comparisonScoreResultSchema = z.object({
+  submission: comparisonSubmissionSchema,
+  targets: z.array(comparisonTargetScoreSchema).min(2).max(4),
+}).strict();
 
 const scoringStatuses = new Set(["verified", "corroborated", "university-reported"] as const);
 

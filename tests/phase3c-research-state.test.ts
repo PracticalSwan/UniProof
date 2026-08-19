@@ -144,6 +144,38 @@ describe("research workspace reducer", () => {
     });
   });
 
+  it("installs a saved historical snapshot only while not loading and preserves it on refresh cancellation", () => {
+    const savedSubmission = makeSnapshot({ sequence: 1 });
+    const savedDossier = makeDossier("saved");
+    let state: ResearchWorkspaceState = researchWorkspaceReducer(initialResearchWorkspaceState, {
+      type: "restore",
+      dossier: savedDossier,
+      submission: savedSubmission,
+    });
+    expect(state).toEqual({
+      kind: "result",
+      dossier: savedDossier,
+      submission: savedSubmission,
+      notice: "Saved snapshot loaded.",
+    });
+
+    state = start(state, 2, savedSubmission);
+    const ignored = researchWorkspaceReducer(state, {
+      type: "restore",
+      dossier: makeDossier("late-restore"),
+      submission: makeSnapshot({ sequence: 3 }),
+    });
+    expect(ignored).toBe(state);
+
+    state = terminal(state, { type: "cancelled", sequence: 2 });
+    expect(state).toEqual({
+      kind: "result",
+      dossier: savedDossier,
+      submission: savedSubmission,
+      notice: "The research request was cancelled in this session.",
+    });
+  });
+
   it("preserves the previous dossier and its submission when refreshing a result", () => {
     const firstSubmission = makeSnapshot({ sequence: 1 });
     const dossier = makeDossier();

@@ -53,13 +53,15 @@ describe("Phase 4 deterministic trade-offs", () => {
     const factual = tradeoffs.filter((item) => item.kind === "relative" || item.kind === "tie");
     expect(factual.length).toBeGreaterThan(0);
     for (const item of factual) {
-      expect(item.claimIds.length).toBeGreaterThan(0);
+      expect(item.evidenceRefs.length).toBeGreaterThan(0);
+      expect("claimIds" in item).toBe(false);
       for (const targetKey of item.targetKeys) {
         const dossier = dossiers.find((candidate) => `${candidate.target.university.id}::${candidate.target.program?.id ?? ""}` === targetKey);
         expect(dossier).toBeDefined();
       }
-      for (const claimId of item.claimIds) {
-        expect(dossiers.some((dossier) => dossier.categories.some((row) => row.claims.some((claim) => claim.id === claimId)))).toBe(true);
+      for (const reference of item.evidenceRefs) {
+        const dossier = dossiers.find((candidate) => `${candidate.target.university.id}::${candidate.target.program?.id ?? ""}` === reference.targetKey);
+        expect(dossier?.categories.some((row) => row.claims.some((claim) => claim.id === reference.claimId))).toBe(true);
       }
     }
   });
@@ -174,7 +176,8 @@ describe("Phase 4 deterministic trade-offs", () => {
       expect(rows).toHaveLength(2);
       expect(rows.every((item) => item.kind === "gap" || item.kind === "warning")).toBe(true);
       expect(rows.every((item) => item.summary.trim().length > 0)).toBe(true);
-      expect(rows.every((item) => item.claimIds.length === 0)).toBe(true);
+      expect(rows.every((item) => item.evidenceRefs.length === 0)).toBe(true);
+      expect(rows.every((item) => !("claimIds" in item))).toBe(true);
     }
   });
 });

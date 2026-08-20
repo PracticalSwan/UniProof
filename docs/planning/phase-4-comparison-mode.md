@@ -144,9 +144,10 @@ Phase 4 has five score dimensions. They are application-owned semantics, not mod
 
 Rules:
 
-- Every weight is an integer from 0 through 100.
-- The five weights must sum **exactly 100**. There is no hidden normalization of malformed weights.
-- At least one weight must be positive; the exact-sum rule already guarantees this.
+- Every raw weight is an integer from 0 through 100 and is presented as a native slider value.
+- Raw weights are relative priorities and may have any positive total. The controls are never rebalanced while the user drags them.
+- At least one raw weight must be positive; the all-zero vector is invalid and must fail before Research dispatch.
+- Deterministic scoring derives one normalized vector using `normalized_i = raw_i / sum(raw_weights)`. Raw values remain unchanged for UI state and saved snapshots.
 - A priority with weight 0 is display-only for fit calculation.
 - If a positive-weight priority's backing Research category is excluded, the form is invalid. The application must not silently zero a weight or silently add a category.
 - Admissions and program structure are display-only in Phase 4 because applicant-specific admissions fit belongs to Phase 5 and shorter/longer program structure is not universally better without a preference model.
@@ -399,16 +400,20 @@ Do not infer a different reason from display text.
 
 ## 16. Weighted evidence coverage
 
-Let the user's positive priority weights sum to 100.
+Let `raw_d` be the five user-selected slider values and `rawTotal = sum(raw_d)`, where `rawTotal > 0`. Define one normalized vector:
+
+```text
+weight_d = raw_d / rawTotal
+```
 
 For target `t`:
 
 ```text
 availableWeight_t = sum(weight_d for every dimension d scored for target t)
-coverage_t = availableWeight_t / 100 * 100
+coverage_t = availableWeight_t * 100
 ```
 
-Because the denominator is explicitly 100, `coverage_t == availableWeight_t` numerically. The formula is still expressed this way so the semantic denominator remains visible.
+Coverage therefore remains a percentage even when the raw sliders do not total 100. The scoring gate uses the unrounded normalized percentage; presentation may round only for display.
 
 Coverage is evidence/score availability for the selected priorities. It is **not** model confidence, admission chance, research completeness across all seven categories, or institutional quality.
 
@@ -610,7 +615,7 @@ The live workspace must provide:
 - catalog search/filter and 2–4 selected-target chips/cards;
 - explicit university/program comparison scope and degree-level validation;
 - seven Research category controls;
-- five visible integer priority controls with a continuously visible total out of 100;
+- five visible native range sliders from 0–100, each with its current raw value shown to the right; raw totals are unrestricted except that the all-zero vector is invalid;
 - ranking/student-opinion display toggles with scoring disclaimer;
 - optional public intake/year;
 - privacy guidance explaining that applicant/private information does not belong in Compare;
@@ -827,7 +832,7 @@ Use queued `/api/research` replies in exact target order. Existing strict queue-
 - mixed university/program scope;
 - mixed bachelor/master program scope;
 - filters never silently retarget selected items;
-- weights 100 valid, 99/101 invalid, decimals/negative/>100 invalid;
+- slider bounds 0–100 and step 1; arbitrary positive raw totals valid; all-zero invalid; keyboard Home/End/Arrow operation updates the visible raw value;
 - positive weight backed by excluded category invalid;
 - same-tick double submit one batch only;
 - strict sequential request order; prove no request 2 before request 1 completes;
@@ -1009,7 +1014,7 @@ Phase 4 was implemented and re-reviewed locally in the main ChatGPT agent with z
 | --- | --- | --- |
 | Exactly 2–4 unique supported targets; homogeneous scope/degree | `lib/comparison/contracts.ts`, `lib/comparison/client-form.ts`, `components/compare/compare-form.tsx` | `tests/phase4-comparison-contracts.test.ts`, `tests/e2e/compare-form.spec.ts` |
 | Seven category include/exclude controls; ranking/opinion display-only filters | comparison contracts/form/scoring/result presentation | comparison contract tests; `compare-form.spec.ts`; `compare-evidence.spec.ts` |
-| Five visible integer weights totaling exactly 100 with category coupling | comparison contracts, form, `comparison-priority-row.tsx` | comparison contract tests; `compare-form.spec.ts` |
+| Five visible 0–100 relative sliders with positive-total validation, deterministic normalization, and category coupling | comparison contracts, form, scoring, `comparison-priority-row.tsx` | comparison contract/scoring tests; `compare-form.spec.ts`; saved-artifact compatibility tests |
 | Closed exact metric registry; strict type/unit/currency/period rules | `lib/comparison/metric-registry.ts`, `lib/comparison/scoring.ts` | `tests/phase4-comparison-scoring.test.ts`, `compare-scoring.spec.ts` |
 | Eligible evidence only; missing/unscorable evidence is not poor fit | `lib/comparison/scoring.ts` | scoring unit tests; `compare-scoring.spec.ts`; `compare-evidence.spec.ts` |
 | Weighted coverage and sparse-fit suppression | `lib/comparison/scoring.ts`, `comparison-target-card.tsx` | scoring unit tests; `compare-scoring.spec.ts` |

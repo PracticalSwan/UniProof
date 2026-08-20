@@ -58,10 +58,6 @@ export function CompareForm({
   onReset,
 }: CompareFormProps) {
   const results = React.useMemo(() => searchComparisonCatalog(state, catalog), [state, catalog]);
-  const weightTotal = comparisonPriorityOrder.reduce((sum, priority) => {
-    const raw = state.weights[priority];
-    return /^(?:0|[1-9]\d*)$/.test(raw) ? sum + Number(raw) : sum;
-  }, 0);
 
   const update = (patch: Partial<ComparisonFormState>) => onStateChange((current) => ({ ...current, ...patch }));
 
@@ -187,8 +183,9 @@ export function CompareForm({
 
       <section className="grid gap-6 lg:grid-cols-2">
         <fieldset className="rounded-lg border border-border bg-white p-4 sm:p-6" aria-describedby={fieldErrors.categories === undefined ? undefined : "compare-categories-error"}>
-          <legend className="px-1 text-lg font-semibold">Research categories</legend>
-          <p className="mb-4 text-sm text-muted-foreground">These seven categories control what each existing Research request asks for.</p>
+          <legend className="sr-only">Research categories</legend>
+          <h2 className="text-lg font-semibold">Research categories</h2>
+          <p className="mb-4 mt-2 text-sm text-muted-foreground">These seven categories control what each existing Research request asks for.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {researchModeCategoryOrder.map((category) => (
               <label key={category} className="flex min-h-8 items-center gap-2 text-sm">
@@ -211,39 +208,53 @@ export function CompareForm({
         </fieldset>
 
         <fieldset className="rounded-lg border border-border bg-white p-4 sm:p-6" aria-describedby={fieldErrors.weights === undefined ? undefined : "compare-weights-error"}>
-          <legend className="px-1 text-lg font-semibold">Comparison priorities</legend>
-          <p className="mb-4 text-sm text-muted-foreground">All five weights stay visible and must be whole numbers totaling exactly 100.</p>
-          <div className="grid gap-3">
+          <legend className="sr-only">Comparison priorities</legend>
+          <h2 className="text-lg font-semibold">Comparison priorities</h2>
+          <p className="mb-5 mt-2 text-sm text-muted-foreground">
+            Set relative importance from 0 to 100. UniProof normalizes positive values when scoring; at least one priority must be above 0.
+          </p>
+          <div className="grid gap-5">
             {comparisonPriorityOrder.map((priority) => {
               const id = `compare-weight-${priority}`;
               const errorId = `${id}-error`;
               const fieldError = fieldErrors[`weight-${priority}`];
               return (
-                <label key={priority} className="grid grid-cols-[minmax(0,1fr)_5.5rem] items-center gap-3 text-sm font-semibold" htmlFor={id}>
-                  {priorityLabels[priority]} weight
-                  <input
-                    id={id}
-                    inputMode="numeric"
-                    value={state.weights[priority]}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      onStateChange((current) => ({
-                        ...current,
-                        weights: { ...current.weights, [priority]: value },
-                      }));
-                    }}
-                    disabled={disabled}
-                    aria-invalid={fieldError === undefined ? undefined : true}
-                    aria-describedby={fieldError === undefined ? (fieldErrors.weights === undefined ? undefined : "compare-weights-error") : errorId}
-                    className="min-h-10 rounded-md border border-input bg-white px-3 py-2 text-right font-normal outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                  />
-                  {fieldError === undefined ? null : <span id={errorId} className="col-span-2 text-xs font-normal text-destructive">{fieldError}</span>}
-                </label>
+                <div key={priority} className="grid gap-2">
+                  <label htmlFor={id} className="text-sm font-semibold">{priorityLabels[priority]} weight</label>
+                  <div className="grid grid-cols-[minmax(0,1fr)_3.5rem] items-center gap-3">
+                    <input
+                      id={id}
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={state.weights[priority]}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        onStateChange((current) => ({
+                          ...current,
+                          weights: { ...current.weights, [priority]: value },
+                        }));
+                      }}
+                      disabled={disabled}
+                      aria-invalid={fieldError === undefined ? undefined : true}
+                      aria-describedby={fieldError === undefined ? (fieldErrors.weights === undefined ? undefined : "compare-weights-error") : errorId}
+                      className="h-8 w-full cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    />
+                    <span
+                      data-testid={`${id}-value`}
+                      aria-hidden="true"
+                      className="min-w-0 rounded-md border border-border bg-panel px-2 py-1 text-right text-sm font-semibold tabular-nums"
+                    >
+                      {state.weights[priority]}
+                    </span>
+                  </div>
+                  {fieldError === undefined ? null : <span id={errorId} className="text-xs font-normal text-destructive">{fieldError}</span>}
+                </div>
               );
             })}
           </div>
-          <p className={`mt-4 text-sm font-semibold ${weightTotal === 100 ? "text-primary" : "text-destructive"}`}>Weight total {weightTotal} / 100</p>
-          {fieldErrors.weights === undefined ? null : <p id="compare-weights-error" role="alert" className="mt-2 text-sm font-semibold text-destructive">{fieldErrors.weights}</p>}
+          {fieldErrors.weights === undefined ? null : <p id="compare-weights-error" role="alert" className="mt-4 text-sm font-semibold text-destructive">{fieldErrors.weights}</p>}
         </fieldset>
       </section>
 

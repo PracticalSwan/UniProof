@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import type { GuideDraft, GuideFieldErrors } from "@/lib/guide/client-form";
+import {
+  guideQualificationLevelOrder,
+  type GuideQualificationLevel,
+} from "@/lib/guide/contracts";
 import { searchResearchCatalog } from "@/lib/research/catalog/search";
 
 interface GuideProfileFormProps {
@@ -23,6 +27,15 @@ interface GuideProfileFormProps {
 }
 
 const inputClass = "h-[42px] w-full min-w-0 max-w-full rounded-md border border-input bg-white px-3 text-sm";
+
+const qualificationLevelLabels: Readonly<Record<GuideQualificationLevel, string>> = {
+  secondary: "Secondary",
+  diploma: "Diploma",
+  bachelor: "Bachelor",
+  master: "Master",
+  doctorate: "Doctorate",
+  other: "Other",
+};
 
 export function GuideProfileForm({
   draft,
@@ -143,9 +156,10 @@ export function GuideProfileForm({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label htmlFor="guide-intake" className="text-sm font-medium">
-              Intake <span className="text-muted-foreground">(optional, sent to Research)</span>
+          <div className="grid content-start gap-1.5">
+            <label htmlFor="guide-intake" className="grid text-sm font-medium sm:min-h-12 sm:content-end">
+              <span>Intake</span>
+              <span className="text-xs font-normal text-muted-foreground">Optional, sent to Research</span>
             </label>
             <Input
               id="guide-intake"
@@ -159,9 +173,10 @@ export function GuideProfileForm({
             />
             {fieldError("intake")}
           </div>
-          <div>
-            <label htmlFor="guide-year" className="text-sm font-medium">
-              Academic year <span className="text-muted-foreground">(optional, sent to Research)</span>
+          <div className="grid content-start gap-1.5">
+            <label htmlFor="guide-year" className="grid text-sm font-medium sm:min-h-12 sm:content-end">
+              <span>Academic year</span>
+              <span className="text-xs font-normal text-muted-foreground">Optional, sent to Research</span>
             </label>
             <Input
               id="guide-year"
@@ -221,8 +236,8 @@ export function GuideProfileForm({
             className={inputClass}
             autoComplete="off"
           >
-            {["secondary", "diploma", "bachelor", "master", "doctorate", "other"].map((level) => (
-              <option key={level} value={level}>{level}</option>
+            {guideQualificationLevelOrder.map((level) => (
+              <option key={level} value={level}>{qualificationLevelLabels[level]}</option>
             ))}
           </select>
         </div>
@@ -383,8 +398,8 @@ export function GuideProfileForm({
       <fieldset disabled={disabled} className="min-w-0 space-y-4">
         <legend className="text-lg font-semibold">Budget and scholarships</legend>
         <div className="grid gap-3 sm:grid-cols-3">
-          <div>
-            <label htmlFor="guide-budget-amount" className="text-sm font-medium">Amount (optional)</label>
+          <div className="grid content-start gap-1.5">
+            <label htmlFor="guide-budget-amount" className="text-sm font-medium sm:flex sm:min-h-10 sm:items-end">Amount (optional)</label>
             <Input
               id="guide-budget-amount"
               type="text"
@@ -398,8 +413,8 @@ export function GuideProfileForm({
             />
             {fieldError("budgetAmount")}
           </div>
-          <div>
-            <label htmlFor="guide-budget-currency" className="text-sm font-medium">Currency</label>
+          <div className="grid content-start gap-1.5">
+            <label htmlFor="guide-budget-currency" className="text-sm font-medium sm:flex sm:min-h-10 sm:items-end">Currency</label>
             <Input
               id="guide-budget-currency"
               value={draft.budgetCurrency}
@@ -413,8 +428,8 @@ export function GuideProfileForm({
             />
             {fieldError("budgetCurrency")}
           </div>
-          <div>
-            <label htmlFor="guide-budget-scope" className="text-sm font-medium">Scope</label>
+          <div className="grid content-start gap-1.5">
+            <label htmlFor="guide-budget-scope" className="text-sm font-medium sm:flex sm:min-h-10 sm:items-end">Scope</label>
             <select
               id="guide-budget-scope"
               value={draft.budgetScope}

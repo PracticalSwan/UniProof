@@ -323,6 +323,72 @@ describe("Phase 4 deterministic scoring", () => {
     expect(below.targets[0]).toMatchObject({ evidenceCoverage: 49, fitScore: null, fitSuppressed: true });
   });
 
+  it("normalizes relative weights for coverage and fit while remaining scale-invariant", () => {
+    const relativeWeights: ComparisonPriorityWeights = {
+      affordability: 100,
+      research: 50,
+      scholarships: 50,
+      outcomes: 0,
+      support: 0,
+    };
+    const relative = scoreComparison(submission({ weights: relativeWeights }), [
+      dossier(targetA, [
+        tuition("relative-a", 10_000),
+        { id: "relative-a-r", category: "research", property: "research opportunity available", value: true },
+      ]),
+      dossier(targetB, [
+        tuition("relative-b", 20_000),
+        { id: "relative-b-r", category: "research", property: "research opportunity available", value: false },
+      ]),
+    ]);
+    expect(relative.targets[0]!.evidenceCoverage).toBe(75);
+    expect(relative.targets[0]!.fitScore).toBe(100);
+    expect(relative.targets[1]!.fitScore).toBe(0);
+
+    const baseline = scoreComparison(submission(), [
+      dossier(targetA, [
+        tuition("scale-a", 10_000),
+        { id: "scale-a-r", category: "research", property: "research opportunity available", value: true },
+      ]),
+      dossier(targetB, [
+        tuition("scale-b", 20_000),
+        { id: "scale-b-r", category: "research", property: "research opportunity available", value: false },
+      ]),
+    ]);
+    const doubled = scoreComparison(submission({
+      weights: { affordability: 60, research: 60, scholarships: 40, outcomes: 40, support: 0 },
+    }), [
+      dossier(targetA, [
+        tuition("scale-a", 10_000),
+        { id: "scale-a-r", category: "research", property: "research opportunity available", value: true },
+      ]),
+      dossier(targetB, [
+        tuition("scale-b", 20_000),
+        { id: "scale-b-r", category: "research", property: "research opportunity available", value: false },
+      ]),
+    ]);
+    expect(doubled.targets.map(({ evidenceCoverage, fitScore, fitSuppressed }) => ({ evidenceCoverage, fitScore, fitSuppressed })))
+      .toEqual(baseline.targets.map(({ evidenceCoverage, fitScore, fitSuppressed }) => ({ evidenceCoverage, fitScore, fitSuppressed })));
+  });
+
+  it("uses unrounded normalized coverage at the 50 percent suppression boundary", () => {
+    const weights: ComparisonPriorityWeights = { affordability: 1, research: 1, scholarships: 1, outcomes: 1, support: 1 };
+    const result = scoreComparison(submission({ weights }), [
+      dossier(targetA, [
+        tuition("equal-a", 10_000),
+        { id: "equal-a-r", category: "research", property: "research opportunity available", value: true },
+        { id: "equal-a-s", category: "scholarships", property: "scholarship available", value: true },
+      ]),
+      dossier(targetB, [
+        tuition("equal-b", 20_000),
+        { id: "equal-b-r", category: "research", property: "research opportunity available", value: false },
+        { id: "equal-b-s", category: "scholarships", property: "scholarship available", value: true },
+      ]),
+    ]);
+    expect(result.targets[0]!.evidenceCoverage).toBeCloseTo(60, 10);
+    expect(result.targets[0]!.fitSuppressed).toBe(false);
+  });
+
   it("preserves immutable submission target order and never sorts by score", () => {
     const ordered = submission({ targets: [targetB, targetA, targetC] });
     const result = scoreComparison(ordered, [

@@ -12,6 +12,8 @@
 
 **Threat model:** `docs/security-threat-model.md`
 
+> **2026-08-20 update:** This historical implementation runbook records the original exact-total-100 weight UX. Current Comparison behavior is governed by `docs/planning/phase-4-comparison-mode.md` and `docs/superpowers/plans/2026-08-20-pre-phase6c-ui-comparison-cleanup.md`: five raw 0–100 relative sliders, all-zero rejection, and deterministic `raw / sum(raw)` normalization. Do not reintroduce the older exact-total constraint from the historical steps below.
+
 ## Global constraints
 
 - Baseline reviewed/pushed application commit: `9d01a57c1df8f4aa471d5313811c70f2177a5415`.

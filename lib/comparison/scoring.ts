@@ -10,6 +10,7 @@ import {
   comparisonPriorityOrder,
   comparisonSubmissionSchema,
   comparisonTargetKey,
+  normalizeComparisonPriorityWeights,
   comparisonTargetSchema,
   type ComparisonPriority,
   type ComparisonSubmission,
@@ -142,7 +143,7 @@ export const comparisonTargetScoreSchema = z.object({
       comparisonPriorityOrder.map((priority) => [priority, comparisonDimensionResultSchema]),
     ) as Record<ComparisonPriority, typeof comparisonDimensionResultSchema>,
   ),
-  evidenceCoverage: z.number().int().min(0).max(100),
+  evidenceCoverage: z.number().finite().min(0).max(100),
   fitScore: z.number().finite().min(0).max(100).nullable(),
   fitSuppressed: z.boolean(),
 }).strict();
@@ -573,19 +574,20 @@ export function scoreComparison(
     }
   }
 
+  const normalizedWeights = normalizeComparisonPriorityWeights(submission.weights);
   const targets: ComparisonTargetScore[] = resolved.map((item) => {
     const dimensions = item.dimensions as Record<ComparisonPriority, ComparisonDimensionResult>;
     const scoredPositive = comparisonPriorityOrder.filter(
-      (dimension) => submission.weights[dimension] > 0 && dimensions[dimension].state === "scored",
+      (dimension) => normalizedWeights[dimension] > 0 && dimensions[dimension].state === "scored",
     );
-    const availableWeight = scoredPositive.reduce((sum, dimension) => sum + submission.weights[dimension], 0);
-    const evidenceCoverage = availableWeight;
+    const availableWeight = scoredPositive.reduce((sum, dimension) => sum + normalizedWeights[dimension], 0);
+    const evidenceCoverage = Math.min(100, availableWeight * 100);
     let fitScore: number | null = null;
     if (scoredPositive.length >= 2 && evidenceCoverage >= 50 && availableWeight > 0) {
       const weightedTotal = scoredPositive.reduce((sum, dimension) => {
         const result = dimensions[dimension];
         return result.state === "scored"
-          ? sum + result.score * submission.weights[dimension]
+          ? sum + result.score * normalizedWeights[dimension]
           : sum;
       }, 0);
       fitScore = weightedTotal / availableWeight;

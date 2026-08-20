@@ -45,22 +45,36 @@ export const comparisonTargetSchema = z.object({
 export type ComparisonTarget = z.infer<typeof comparisonTargetSchema>;
 
 export const comparisonPriorityWeightsSchema = z.object({
-  affordability: z.number().int().min(0).max(100),
-  research: z.number().int().min(0).max(100),
-  scholarships: z.number().int().min(0).max(100),
-  outcomes: z.number().int().min(0).max(100),
-  support: z.number().int().min(0).max(100),
+  affordability: z.number().finite().int().min(0).max(100),
+  research: z.number().finite().int().min(0).max(100),
+  scholarships: z.number().finite().int().min(0).max(100),
+  outcomes: z.number().finite().int().min(0).max(100),
+  support: z.number().finite().int().min(0).max(100),
 }).strict().superRefine((weights, context) => {
   const total = comparisonPriorityOrder.reduce((sum, priority) => sum + weights[priority], 0);
-  if (total !== 100) {
+  if (total <= 0) {
     context.addIssue({
       code: "custom",
-      message: "comparison priority weights must total exactly 100",
+      message: "at least one comparison priority weight must be positive",
     });
   }
 });
 
 export type ComparisonPriorityWeights = z.infer<typeof comparisonPriorityWeightsSchema>;
+export type NormalizedComparisonPriorityWeights = Readonly<Record<ComparisonPriority, number>>;
+
+export function normalizeComparisonPriorityWeights(
+  weights: ComparisonPriorityWeights,
+): NormalizedComparisonPriorityWeights {
+  const parsed = comparisonPriorityWeightsSchema.safeParse(weights);
+  if (!parsed.success) {
+    throw new Error("Comparison priority normalization requires bounded integer weights with a positive total.");
+  }
+  const total = comparisonPriorityOrder.reduce((sum, priority) => sum + parsed.data[priority], 0);
+  return Object.freeze(Object.fromEntries(
+    comparisonPriorityOrder.map((priority) => [priority, parsed.data[priority] / total]),
+  ) as Record<ComparisonPriority, number>);
+}
 
 export const comparisonSubmissionSchema = z.object({
   targets: z.array(comparisonTargetSchema).min(2).max(4),

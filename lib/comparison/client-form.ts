@@ -138,12 +138,12 @@ function parseWeights(
     parsed[priority] = value;
   }
   if (invalid) {
-    errors.weights = "All five priorities must be whole numbers from 0 to 100 and total exactly 100.";
+    errors.weights = "All five priorities must be whole numbers from 0 to 100.";
     return undefined;
   }
   const total = comparisonPriorityOrder.reduce((sum, priority) => sum + parsed[priority], 0);
-  if (total !== 100) {
-    errors.weights = `Priority weights total ${total}. Set the five visible weights to exactly 100.`;
+  if (total <= 0) {
+    errors.weights = "Set at least one comparison priority above 0.";
     return undefined;
   }
   return parsed;

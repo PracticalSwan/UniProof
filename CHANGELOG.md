@@ -20,6 +20,7 @@ The project has not published a tagged release yet. Until the first release, com
 
 ### Changed
 
+- Replaced Comparison's exact-total-100 numeric priority inputs with keyboard-accessible 0–100 relative sliders, deterministic positive-total normalization, all-zero fail-closed validation, and normalized evidence coverage while preserving version-1 saved snapshots. Also aligned Guide applicant-profile paired fields, title-cased qualification labels without changing canonical lowercase values, and documented the exact bounded 30-university/45-program catalog in README.
 - Reclassified the `shadcn` CLI from a production dependency to an exact development dependency because runtime application code does not import it.
 - Simplified Comparison result/provenance contracts by removing obsolete flat trade-off claim IDs and an impossible nullable result score state.
 - Expanded README, requirements, design, security, threat-model, roadmap, and Phase 5/6 runbooks to reflect the reviewed/browser-verified Phase 0–6B local boundary while keeping Phase 6C deployment/live-service scope explicit.

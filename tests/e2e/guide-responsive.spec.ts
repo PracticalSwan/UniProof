@@ -59,6 +59,32 @@ async function renderStressGuide(page: import("@playwright/test").Page, research
   await expect(page.getByText("Assessment complete", { exact: false })).toBeVisible({ timeout: 15_000 });
 }
 
+test("Guide applicant paired fields align on desktop and stack cleanly on narrow screens", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openGuide(page);
+  const desktopBoxes = await Promise.all([
+    page.locator("#guide-intake").boundingBox(),
+    page.locator("#guide-year").boundingBox(),
+    page.locator("#guide-budget-amount").boundingBox(),
+    page.locator("#guide-budget-currency").boundingBox(),
+    page.locator("#guide-budget-scope").boundingBox(),
+  ]);
+  for (const box of desktopBoxes) expect(box).not.toBeNull();
+  expect(Math.abs(desktopBoxes[0]!.y - desktopBoxes[1]!.y)).toBeLessThanOrEqual(1);
+  expect(Math.max(...desktopBoxes.slice(2).map((box) => box!.y)) - Math.min(...desktopBoxes.slice(2).map((box) => box!.y))).toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 320, height: 740 });
+  const narrowIntake = await page.locator("#guide-intake").boundingBox();
+  const narrowYear = await page.locator("#guide-year").boundingBox();
+  const narrowAmount = await page.locator("#guide-budget-amount").boundingBox();
+  const narrowCurrency = await page.locator("#guide-budget-currency").boundingBox();
+  const narrowScope = await page.locator("#guide-budget-scope").boundingBox();
+  for (const box of [narrowIntake, narrowYear, narrowAmount, narrowCurrency, narrowScope]) expect(box).not.toBeNull();
+  expect(narrowYear!.y).toBeGreaterThan(narrowIntake!.y);
+  expect(narrowCurrency!.y).toBeGreaterThan(narrowAmount!.y);
+  expect(narrowScope!.y).toBeGreaterThan(narrowCurrency!.y);
+});
+
 for (const viewport of [
   { width: 320, height: 740 },
   { width: 375, height: 812 },

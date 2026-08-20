@@ -5,6 +5,7 @@ import {
   selectDefaultComparisonTargets,
   selectFourComparisonTargets,
   selectThreeComparisonTargets,
+  setComparisonWeight,
   submitComparison,
 } from "@/tests/e2e/helpers/compare-browser";
 import {
@@ -283,8 +284,8 @@ test.describe("Phase 4 Compare lifecycle and ownership", () => {
 
     await page.getByRole("button", { name: "Clear result" }).click();
     await page.getByLabel("Academic year (public context only, optional)").fill("2027-28");
-    await page.getByLabel("Affordability weight").fill("31");
-    await page.getByLabel("Research weight").fill("29");
+    await setComparisonWeight(page, "Affordability", 31);
+    await setComparisonWeight(page, "Research", 29);
     research.enqueueJson(mitResponse!);
     research.enqueueJson(stanfordResponse!);
     await submitComparison(page);

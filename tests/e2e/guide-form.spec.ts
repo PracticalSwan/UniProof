@@ -34,6 +34,30 @@ test.describe("Guide form", () => {
     await expect(select).toHaveValue("program-tu-delft-computer-science-msc");
   });
 
+  test("shows title-cased qualification labels while preserving canonical lowercase values", async ({ page }) => {
+    await openGuide(page);
+    const level = page.getByLabel("Level");
+    await expect(level.locator("option")).toHaveText([
+      "Secondary",
+      "Diploma",
+      "Bachelor",
+      "Master",
+      "Doctorate",
+      "Other",
+    ]);
+    await expect.poll(() => level.locator("option").evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value))).toEqual([
+      "secondary",
+      "diploma",
+      "bachelor",
+      "master",
+      "doctorate",
+      "other",
+    ]);
+    await expect(level).toHaveValue("bachelor");
+    await level.selectOption("master");
+    await expect(level).toHaveValue("master");
+  });
+
   test("program selection populates target", async ({ page }) => {
     await openGuide(page);
     await selectGuideProgram(page);

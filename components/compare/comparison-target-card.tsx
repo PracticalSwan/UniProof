@@ -15,6 +15,11 @@ interface ComparisonTargetCardProps {
   onEvidence: (dossier: ResearchDossier, claimId: string, trigger: HTMLButtonElement) => void;
 }
 
+function formatEvidenceCoverage(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
 function contextualClaims(dossier: ResearchDossier, submission: ComparisonSubmission): PublicResearchClaim[] {
   if (!submission.showRankingEvidence && !submission.showAnecdotalEvidence) return [];
   const sources = new Map(dossier.sources.map((source) => [source.id, source]));
@@ -63,7 +68,7 @@ export function ComparisonTargetCard({
           <span className="text-sm">/100</span>
         </div>
       )}
-      <p className="mt-2 text-xs font-semibold text-muted-foreground">Evidence coverage {targetScore.evidenceCoverage}%</p>
+      <p className="mt-2 text-xs font-semibold text-muted-foreground">Evidence coverage {formatEvidenceCoverage(targetScore.evidenceCoverage)}%</p>
 
       <dl className="mt-5">
         {comparisonPriorityOrder.map((dimension) => (

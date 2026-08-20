@@ -31,7 +31,7 @@ The system shall:
 - Reuse the validated Research Mode dossier boundary for every selected target and shall not accept caller-supplied dossier data through a new comparison API.
 - Execute target research sequentially, not through browser fan-out, with one comparison-owned cancellation boundary and immutable request ownership.
 - Let users include or exclude the seven canonical Research categories. Rankings and student opinions shall be represented as explicit evidence-display filters because the current evidence model treats them as source/evidence classes rather than canonical categories.
-- Let users choose visible integer priority weights for affordability, research opportunities, scholarships, outcomes, and international-student support; the five weights shall sum exactly to 100 and shall never be normalized silently.
+- Let users choose five visible integer relative priority weights from 0–100 for affordability, research opportunities, scholarships, outcomes, and international-student support. Raw slider values do not need to total 100; at least one must be positive, and deterministic scoring shall normalize them as `raw_i / sum(raw_weights)`.
 - Use an application-owned closed metric registry over exact normalized claim-property aliases and compatible typed scalar values. The system shall not fuzzy-match properties, parse numeric-looking strings, convert currencies/units, infer effective periods from retrieval time, or choose a conflict winner for scoring.
 - Allow only verified, corroborated, or university-reported evidence from at least one non-ranking/non-anecdotal source to contribute to numeric fit. Conflicting, outdated, inferred, anecdotal, and ranking-only evidence shall remain visible when applicable but shall not contribute to Phase 4 fit.
 - Keep missing or unscorable evidence separate from poor fit. Missing dimensions shall reduce weighted evidence coverage instead of contributing a zero score.
@@ -39,7 +39,7 @@ The system shall:
 - Produce a transparent user-priority compatibility score within the selected comparison set rather than an objective university ranking, winner label, prestige score, or admission probability.
 - Preserve result-card order by immutable user selection order rather than automatically sorting universities/programs by fit.
 - Generate material trade-offs and evidence-gap explanations deterministically from validated comparison facts, with exact target-scoped claim references for factual statements across independent dossiers and no additional AI scoring/explanation call.
-- Keep comparison weights, display filters, validated dossiers, and results in browser memory only for Phase 4; they shall not be persisted in Web Storage, IndexedDB, cookies, URL state, or a database.
+- Keep live Comparison working state out of Web Storage, IndexedDB, cookies, and URL state. Phase 6A may persist an explicit signed-in private Comparison snapshot, including the raw relative weights, only through the versioned user-scoped saved-artifact boundary.
 - Collect no applicant profile or other private personal information in Compare; optional intake/academic-year fields are public research context only.
 
 Detailed Phase 4 behavior, formulas, edge cases, security controls, and acceptance gates are defined in `docs/planning/phase-4-comparison-mode.md`.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { comparisonSubmissionSchema, freezeComparisonSubmission } from "@/lib/comparison/contracts";
+import { comparisonSubmissionSchema, freezeComparisonSubmission, type ComparisonPriorityWeights } from "@/lib/comparison/contracts";
 import { scoreComparison } from "@/lib/comparison/scoring";
 import { buildComparisonTradeoffs } from "@/lib/comparison/tradeoffs";
 import { finalizeGuideResult } from "@/lib/guide/client-state";
@@ -67,7 +67,7 @@ function guideResult() {
   return result.result;
 }
 
-function comparisonResult() {
+function comparisonResult(weights: ComparisonPriorityWeights = { affordability: 30, research: 30, scholarships: 20, outcomes: 20, support: 0 }) {
   const targetA = {
     universityId: persistenceComparisonTargets[0].university.id,
     programId: persistenceComparisonTargets[0].program.id,
@@ -79,7 +79,7 @@ function comparisonResult() {
   const submission = freezeComparisonSubmission(comparisonSubmissionSchema.parse({
     targets: [targetA, targetB],
     categories: ["tuition", "scholarships", "research", "outcomes", "support"],
-    weights: { affordability: 30, research: 30, scholarships: 20, outcomes: 20, support: 0 },
+    weights,
     showRankingEvidence: false,
     showAnecdotalEvidence: false,
   }));
@@ -294,6 +294,25 @@ describe("saved artifact runtime validation", () => {
     const refs = validation.artifact.payload.tradeoffs.flatMap((item) => item.evidenceRefs);
     expect(refs).toContainEqual({ targetKey: `${result.outcomes[0]!.target.universityId}::${result.outcomes[0]!.target.programId}`, claimId: "same-id" });
     expect(refs).toContainEqual({ targetKey: `${result.outcomes[1]!.target.universityId}::${result.outcomes[1]!.target.programId}`, claimId: "same-id" });
+  });
+
+  it("keeps version-1 Comparison snapshots compatible with legacy total-100 and new relative raw weights", () => {
+    const cases: ComparisonPriorityWeights[] = [
+      { affordability: 30, research: 30, scholarships: 20, outcomes: 20, support: 0 },
+      { affordability: 100, research: 50, scholarships: 50, outcomes: 0, support: 0 },
+    ];
+
+    for (const weights of cases) {
+      const result = comparisonResult(weights);
+      const validation = validateSavedArtifact({
+        kind: "comparison",
+        schemaVersion: 1,
+        payload: result,
+      }, researchCatalog);
+      expect(validation.ok).toBe(true);
+      if (!validation.ok || validation.artifact.kind !== "comparison") continue;
+      expect(validation.artifact.payload.submission.weights).toEqual(weights);
+    }
   });
 
   it("rejects reordered comparison outcomes as internally invalid", () => {

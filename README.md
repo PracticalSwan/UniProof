@@ -61,9 +61,42 @@ See [`docs/design.md`](docs/design.md), [`docs/security.md`](docs/security.md), 
 
 ## Supported catalog
 
-The checked-in MVP catalog contains 30 universities and 45 computing programs across Belgium, Canada, Denmark, Finland, Germany, Italy, the Netherlands, Sweden, Thailand, the United Kingdom, and the United States. Research and downstream modes operate on supported catalog identity rather than arbitrary user-supplied university URLs.
+The checked-in MVP catalog contains **30 universities and 45 computing programs across 11 country codes** (`BE`, `CA`, `DE`, `DK`, `FI`, `GB`, `IT`, `NL`, `SE`, `TH`, `US`). Research and downstream modes operate on supported catalog identity rather than arbitrary user-supplied university URLs. Coverage is deliberately bounded; UniProof does **not** claim global university coverage.
 
-Coverage remains deliberately bounded to this checked-in catalog; arbitrary/global university ingestion is outside the current MVP.
+| Country | University | Supported program(s) |
+| --- | --- | --- |
+| BE | KU Leuven | Master of Artificial Intelligence |
+| CA | McGill University | B.Sc. Major in Computer Science; M.Sc. Computer Science (Non-Thesis) |
+| CA | University of Alberta | Master of Science (Course-Based) in Computing Science, Multimedia |
+| CA | University of British Columbia | Computer Science Major (BSc); MSc Computer Science |
+| CA | University of Toronto | Computer Science Admission Category (St. George); Applied Computing MScAC — Artificial Intelligence Concentration |
+| CA | University of Waterloo | Bachelor of Computer Science; Master of Mathematics (Computer Science) |
+| DE | RWTH Aachen University | Data Science M.Sc.; Human-Centered Intelligent Systems M.Sc. |
+| DE | Technical University of Munich | Informatics M.Sc. |
+| DK | Technical University of Denmark | Master of Science in Engineering (Computer Science and Engineering) |
+| FI | Aalto University | Machine Learning, Data Science and Artificial Intelligence, Master of Science (Technology) |
+| GB | Imperial College London | Computing BEng |
+| GB | The University of Edinburgh | Artificial Intelligence BSc (Hons); Artificial Intelligence MSc |
+| GB | University College London | Computer Science BSc |
+| IT | Politecnico di Milano | Computer Science and Engineering |
+| NL | Delft University of Technology | MSc Computer Science |
+| NL | University of Amsterdam | MSc Artificial Intelligence |
+| SE | KTH Royal Institute of Technology | MSc Computer Science |
+| TH | Chulalongkorn University | Bachelor of Engineering: Computer Engineering (CP); Master of Science Program in Computer Science and Information Technology |
+| TH | King Mongkut's University of Technology Thonburi | Bachelor of Science in Computer Science (English Program); Master of Science in Computer Science |
+| TH | Mahidol University | Master of Science in Computer Science |
+| US | Carnegie Mellon University | Bachelor of Science in Artificial Intelligence; Bachelor of Science in Computer Science |
+| US | Cornell University | Computer Science, B.S. (Engineering); Computer Science, M.Eng. |
+| US | Georgia Institute of Technology | Bachelor of Science in Computer Science |
+| US | Massachusetts Institute of Technology | Bachelor of Science in Artificial Intelligence and Decision Making (Course 6-4); Bachelor of Science in Computer Science and Engineering (Course 6-3) |
+| US | Stanford University | Computer Science Bachelor's Program |
+| US | University of California, Berkeley | Computer Science |
+| US | University of California San Diego | B.S. Artificial Intelligence; B.S. Computer Science; M.S. Computer Science |
+| US | University of Illinois Urbana-Champaign | B.S. in Computer Science; Master of Computer Science in Urbana-Champaign |
+| US | University of Michigan–Ann Arbor | Computer Science Major (Engineering); Master's in Computer Science and Engineering |
+| US | University of Washington, Seattle | B.S. Computer Science (Seattle) |
+
+`lib/research/catalog/data.ts` is the canonical catalog source; this table should be updated with it whenever catalog coverage changes.
 
 ## Tech stack
 

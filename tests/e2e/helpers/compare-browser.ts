@@ -45,6 +45,18 @@ export async function submitComparison(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Compare", exact: true }).click();
 }
 
+export async function setComparisonWeight(page: Page, priorityLabel: string, value: number): Promise<void> {
+  const slider = page.getByLabel(`${priorityLabel} weight`);
+  await slider.evaluate((element, nextValue) => {
+    const input = element as HTMLInputElement;
+    const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+    if (valueSetter === undefined) throw new Error("Range input value setter is unavailable.");
+    valueSetter.call(input, String(nextValue));
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }, value);
+}
+
 export function expectComparisonRequestShape(body: unknown): asserts body is Record<string, unknown> {
   expect(body).toBeTruthy();
   expect(typeof body).toBe("object");

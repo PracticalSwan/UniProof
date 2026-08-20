@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   comparisonPriorityOrder,
+  comparisonPriorityWeightsSchema,
   comparisonSubmissionSchema,
   comparisonTargetKey,
+  normalizeComparisonPriorityWeights,
 } from "@/lib/comparison/contracts";
 import {
   createInitialComparisonFormState,
@@ -72,7 +74,7 @@ describe("Phase 4 comparison contracts", () => {
     expect(validateComparisonForm(state, researchCatalog).submission?.targets).toEqual([bachelorA, bachelorC]);
   });
 
-  it("requires five bounded integer weights to total exactly 100 without normalization", () => {
+  it("accepts five bounded integer relative weights with any positive total", () => {
     const valid = validateComparisonForm(form(), researchCatalog);
     expect(valid.submission?.weights).toEqual({
       affordability: 30,
@@ -84,8 +86,22 @@ describe("Phase 4 comparison contracts", () => {
     expect(Object.keys(valid.submission?.weights ?? {})).toEqual([...comparisonPriorityOrder]);
 
     for (const weights of [
-      { affordability: "29", research: "30", scholarships: "20", outcomes: "20", support: "0" },
-      { affordability: "31", research: "30", scholarships: "20", outcomes: "20", support: "0" },
+      { affordability: "100", research: "100", scholarships: "100", outcomes: "100", support: "100" },
+      { affordability: "100", research: "50", scholarships: "50", outcomes: "0", support: "0" },
+      { affordability: "1", research: "0", scholarships: "0", outcomes: "0", support: "0" },
+    ]) {
+      expect(validateComparisonForm(form({ weights }), researchCatalog).submission?.weights).toEqual(
+        Object.fromEntries(Object.entries(weights).map(([key, value]) => [key, Number(value)])),
+      );
+    }
+  });
+
+  it("rejects an all-zero relative-weight vector and malformed or non-finite weights", () => {
+    expect(validateComparisonForm(form({
+      weights: { affordability: "0", research: "0", scholarships: "0", outcomes: "0", support: "0" },
+    }), researchCatalog).fieldErrors.weights).toMatch(/at least one/i);
+
+    for (const weights of [
       { affordability: "-1", research: "61", scholarships: "20", outcomes: "20", support: "0" },
       { affordability: "30.5", research: "29.5", scholarships: "20", outcomes: "20", support: "0" },
       { affordability: "NaN", research: "60", scholarships: "20", outcomes: "20", support: "0" },
@@ -94,6 +110,50 @@ describe("Phase 4 comparison contracts", () => {
     ]) {
       expect(validateComparisonForm(form({ weights }), researchCatalog).fieldErrors.weights).toBeDefined();
     }
+
+    for (const affordability of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1, 101, 1.5]) {
+      expect(comparisonPriorityWeightsSchema.safeParse({
+        affordability,
+        research: 30,
+        scholarships: 20,
+        outcomes: 20,
+        support: 0,
+      }).success).toBe(false);
+    }
+  });
+
+  it("normalizes relative weights deterministically without mutating raw values", () => {
+    const equalRaw = { affordability: 100, research: 100, scholarships: 100, outcomes: 100, support: 100 };
+    expect(normalizeComparisonPriorityWeights(equalRaw)).toEqual({
+      affordability: 0.2,
+      research: 0.2,
+      scholarships: 0.2,
+      outcomes: 0.2,
+      support: 0.2,
+    });
+    expect(equalRaw).toEqual({ affordability: 100, research: 100, scholarships: 100, outcomes: 100, support: 100 });
+
+    expect(normalizeComparisonPriorityWeights({
+      affordability: 100,
+      research: 50,
+      scholarships: 50,
+      outcomes: 0,
+      support: 0,
+    })).toEqual({
+      affordability: 0.5,
+      research: 0.25,
+      scholarships: 0.25,
+      outcomes: 0,
+      support: 0,
+    });
+
+    expect(() => normalizeComparisonPriorityWeights({
+      affordability: 0,
+      research: 0,
+      scholarships: 0,
+      outcomes: 0,
+      support: 0,
+    })).toThrow(/positive/i);
   });
 
   it("requires each positive-weight dimension's backing category but permits category exclusion at weight zero", () => {

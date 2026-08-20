@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { comparisonResultSchema } from "@/lib/comparison/client-state";
-import { comparisonTargetKey } from "@/lib/comparison/contracts";
+import { comparisonTargetKey, normalizeComparisonPriorityWeights } from "@/lib/comparison/contracts";
 import { bindCatalogOwnedResearchTarget } from "@/lib/research/catalog/presentation";
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import {
@@ -301,6 +301,7 @@ function validateComparisonArtifact(
     return { ok: false, code: "snapshot-invalid" };
   }
 
+  const normalizedWeights = normalizeComparisonPriorityWeights(payload.submission.weights);
   for (const target of payload.score.targets) {
     const key = comparisonTargetKey(target.target);
     if (target.dossier !== null && !sameJson(target.dossier, dossierByKey.get(key) ?? null)) {
@@ -310,7 +311,7 @@ function validateComparisonArtifact(
     let coveredWeight = 0;
     for (const [dimension, outcome] of Object.entries(target.dimensions)) {
       if (outcome.state !== "scored") continue;
-      coveredWeight += payload.submission.weights[dimension as keyof typeof payload.submission.weights];
+      coveredWeight += normalizedWeights[dimension as keyof typeof normalizedWeights] * 100;
       const dossier = dossierByKey.get(key);
       const claims = dossier === undefined ? new Set<string>() : researchClaimIds(dossier);
       if (outcome.claimIds.some((claimId) => !claims.has(claimId))) {
@@ -324,11 +325,12 @@ function validateComparisonArtifact(
         return { ok: false, code: "snapshot-invalid" };
       }
     }
-    if (target.evidenceCoverage !== coveredWeight) {
+    const expectedCoverage = Math.min(100, coveredWeight);
+    if (Math.abs(target.evidenceCoverage - expectedCoverage) > Number.EPSILON * 100) {
       return { ok: false, code: "snapshot-invalid" };
     }
     const scoredCount = Object.values(target.dimensions).filter((item) => item.state === "scored").length;
-    const shouldSuppress = scoredCount < 2 || coveredWeight < 50;
+    const shouldSuppress = scoredCount < 2 || expectedCoverage < 50;
     if (target.fitSuppressed !== shouldSuppress || (target.fitScore === null) !== shouldSuppress) {
       return { ok: false, code: "snapshot-invalid" };
     }

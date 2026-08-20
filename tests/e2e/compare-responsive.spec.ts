@@ -2,6 +2,7 @@ import { expect, expectNoHorizontalOverflow, test } from "@/tests/e2e/helpers/re
 import {
   openCompare,
   selectFourComparisonTargets,
+  setComparisonWeight,
   submitComparison,
 } from "@/tests/e2e/helpers/compare-browser";
 import {
@@ -134,8 +135,8 @@ for (const viewport of [
     for (const response of stressResponses) research.enqueueJson(response);
     await openCompare(page);
     await selectFourComparisonTargets(page);
-    await page.getByLabel("Support weight").fill("1");
-    await page.getByLabel("Outcomes weight").fill("19");
+    await setComparisonWeight(page, "Support", 1);
+    await setComparisonWeight(page, "Outcomes", 19);
     await page.getByLabel("Show ranking-derived contextual evidence (display only; never scored)").check();
     await submitComparison(page);
 

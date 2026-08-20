@@ -5,6 +5,7 @@ import {
   expectComparisonRequestShape,
   openCompare,
   selectDefaultComparisonTargets,
+  setComparisonWeight,
   submitComparison,
 } from "@/tests/e2e/helpers/compare-browser";
 import { defaultComparisonBrowserResponses } from "@/tests/fixtures/comparison-browser";
@@ -16,14 +17,31 @@ test.describe("Phase 4 Compare form", () => {
     await expect(page.getByText(/Example A|Example B|Example C/)).toHaveCount(0);
     await expect(page.getByLabel("Search supported universities and programs")).toBeVisible();
     await expect(page.getByRole("group", { name: "Selected comparison targets" })).toBeVisible();
-    await expect(page.getByRole("group", { name: "Research categories" })).toBeVisible();
-    await expect(page.getByRole("group", { name: "Comparison priorities" })).toBeVisible();
-    await expect(page.getByText("Weight total 100 / 100")).toBeVisible();
-    await expect(page.getByLabel("Affordability weight")).toHaveValue("30");
-    await expect(page.getByLabel("Research weight")).toHaveValue("30");
-    await expect(page.getByLabel("Scholarships weight")).toHaveValue("20");
-    await expect(page.getByLabel("Outcomes weight")).toHaveValue("20");
-    await expect(page.getByLabel("Support weight")).toHaveValue("0");
+    const categories = page.getByRole("group", { name: "Research categories" });
+    const priorities = page.getByRole("group", { name: "Comparison priorities" });
+    await expect(categories).toBeVisible();
+    await expect(priorities).toBeVisible();
+    await expect(categories.getByRole("heading", { level: 2, name: "Research categories" })).toBeVisible();
+    await expect(priorities.getByRole("heading", { level: 2, name: "Comparison priorities" })).toBeVisible();
+    await expect(page.getByText(/relative importance/i)).toBeVisible();
+    await expect(page.getByText(/total exactly 100|Weight total 100 \/ 100/)).toHaveCount(0);
+
+    const expected = {
+      affordability: "30",
+      research: "30",
+      scholarships: "20",
+      outcomes: "20",
+      support: "0",
+    } as const;
+    for (const [priority, value] of Object.entries(expected)) {
+      const slider = page.locator(`#compare-weight-${priority}`);
+      await expect(slider).toHaveAttribute("type", "range");
+      await expect(slider).toHaveAttribute("min", "0");
+      await expect(slider).toHaveAttribute("max", "100");
+      await expect(slider).toHaveAttribute("step", "1");
+      await expect(slider).toHaveValue(value);
+      await expect(page.getByTestId(`compare-weight-${priority}-value`)).toHaveText(value);
+    }
   });
 
   test("finds expanded Canada and EU targets through the bounded result list", async ({ page }) => {
@@ -42,7 +60,7 @@ test.describe("Phase 4 Compare form", () => {
     await expect(results.getByRole("button", { name: /RWTH Aachen UniversityUniversity target/ })).toBeVisible();
   });
 
-  test("validates target count and invalid weights before any Research dispatch", async ({ page, research }) => {
+  test("validates target count and rejects an all-zero priority vector before any Research dispatch", async ({ page, research }) => {
     await page.goto("/compare");
     await page.getByRole("button", { name: "Compare", exact: true }).click();
     await expect(page.getByText("Select exactly two to four unique supported targets.")).toBeVisible();
@@ -54,10 +72,39 @@ test.describe("Phase 4 Compare form", () => {
     expect(research.requests).toHaveLength(0);
     await page.getByRole("button", { name: "Reset form" }).click();
 
-    await page.getByLabel("Affordability weight").fill("29");
+    await selectDefaultComparisonTargets(page);
+    for (const priority of ["Affordability", "Research", "Scholarships", "Outcomes", "Support"]) {
+      await setComparisonWeight(page, priority, 0);
+    }
     await page.getByRole("button", { name: "Compare", exact: true }).click();
-    await expect(page.getByText(/Priority weights total 99/)).toBeVisible();
+    await expect(page.getByText("Set at least one comparison priority above 0.")).toBeVisible();
     expect(research.requests).toHaveLength(0);
+  });
+
+  test("allows arbitrary positive relative totals and supports native slider keyboard controls", async ({ page, research }) => {
+    const [mit, stanford] = defaultComparisonBrowserResponses();
+    research.enqueueJson(mit!);
+    research.enqueueJson(stanford!);
+    await openCompare(page);
+    await selectDefaultComparisonTargets(page);
+
+    const affordability = page.getByLabel("Affordability weight");
+    await affordability.focus();
+    await page.keyboard.press("Home");
+    await expect(affordability).toHaveValue("0");
+    await expect(page.getByTestId("compare-weight-affordability-value")).toHaveText("0");
+    await page.keyboard.press("ArrowRight");
+    await expect(affordability).toHaveValue("1");
+    await page.keyboard.press("End");
+    await expect(affordability).toHaveValue("100");
+
+    await setComparisonWeight(page, "Research", 50);
+    await setComparisonWeight(page, "Scholarships", 50);
+    await setComparisonWeight(page, "Outcomes", 0);
+    await setComparisonWeight(page, "Support", 0);
+    await submitComparison(page);
+    await expect(page.getByRole("heading", { level: 2, name: "Comparison results" })).toBeVisible();
+    expect(research.requests).toHaveLength(2);
   });
 
   test("selects exactly two, three, or four unique programs and prevents a fifth selection", async ({ page, research }) => {
@@ -114,21 +161,13 @@ test.describe("Phase 4 Compare form", () => {
     expect(research.requests).toHaveLength(2);
   });
 
-  test("rejects unsafe weight shapes/category coupling and keeps display toggles out of Research requests", async ({ page, research }) => {
+  test("rejects positive-weight/category mismatch and keeps display toggles out of Research requests", async ({ page, research }) => {
     await openCompare(page);
     await selectDefaultComparisonTargets(page);
     const affordability = page.getByLabel("Affordability weight");
-    for (const value of ["31", "-1", "30.5", "101"]) {
-      await affordability.fill(value);
-      await submitComparison(page);
-      await expect(page.getByRole("alert").filter({ hasText: /priorities|Priority weights|whole numbers/i }).first()).toBeVisible();
-      if (value === "-1" || value === "30.5" || value === "101") {
-        await expect(affordability).toHaveAttribute("aria-invalid", "true");
-        await expect(page.getByLabel("Research weight")).not.toHaveAttribute("aria-invalid", "true");
-      }
-      expect(research.requests).toHaveLength(0);
-    }
-    await affordability.fill("30");
+    await expect(affordability).toHaveAttribute("type", "range");
+    await expect(affordability).toHaveAttribute("min", "0");
+    await expect(affordability).toHaveAttribute("max", "100");
     await page.getByRole("checkbox", { name: "Tuition" }).uncheck();
     await submitComparison(page);
     await expect(page.getByText("Every positive priority needs its backing Research category selected, or set that priority to 0.")).toBeVisible();

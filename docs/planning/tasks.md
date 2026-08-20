@@ -314,7 +314,7 @@ This side phase expands the checked-in supported catalog without changing the Re
 - [x] Prove Phase 6A saved-artifact version-1 backward compatibility for original targets plus new-country Research/Comparison/Guide targets; add no migration/version bump/auto-refresh/re-score/reassess path for additive catalog rows.
 - [x] Run the complete current focused/full Vitest, type, lint, build, audit, dev/built Playwright, repeated lifecycle, local persistence/Auth where applicable, security/privacy, secret/client-boundary, generated-residue, protected-screenshot, workspace/diff, and all landed Phase 6B verification gates.
 - [x] Perform a two-pass defect-first source/spec then code/security/privacy review, fix verified findings regression-first, and synchronize README/requirements/design/data-sources/security/threat-model/tasks/changelog/memory only from observed final behavior and counts.
-- [ ] Repository commit/push is now separately authorized by the owner and is the remaining publication step for this reviewed candidate. Hosted Supabase/Vercel/WAF/Devpost mutation, deployment, and live Research provider smoke remain outside this side phase and deferred to Phase 6C.
+- [x] Repository publication completed under the owner's explicit 2026-08-20 authorization: the reviewed Phase 6B + UCE candidate was pushed as `11b4c4e`, the first clean-checkout CI run exposed one screenshot-presence test defect, and the regression fix was pushed as `b0cb34d`; GitHub Actions run `32326520878` then completed green for both application and local-Supabase jobs. Hosted Supabase/Vercel/WAF/Devpost mutation, deployment, and live Research provider smoke remain outside this side phase and deferred to Phase 6C.
 
 ## Scope Control
 

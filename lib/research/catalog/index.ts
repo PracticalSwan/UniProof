@@ -1,4 +1,10 @@
 export { researchCatalog } from "./data";
+export {
+  researchCatalogCountryCodes,
+  researchCatalogCountryCodeSchema,
+  researchCatalogCountryLabels,
+} from "./countries";
+export type { ResearchCatalogCountryCode } from "./countries";
 export { bindCatalogOwnedResearchTarget } from "./presentation";
 export { searchResearchCatalog } from "./search";
 export {

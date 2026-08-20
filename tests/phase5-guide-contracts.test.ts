@@ -13,6 +13,7 @@ import {
   validateGuideProfileDraft,
 } from "@/lib/guide/client-form";
 import { researchCatalog } from "@/lib/research/catalog/data";
+import { guideCatalogTarget } from "@/tests/helpers/catalog-targets";
 
 const validProfile: GuideApplicantProfile = {
   citizenship: "Malaysia",
@@ -257,8 +258,7 @@ describe("formatLocalAssessmentDate", () => {
 
 describe("guide draft validation", () => {
   function validDraft() {
-    const university = researchCatalog.universities[0]!;
-    const program = researchCatalog.programs.find((item) => item.universityId === university.id)!;
+    const { university, program } = guideCatalogTarget;
     return {
       ...createDefaultGuideDraft(),
       universityId: university.id,

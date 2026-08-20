@@ -6,9 +6,10 @@ import { defineConfig } from "@playwright/test";
 import {
   phase3dDevHarnessRootFiles,
   resolvePhase3dDevHarness,
+  resolvePlaywrightPort,
 } from "./tests/e2e/helpers/playwright-harness";
 
-const port = 3102;
+const port = resolvePlaywrightPort(process.env.UNIPROOF_E2E_PORT);
 const productionServer = process.env.UNIPROOF_E2E_PRODUCTION === "1";
 const inheritedDevHarnessId = process.env.UNIPROOF_E2E_DEV_HARNESS_ID;
 const devHarness = productionServer

@@ -19,7 +19,12 @@ import {
 } from "@/lib/research/mode/public-contracts";
 
 export type GuideTransportError = Readonly<{
-  code: PublicResearchTransportError["code"] | "network-error" | "invalid-response";
+  code:
+    | PublicResearchTransportError["code"]
+    | "deployment-rate-limit"
+    | "deployment-timeout"
+    | "network-error"
+    | "invalid-response";
   message: string;
 }>;
 

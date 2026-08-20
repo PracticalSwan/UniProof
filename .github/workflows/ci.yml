@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.19.0'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Unit and contract tests
+        run: npx vitest run
+
+      - name: TypeScript
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npx eslint .
+
+      - name: Production build
+        run: npm run build
+
+      - name: Dependency audit
+        run: npm audit --omit=dev
+
+      - name: Workspace contract
+        shell: pwsh
+        run: ./scripts/verify-workspace.ps1
+
+      - name: Release contract
+        run: node scripts/verify-release-config.mjs --profile=ci
+
+      - name: Anonymous browser gates
+        run: npx playwright test tests/e2e/research-*.spec.ts tests/e2e/compare-*.spec.ts tests/e2e/guide-*.spec.ts --retries=0
+
+      - name: Built anonymous browser gates
+        env:
+          UNIPROOF_E2E_PRODUCTION: '1'
+        run: npx playwright test tests/e2e/research-*.spec.ts tests/e2e/compare-*.spec.ts tests/e2e/guide-*.spec.ts --retries=0
+
+  local-supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22.19.0'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3.0.0
+        with:
+          version: 2.114.0
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Reset local database
+        run: supabase db reset
+
+      - name: Lint local database
+        run: supabase db lint
+
+      - name: Local database advisors
+        run: supabase db advisors --local
+
+      - name: pgTAP
+        run: supabase test db
+
+      - name: Auth and Saved browser gates
+        run: node scripts/run-playwright-local-supabase.mjs tests/e2e/auth-saved.spec.ts --retries=0
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup

@@ -129,7 +129,7 @@ test.describe("Research cancellation and request ownership", () => {
     await pending.entered;
 
     await page.getByRole("link", { name: "Compare", exact: true }).click();
-    await expect(page).toHaveURL(/\/compare$/);
+    await expect(page).toHaveURL(/\/compare$/, { timeout: 15_000 });
     pending.release();
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 

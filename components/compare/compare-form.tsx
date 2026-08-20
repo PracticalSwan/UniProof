@@ -3,6 +3,10 @@
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  researchCatalogCountryCodes,
+  researchCatalogCountryLabels,
+} from "@/lib/research/catalog/countries";
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import { categoryLabel } from "@/lib/research/mode/format";
 import { researchModeCategoryOrder, type ResearchModeCategory } from "@/lib/research/mode/public-contracts";
@@ -94,14 +98,20 @@ export function CompareForm({
             Country filter
             <select
               value={state.countryCode ?? ""}
-              onChange={(event) => update({ countryCode: event.target.value === "" ? undefined : event.target.value as "US" | "GB" | "TH" })}
+              onChange={(event) => update({
+                countryCode: event.target.value === ""
+                  ? undefined
+                  : event.target.value as ComparisonFormState["countryCode"],
+              })}
               disabled={disabled}
               className="min-h-11 rounded-md border border-input bg-white px-3 py-2 font-normal"
             >
               <option value="">All countries</option>
-              <option value="US">United States</option>
-              <option value="GB">United Kingdom</option>
-              <option value="TH">Thailand</option>
+              {researchCatalogCountryCodes.map((countryCode) => (
+                <option key={countryCode} value={countryCode}>
+                  {researchCatalogCountryLabels[countryCode]}
+                </option>
+              ))}
             </select>
           </label>
           <label className="grid gap-2 text-sm font-semibold">

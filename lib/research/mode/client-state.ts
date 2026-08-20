@@ -7,6 +7,8 @@ import type {
 
 export type ResearchWorkspaceError =
   | PublicResearchTransportError
+  | { code: "deployment-rate-limit"; message: string }
+  | { code: "deployment-timeout"; message: string }
   | { code: "network-error"; message: string }
   | { code: "invalid-response"; message: string };
 

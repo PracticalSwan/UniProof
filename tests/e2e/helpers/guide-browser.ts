@@ -1,12 +1,9 @@
 import { expect, type Page } from "@playwright/test";
 
 import type { ResearchDossier } from "@/lib/research/mode/public-contracts";
-import { researchCatalog } from "@/lib/research/catalog/data";
+import { guideCatalogTarget } from "@/tests/helpers/catalog-targets";
 
-export const guideFixtureTarget = {
-  university: researchCatalog.universities[0]!,
-  program: researchCatalog.programs.find((p) => p.universityId === researchCatalog.universities[0]!.id)!,
-};
+export const guideFixtureTarget = guideCatalogTarget;
 
 export async function openGuide(page: Page): Promise<void> {
   await page.goto("/guide");

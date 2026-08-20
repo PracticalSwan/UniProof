@@ -1,13 +1,10 @@
 import { test, expect } from "./helpers/research-browser";
-import { openGuide, selectGuideProgram, fillGuideProfile, submitGuide } from "./helpers/guide-browser";
+import { guideFixtureTarget, openGuide, selectGuideProgram, fillGuideProfile, submitGuide } from "./helpers/guide-browser";
 import { buildGuideDossier } from "@/tests/fixtures/guide-dossiers";
 import { publicErrorStatuses, publicTransportErrors } from "@/tests/fixtures/research-dossiers";
 import { researchCatalog } from "@/lib/research/catalog/data";
 
-const target = {
-  university: researchCatalog.universities[0]!,
-  program: researchCatalog.programs.find((p) => p.universityId === researchCatalog.universities[0]!.id)!,
-};
+const target = guideFixtureTarget;
 const secondProgram = researchCatalog.programs.find((program) => program.id !== target.program.id)!;
 const secondUniversity = researchCatalog.universities.find((university) => university.id === secondProgram.universityId)!;
 
@@ -102,6 +99,26 @@ test.describe("Guide lifecycle", () => {
     expect(research.requests).toHaveLength(2);
     expect(research.requests[1]!.body).toEqual(failedBody);
     await expect(page.getByRole("button", { name: "Retry this assessment" })).toHaveCount(0);
+  });
+
+  test("raw deployment throttling preserves the prior assessment, applicant draft, and explicit retry", async ({ page, research }) => {
+    await prepareGuide(page);
+    research.enqueueJson({ ok: true, dossier: unknownDossier() });
+    await submitGuide(page);
+    await expect(page.getByText("Assessment complete", { exact: false })).toBeVisible({ timeout: 15_000 });
+
+    await page.getByLabel("GPA value (optional)").fill("3.85");
+    research.enqueueRaw("<html>platform internals stay private</html>", { status: 429, contentType: "text/html" });
+    await page.getByRole("button", { name: "Refresh requirements" }).click();
+
+    const error = page.getByRole("alert", { name: "Guide request error" });
+    await expect(error).toContainText("temporarily limiting research requests");
+    await expect(error).not.toContainText(/platform internals|html|vercel/i);
+    await expect(page.getByRole("heading", { name: "Requirement assessment" })).toBeVisible();
+    await expect(page.getByLabel("GPA value (optional)")).toHaveValue("3.85");
+    await expect(page.getByRole("button", { name: "Retry this assessment" })).toHaveCount(1);
+    await page.waitForTimeout(100);
+    expect(research.requests).toHaveLength(2);
   });
 
   test("failed refresh preserves reusable evidence and profile-only Assess supersedes the transient error locally", async ({ page, research }) => {

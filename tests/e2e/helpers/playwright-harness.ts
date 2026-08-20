@@ -1,6 +1,23 @@
 import path from "node:path";
 
 const SAFE_HARNESS_ID = /^[A-Za-z0-9_-]{1,80}$/;
+const PLAYWRIGHT_DEFAULT_PORT = 3102;
+
+export function resolvePlaywrightPort(value: string | undefined): number {
+  if (value === undefined) return PLAYWRIGHT_DEFAULT_PORT;
+  if (!/^[1-9]\d{0,4}$/u.test(value)) {
+    throw new Error("Invalid Playwright port; expected an integer from 1 through 65535.");
+  }
+  const port = Number(value);
+  if (port > 65_535) {
+    throw new Error("Invalid Playwright port; expected an integer from 1 through 65535.");
+  }
+  return port;
+}
+
+export function resolvePlaywrightOrigin(value: string | undefined): string {
+  return `http://127.0.0.1:${resolvePlaywrightPort(value)}`;
+}
 
 export const phase3dDevHarnessRootFiles = [
   "next.config.ts",

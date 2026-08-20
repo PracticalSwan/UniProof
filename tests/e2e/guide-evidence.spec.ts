@@ -1,12 +1,8 @@
 import { test, expect } from "./helpers/research-browser";
-import { openGuide, selectGuideProgram, fillGuideProfile, submitGuide } from "./helpers/guide-browser";
+import { guideFixtureTarget, openGuide, selectGuideProgram, fillGuideProfile, submitGuide } from "./helpers/guide-browser";
 import { buildGuideDossier, makeClaim } from "@/tests/fixtures/guide-dossiers";
-import { researchCatalog } from "@/lib/research/catalog/data";
 
-const target = {
-  university: researchCatalog.universities[0]!,
-  program: researchCatalog.programs.find((p) => p.universityId === researchCatalog.universities[0]!.id)!,
-};
+const target = guideFixtureTarget;
 
 function gpaDossier(options: { supportingText?: string; universityWebsiteUrl?: string; programOfficialUrl?: string } = {}) {
   return buildGuideDossier({

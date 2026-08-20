@@ -171,6 +171,12 @@ Risk labels are project-relative engineering priorities, not formal CVSS scores.
 | T-31 | Dossier-local claim ID collision opens the wrong Guide evidence after refresh | Medium | High integrity | Guide factual outputs use `{ targetKey, claimId }`; preserved/new result evidence resolves both identities; reused-ID regression | trigger lifecycle/focus bugs remain implementation risk |
 | T-32 | Deadline date shifts by timezone or ambiguous locale parsing | Medium | High product integrity | strict `YYYY-MM-DD` real-date validation; date-only arithmetic; no locale/date-time coercion; leap/past/today/30/31-day tests | browser/date helper bug; deterministic unit tests required |
 | T-33 | Checklist invents documents, contacts, dates, fees, or readiness | Medium | High product integrity | tasks derive only from validated evidence or clearly generic local actions; factual tasks carry evidence refs; no document uploads/readiness fields; source/catalog URLs only | unrecognized requirements remain manual rather than disappearing |
+| T-34 | Whole-Research deadline/caller-cancel confusion or post-terminal work | High without one owner | High cost/integrity | Phase 6B one 240s execution budget beneath 300s host cap; distinct internal deadline vs caller-cancel reason; composed AbortSignal; abort-aware retry waits; stage checks before dispatch; fake-timer race tests; Vercel Research-only cancellation opt-in | platform disconnect delivery must still be verified live; upstream work already accepted by a provider may not be revocable instantly |
+| T-35 | WAF/platform 429/504 body leaks internals or causes retry amplification | Medium when public | High | client classifies raw 429/504 before application JSON/content-type parsing; body is ignored/cancelled best-effort; sanitized local outcomes; no browser auto-retry; Compare stops the active sequential batch on terminal platform failure | exact Vercel response/header behavior must be rechecked on Preview/Production |
+| T-36 | Provider privacy/free-route drift sends private data or violates retention assumptions | Medium | Critical privacy/cost | Phase 6B primary-source provider review + fixture contract tests; applicant/account/private data mechanically excluded; Gemini unpaid-tier public-only input; OpenRouter data_collection deny/optional ZDR; Brave raw-response non-persistence; no paid escalation | provider terms/account settings can change between local review and release; Phase 6C must recheck current state |
+| T-37 | CI workflow or third-party Action exfiltrates secrets / gains write authority | Medium if CI added casually | Critical | no pull_request_target; permissions contents:read; no production provider/Vercel/hosted-Supabase secrets; full-SHA action pins; no deploy steps; sanitized/no artifacts by default; local Supabase only | upstream Action compromise at pinned commit or future workflow edits require review |
+| T-38 | Fluid Compute cross-request mutable module state leaks one request/user into another | Medium if new module globals are introduced | Critical privacy/integrity | request/user/budget ownership remains invocation-local; server module constants/read-only caches only; final 6B review searches for module-scope mutable request/user state; Auth/RLS revalidates per request | framework/runtime behavior and future caching optimizations must be re-reviewed |
+| T-39 | Expanded catalog aliases/official-host matching silently retargets or promotes the wrong institution | Medium without closed identities | High integrity | one closed 11-country schema; global normalized university name/alias collision rejection; stable owner IDs; no fuzzy/model retargeting; ownerless program UI fails closed; official-host normalization strips only one leading `www.` and accepts exact/real subdomains with malicious suffix regressions | institutions using unrelated sibling domains may require an explicit separately reviewed ownership rule rather than broad base-domain trust |
 
 ## 7. Phase 4 score-integrity threats
 
@@ -291,7 +297,7 @@ Target:
 - `Cross-Origin-Resource-Policy: same-origin` after compatibility test
 - `poweredByHeader: false`
 
-HSTS is deferred until a real HTTPS deployment/domain is authorized and verified.
+HSTS remains a deployment-observation boundary rather than an application header. Current Vercel documentation supplies `Strict-Transport-Security: max-age=63072000` on deployment responses; Phase 6B must not add a conflicting app-owned HSTS/includeSubDomains/preload policy, and Phase 6C verifies the actual final canonical HTTPS response.
 
 ## 10. Privacy engineering decisions
 
@@ -352,15 +358,14 @@ The user explicitly does not want security policy to limit the developing AI age
 
 Phase 6A closes the local authentication/ownership/persistence design and verification boundary, but public deployment remains blocked until Phase 6B/6C verifies:
 
-- durable distributed rate limiting/abuse protection for expensive Research flows;
-- actual host function duration and cancellation semantics;
-- production domain/TLS behavior;
-- HSTS policy and subdomain/preload consequences;
-- current AI/search provider terms/privacy/configuration;
-- production secret-store/environment configuration;
+- durable distributed rate limiting/abuse protection for expensive Research flows, with the planned exact Vercel WAF rule observed before enforcement;
+- actual selected Vercel project/Fluid Compute acceptance of the Phase 6B 300-second Research cap and real request-cancellation delivery;
+- production domain/TLS behavior and actual Vercel-delivered HSTS on the canonical origin, without a conflicting UniProof includeSubDomains/preload policy;
+- current AI/search provider endpoint/model/free-route/data-use configuration, including Gemini unpaid-tier public-only constraints and Brave raw-result/query-retention constraints;
+- production secret-store/environment configuration and release-config verification;
 - explicit live-service smoke authorization;
-- deployed CSP/header behavior;
-- any persistence/authentication/RLS boundary that has been introduced by then.
+- deployed CSP/header/cache/session behavior;
+- hosted persistence/authentication/RLS/email-delivery behavior introduced by Phase 6A.
 
 Phase 6A locally implements the identity/ownership/persistence mitigations below; Phase 6B/6C items remain planned/deployment-gated. Phase 6 threats and required mitigations include:
 
@@ -374,11 +379,11 @@ Phase 6A locally implements the identity/ownership/persistence mitigations below
 - **Storage/resource abuse:** save requests require actual streamed-byte bounds, strict runtime schema/version validation, one bounded maximum-20 metadata list (no unnecessary pagination surface), and a database-race-safe per-owner artifact cap without silent user-data eviction.
 - **Ambiguous non-idempotent mutation completion:** a transport disconnect after Save/Delete can leave client knowledge uncertain even when the DB mutation committed. Do not blind-auto-retry; keep one logical mutation single-flight, show an outcome-unknown state, and reconcile the bounded list before the user retries or the UI claims definitive success.
 - **Service-role/RLS bypass:** ordinary user APIs use authenticated user-scoped clients plus explicit minimum table grants/RLS. A service-role credential is unnecessary for normal CRUD and must remain outside client graphs and ordinary request handling.
-- **Hosting hard-timeout work leakage:** an application-owned whole-Research deadline must expire before the verified platform hard limit, abort in-flight work where possible, and prevent later retries/fallbacks/provider dispatch while preserving truthful completed evidence.
-- **Distributed abuse:** deployment must enforce a real shared/deployment-layer limit on only the expensive Research route. In-process counters, per-tab single flight, and provider budgets remain defense-in-depth but are not distributed abuse control.
-- **Rate-limit usability/DoS:** the initial IP threshold must be observed against the complete judge flow before enforcement; shared NAT false positives, 429 handling, no browser retry storm, rollback, and current Vercel pricing/plan constraints must be verified.
-- **Deployment/configuration drift:** Preview and Production environment scopes, Supabase Auth URLs/email delivery, WAF rule, function duration, TLS/HSTS/CSP, provider privacy/free-route assumptions, and Git integration side effects must be rechecked from current platform state rather than inferred from local config.
-- **Supply-chain/CI secret exposure:** CI is least privilege, fixture/local-Supabase only, no production provider/database/deploy secrets on untrusted PRs, and only sanitized bounded artifacts may be uploaded.
+- **Hosting hard-timeout work leakage:** Phase 6B owns one 240-second Research execution budget beneath a 300-second route cap, distinguishes deadline `timeout` from caller `cancelled`, opts Research into Vercel cancellation, aborts retry waits/in-flight work where possible, and prevents later retries/fallbacks/provider dispatch while preserving truthful completed evidence. Actual Vercel signal delivery and selected-project duration acceptance remain live gates.
+- **Distributed abuse:** deployment must enforce a real shared/deployment-layer limit on only the expensive Research POST. In-process counters, per-tab single flight, provider budgets, and hidden local test modes are not distributed abuse control.
+- **Rate-limit usability/DoS:** the provisional 20/source-IP/60s fixed-window threshold must be observed in Log mode against the complete judge flow before enforcement; shared NAT false positives, exact path/method matching, raw 429 handling before JSON parsing, no browser retry storm, rollback, and current Vercel pricing/project limits must be verified.
+- **Deployment/configuration drift:** Preview and Production environment scopes, Supabase Auth URLs/email delivery, WAF rule, 300-second Research cap/cancellation opt-in, TLS/platform HSTS/CSP, stable Gemini v1 plus provider privacy/free-route assumptions, and Git integration side effects must be rechecked from current platform state rather than inferred from local config.
+- **Supply-chain/CI secret exposure:** CI is least privilege (`contents: read`, no `pull_request_target`), fixture/local-Supabase only, full-SHA-pinned official Actions, no production provider/database/Vercel/deploy secrets, and no artifacts by default unless a bounded sanitized path is deliberately reviewed.
 - **Release-integrity mismatch:** the public repository, exact CI commit, deployed candidate, README/screenshots/demo, and Devpost claims must describe the same observed implementation; an uncommitted or superseded deployment is not acceptable release provenance.
 
 Full edge cases and deployment gates are in `docs/planning/phase-6-hardening-submission-readiness.md`; the Phase 6A/6B/6C plans separate local implementation from authorization-gated external release work.

@@ -61,9 +61,9 @@ See [`docs/design.md`](docs/design.md), [`docs/security.md`](docs/security.md), 
 
 ## Supported catalog
 
-The checked-in MVP catalog currently contains 10 universities and 14 computing programs across the United States, United Kingdom, and Thailand. Research and downstream modes operate on supported catalog identity rather than arbitrary user-supplied university URLs.
+The checked-in MVP catalog contains 30 universities and 45 computing programs across Belgium, Canada, Denmark, Finland, Germany, Italy, the Netherlands, Sweden, Thailand, the United Kingdom, and the United States. Research and downstream modes operate on supported catalog identity rather than arbitrary user-supplied university URLs.
 
-Global university coverage is intentionally deferred until the current evidence and safety model is stable.
+Coverage remains deliberately bounded to this checked-in catalog; arbitrary/global university ingestion is outside the current MVP.
 
 ## Tech stack
 
@@ -190,7 +190,7 @@ Never use a real person's academic/private information in fixtures, bug reports,
 
 ## Development status
 
-Phase 0–6A are implemented through the local reviewed/browser-verified boundary. Optional Supabase passwordless Auth, user-scoped RLS persistence, and explicit saved profile/Research/Comparison/Guide snapshots are implemented locally. Durable distributed Research rate limiting, hosted Supabase/Auth verification, public deployment, production HSTS/domain policy, CI/release automation, live-provider smoke, and Devpost submission remain Phase 6B/6C work.
+Phase 0–6B are implemented through the local reviewed/browser-verified boundary. Optional Supabase passwordless Auth, user-scoped RLS persistence, explicit saved profile/Research/Comparison/Guide snapshots, the 240-second Research execution budget, Research-only host-cancellation configuration, sanitized deployment 429/504 handling, Gemini stable-v1 transport, release-configuration verification, and least-privilege GitHub Actions CI are implemented locally. Durable Vercel WAF enforcement, hosted Supabase/Auth verification, actual GitHub Actions execution, public deployment, production TLS/HSTS/domain verification, live-provider smoke, and Devpost submission remain Phase 6C work.
 
 No README statement should be treated as proof of a live public deployment or currently available service endpoint.
 

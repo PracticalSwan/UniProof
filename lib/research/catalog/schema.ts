@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { researchCatalogCountryCodeSchema } from "./countries";
+
 export function normalizeResearchCatalogText(value: string): string {
   return value
     .normalize("NFKC")
@@ -39,7 +41,7 @@ const aliasesSchema = z.array(catalogAliasSchema).max(12)
 export const researchCatalogUniversitySchema = z.object({
   id: catalogIdSchema,
   name: catalogNameSchema,
-  countryCode: z.enum(["US", "GB", "TH"]),
+  countryCode: researchCatalogCountryCodeSchema,
   websiteUrl: canonicalHttpsUrlSchema,
   rorId: z.string().refine((value) => {
     try {
@@ -66,7 +68,7 @@ export const researchCatalogProgramSchema = z.object({
 }).strict();
 
 export const researchCatalogSchema = z.object({
-  universities: z.array(researchCatalogUniversitySchema).min(10).max(15),
+  universities: z.array(researchCatalogUniversitySchema).min(10).max(40),
   programs: z.array(researchCatalogProgramSchema).min(10).max(60),
 }).strict()
   .superRefine((catalog, context) => {
@@ -79,13 +81,20 @@ export const researchCatalogSchema = z.object({
       context.addIssue({ code: "custom", message: "program IDs must be unique", path: ["programs"] });
     }
 
-    const universityIdentities = new Set<string>();
+    const universityIdentityOwners = new Map<string, string>();
     for (const university of catalog.universities) {
-      const identity = `${university.countryCode}:${normalizeResearchCatalogText(university.name)}`;
-      if (universityIdentities.has(identity)) {
-        context.addIssue({ code: "custom", message: "university identity must be unique within a country", path: ["universities"] });
+      for (const value of [university.name, ...(university.aliases ?? [])]) {
+        const identity = normalizeResearchCatalogText(value);
+        const existingOwner = universityIdentityOwners.get(identity);
+        if (existingOwner !== undefined && existingOwner !== university.id) {
+          context.addIssue({
+            code: "custom",
+            message: "university names and aliases must be globally unambiguous after normalization",
+            path: ["universities"],
+          });
+        }
+        universityIdentityOwners.set(identity, university.id);
       }
-      universityIdentities.add(identity);
     }
 
     const programIdentities = new Set<string>();

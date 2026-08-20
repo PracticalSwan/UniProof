@@ -21,6 +21,8 @@ import {
   type PublicResearchTransportError,
 } from "./public-contracts";
 import { readBoundedJsonRequest } from "./read-bounded-request";
+import { isAllowedSameOriginMutation } from "@/lib/security/same-origin";
+import { createResearchExecutionBudget } from "@/lib/research/orchestration/execution-budget";
 
 export const RESEARCH_MODE_MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 
@@ -101,19 +103,6 @@ function errorResponse(code: PublicResearchTransportError["code"], statusOverrid
   );
 }
 
-function isAllowedResearchOrigin(request: Request): boolean {
-  const fetchSite = request.headers.get("sec-fetch-site")?.toLowerCase();
-  if (fetchSite === "cross-site") return false;
-
-  const origin = request.headers.get("origin");
-  if (origin === null) return true;
-  try {
-    return new URL(origin).origin === new URL(request.url).origin;
-  } catch {
-    return false;
-  }
-}
-
 export function createResearchPostHandler(
   dependencies: ResearchHandlerDependencies,
 ): (request: Request) => Promise<Response> {
@@ -122,7 +111,7 @@ export function createResearchPostHandler(
 
   return async function postResearch(request: Request): Promise<Response> {
     try {
-      if (!isAllowedResearchOrigin(request)) return errorResponse("forbidden-origin");
+      if (!isAllowedSameOriginMutation(request)) return errorResponse("forbidden-origin");
 
       const body = await readBoundedJsonRequest(request);
       if (!body.ok) {
@@ -172,12 +161,18 @@ export function createResearchPostHandler(
       };
       const validatedPhase2Request = researchRequestSchema.parse(phase2Request);
 
-      const result = await dependencies.runResearch(validatedPhase2Request, {
-        signal: request.signal,
-        discovery: {
-          targetResolver: dependencies.targetResolver,
-        },
-      });
+      const executionBudget = createResearchExecutionBudget(request.signal);
+      let result: ResearchResult;
+      try {
+        result = await dependencies.runResearch(validatedPhase2Request, {
+          signal: executionBudget.signal,
+          discovery: {
+            targetResolver: dependencies.targetResolver,
+          },
+        });
+      } finally {
+        executionBudget.dispose();
+      }
 
       const resultCategories = canonicalizeResearchModeCategories([
         ...result.run.processedCategories,

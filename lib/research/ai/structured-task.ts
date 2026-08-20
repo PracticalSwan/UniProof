@@ -12,6 +12,7 @@ import {
   RESEARCH_MAX_RETRY_AFTER_MS,
 } from "@/lib/security/research-limits";
 import { readBoundedJson } from "@/lib/integrations/read-bounded-response";
+import { waitForRetryDelay } from "@/lib/integrations/abortable-delay";
 import type {
   StructuredAiBudget,
   StructuredTaskKind,
@@ -179,28 +180,6 @@ function defaultSleep(milliseconds: number): Promise<void> {
   });
 }
 
-async function sleepWithAbort(
-  milliseconds: number,
-  signal: AbortSignal | undefined,
-  sleep: (milliseconds: number) => Promise<void>,
-): Promise<boolean> {
-  if (signal?.aborted) return false;
-  if (milliseconds <= 0) return !signal?.aborted;
-
-  let aborted = false;
-  let onAbort: (() => void) | undefined;
-  const abortPromise = new Promise<void>((resolve) => {
-    onAbort = () => {
-      aborted = true;
-      resolve();
-    };
-    signal?.addEventListener("abort", onAbort, { once: true });
-  });
-  await Promise.race([sleep(milliseconds), abortPromise]);
-  if (onAbort !== undefined) signal?.removeEventListener("abort", onAbort);
-  return !aborted && !signal?.aborted;
-}
-
 async function dispatchOnce(
   spec: ProviderTransportSpec,
   options: Required<Pick<StructuredProviderOptions, "fetchImpl" | "now" | "sleep">> & StructuredProviderOptions,
@@ -257,6 +236,7 @@ async function dispatchOnce(
     ]);
 
     if (signal?.aborted) {
+      cancelResponseBody(response, "provider body discarded after cancellation");
       return {
         outcome: { kind: "aborted" },
         attempt: attemptRecord(spec, "failed", retryCount, startedAt, options.now, "upstream"),
@@ -286,6 +266,9 @@ async function dispatchOnce(
         ...(signal === undefined ? [] : [callerAbortPromise]),
       ]);
     } catch (error) {
+      if (signal?.aborted) {
+        cancelResponseBody(response, "provider body discarded after cancellation");
+      }
       if (deadlineReached || signal?.aborted) throw error;
       return {
         outcome: { kind: "failure", failureKind: "invalid-response" },
@@ -293,6 +276,7 @@ async function dispatchOnce(
       };
     }
     if (signal?.aborted) {
+      cancelResponseBody(response, "provider body discarded after cancellation");
       return {
         outcome: { kind: "aborted" },
         attempt: attemptRecord(spec, "failed", retryCount, startedAt, options.now, "upstream"),
@@ -419,7 +403,7 @@ export async function runProviderTransport(
     const delay = dispatched.outcome.retryAfterMs ?? defaultBackoffMs(retryCount);
     let mayRetry = false;
     try {
-      mayRetry = await sleepWithAbort(delay, options.signal, options.sleep);
+      mayRetry = await waitForRetryDelay(delay, options.signal, options.sleep);
     } catch {
       return { ok: false, provider: spec.provider, failureKind: "upstream", attempts };
     }

@@ -183,18 +183,44 @@ describe("Phase 4 comparison workspace state", () => {
     });
   });
 
-  it("derives retry keys from transport, failed dossiers, and partial incomplete dossiers only", () => {
-    const outcomes = [usable(targetA), failedDossier(targetB), usable(targetC, "partial"), transport(targetA)];
-    expect(deriveRetryTargetKeys(outcomes)).toEqual([
+  it("derives retry keys from retryable outcomes and undispatched immutable targets", () => {
+    const s = submission();
+    expect(deriveRetryTargetKeys(s, [
+      usable(targetA),
+      failedDossier(targetB),
+      usable(targetC, "partial"),
+    ])).toEqual([
       comparisonTargetKey(targetB),
       comparisonTargetKey(targetC),
-      comparisonTargetKey(targetA),
     ]);
-    expect(deriveRetryTargetKeys([{
-      target: targetA,
-      state: "transport-error",
-      error: { code: "unsupported-target", message: "This target is not supported." },
-    }])).toEqual([]);
+
+    expect(deriveRetryTargetKeys(s, [
+      transport(targetA),
+      usable(targetB),
+      usable(targetC),
+    ])).toEqual([comparisonTargetKey(targetA)]);
+
+    expect(deriveRetryTargetKeys(s, [
+      usable(targetA),
+      {
+        target: targetB,
+        state: "transport-error",
+        error: { code: "deployment-rate-limit", message: "The deployment is temporarily limiting research requests." },
+      },
+    ])).toEqual([
+      comparisonTargetKey(targetB),
+      comparisonTargetKey(targetC),
+    ]);
+
+    expect(deriveRetryTargetKeys(s, [
+      {
+        target: targetA,
+        state: "transport-error",
+        error: { code: "unsupported-target", message: "This target is not supported." },
+      },
+      usable(targetB),
+      usable(targetC),
+    ])).toEqual([]);
   });
 
   it("merges retry replacements only by exact immutable target key and keeps selection order", () => {

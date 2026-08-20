@@ -12,6 +12,8 @@ const GUIDE_ERROR_MESSAGES: Record<string, string> = {
   "sensitive-input": "The public Research context could not be accepted. Edit the public intake/year fields and start a new assessment.",
   "forbidden-origin": "The research request was blocked by browser origin controls.",
   "internal-error": "UniProof could not complete this research request.",
+  "deployment-rate-limit": "The deployment is temporarily limiting research requests. Try again explicitly in a moment.",
+  "deployment-timeout": "The deployment timed out before the research request completed. Try again explicitly.",
   "network-error": "The research request could not be sent. Check the connection and try again.",
   "invalid-response": "The research response could not be safely validated for Guide.",
   "guide-assessment-error": "Guide could not safely assess the researched requirements. Try refreshing the requirements.",

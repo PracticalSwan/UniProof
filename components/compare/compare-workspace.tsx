@@ -14,6 +14,7 @@ import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import { executeResearchRequest, type ResearchClientTransportResult } from "@/lib/research/mode/client-transport";
 import type { ResearchDossier, ResearchModeRequest } from "@/lib/research/mode/public-contracts";
 import {
+  comparisonBatchShouldStop,
   comparisonWorkspaceReducer,
   createComparisonWorkspaceState,
   deriveRetryTargetKeys,
@@ -216,6 +217,7 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
           sharedError = true;
           break;
         }
+        if (comparisonBatchShouldStop(result)) break;
       }
 
       if (controller.signal.aborted || activeBatchRef.current !== active) return;
@@ -297,12 +299,12 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
 
   const retryContext: RetryContext | undefined = workspace.kind === "result"
     ? (() => {
-        const targetKeys = deriveRetryTargetKeys(workspace.result.outcomes);
+        const targetKeys = deriveRetryTargetKeys(workspace.result.submission, workspace.result.outcomes);
         return targetKeys.length === 0 ? undefined : { submission: workspace.result.submission, outcomes: workspace.result.outcomes, targetKeys };
       })()
     : workspace.kind === "error" && workspace.error.code === "insufficient-usable-targets"
       ? (() => {
-          const targetKeys = deriveRetryTargetKeys(workspace.completedTargets);
+          const targetKeys = deriveRetryTargetKeys(workspace.submission, workspace.completedTargets);
           return targetKeys.length === 0 ? undefined : { submission: workspace.submission, outcomes: workspace.completedTargets, targetKeys };
         })()
       : undefined;

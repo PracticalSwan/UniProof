@@ -148,6 +148,38 @@ test.describe("Research malformed/untrusted response handling", () => {
     expect(research.requests).toHaveLength(1);
   });
 
+  for (const platformCase of [
+    { status: 429, message: "temporarily limiting research requests" },
+    { status: 504, message: "timed out before the research request completed" },
+  ]) {
+    test(`raw deployment ${platformCase.status} preserves the prior dossier and is explicit-retry only`, async ({ page, research }) => {
+      await openResearch(page);
+      await selectFixtureProgram(page);
+      research.enqueueJson(canonicalTargetResponse);
+      await submitResearch(page);
+      await expect(page.getByRole("heading", { name: "Server Canonical MIT Name • Server Canonical AI Program Name" })).toBeVisible();
+
+      research.enqueueRaw("<html>platform failure details must stay hidden</html>", {
+        status: platformCase.status,
+        contentType: "text/html",
+      });
+      await submitResearch(page);
+
+      const error = page.getByRole("region", { name: "Research request error" });
+      await expect(error).toContainText(platformCase.message);
+      await expect(error).not.toContainText(/platform failure details|html|vercel|https?:\/\//i);
+      await expect(page.getByRole("heading", { name: "Server Canonical MIT Name • Server Canonical AI Program Name" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Retry this research", exact: true })).toHaveCount(1);
+      await page.waitForTimeout(100);
+      expect(research.requests).toHaveLength(2);
+
+      research.enqueueJson(canonicalTargetResponse);
+      await page.getByRole("button", { name: "Retry this research", exact: true }).click();
+      await expect.poll(() => research.requests.length).toBe(3);
+      await expect(page.getByRole("region", { name: "Research request error" })).toHaveCount(0);
+    });
+  }
+
   test("redirect response is rejected instead of being followed", async ({ page, research }) => {
     await openResearch(page);
     await selectFixtureProgram(page);

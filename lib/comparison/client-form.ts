@@ -1,3 +1,4 @@
+import type { ResearchCatalogCountryCode } from "@/lib/research/catalog/countries";
 import { searchResearchCatalog } from "@/lib/research/catalog/search";
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import { researchModeCategoryOrder, type ResearchModeCategory } from "@/lib/research/mode/public-contracts";
@@ -15,7 +16,7 @@ import {
 
 export type ComparisonFormState = {
   search: string;
-  countryCode?: "US" | "GB" | "TH";
+  countryCode?: ResearchCatalogCountryCode;
   degreeLevel?: "bachelor" | "master";
   subjectArea?: string;
   targets: ComparisonTarget[];

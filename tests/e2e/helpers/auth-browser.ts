@@ -1,5 +1,7 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
+import { resolvePlaywrightOrigin } from "@/tests/e2e/helpers/playwright-harness";
+
 const MAILPIT_ORIGIN = "http://127.0.0.1:54324";
 
 export async function clearLocalMailpit(request: APIRequestContext): Promise<void> {
@@ -19,8 +21,16 @@ async function latestMagicLink(request: APIRequestContext): Promise<string | nul
   if (!messageResponse.ok()) return null;
   const detail = await messageResponse.json() as Record<string, unknown>;
   const text = JSON.stringify(detail);
-  const match = /http:\/\/127\.0\.0\.1:3102\/auth\/confirm\?token_hash=[A-Za-z0-9._~-]+(?:&amp;|&)type=email/u.exec(text);
-  return match?.[0]?.replace("&amp;", "&") ?? null;
+  const match = /http:\/\/127\.0\.0\.1:\d{1,5}\/auth\/confirm\?token_hash=[A-Za-z0-9._~-]+(?:&amp;|&)type=email/u.exec(text);
+  if (match?.[0] === undefined) return null;
+  const link = match[0].replace("&amp;", "&");
+  try {
+    return new URL(link).origin === resolvePlaywrightOrigin(process.env.UNIPROOF_E2E_PORT)
+      ? link
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function signInWithLocalMagicLink(
@@ -41,7 +51,7 @@ export async function signInWithLocalMagicLink(
   }, { timeout: 10_000 }).toBe(true);
   if (link === null) throw new Error("Local Mailpit did not return a test magic link.");
   await page.goto(link);
-  await expect(page).toHaveURL(/\/saved$/u);
+  await expect(page).toHaveURL(/\/saved$/u, { timeout: 15_000 });
   const supabaseCookies = (await page.context().cookies()).filter((cookie) => cookie.name.startsWith("sb-"));
   expect(supabaseCookies.length).toBeGreaterThan(0);
   expect(supabaseCookies.some((cookie) => cookie.name.includes("auth-token"))).toBe(true);

@@ -5,13 +5,14 @@ import type {
   TargetResolutionResult,
 } from "./types";
 import { sameResearchIdentity } from "@/lib/research/identity";
+import { hostMatchesOfficialRoot, normalizeOfficialHost } from "@/lib/research/official-host";
 
 function safeHost(url: string | undefined): string | undefined {
   if (url === undefined) return undefined;
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined;
-    return parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.+$/, "");
+    return normalizeOfficialHost(parsed.hostname);
   } catch {
     return undefined;
   }
@@ -245,7 +246,5 @@ export function targetHasInstitutionalIdentity(target: ResolvedResearchTarget): 
 }
 
 export function targetHostMatches(hostname: string, target: ResolvedResearchTarget): boolean {
-  const trusted = target.officialHost?.toLowerCase().replace(/\.+$/, "");
-  const candidate = hostname.toLowerCase().replace(/\.+$/, "");
-  return trusted !== undefined && (candidate === trusted || candidate.endsWith(`.${trusted}`));
+  return target.officialHost !== undefined && hostMatchesOfficialRoot(hostname, target.officialHost);
 }

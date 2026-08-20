@@ -382,10 +382,10 @@ describe("research POST handler", () => {
       categories: ["admissions"],
       question: validBody.question,
     });
-    expect(options).toEqual({
-      signal: request.signal,
-      discovery: { targetResolver },
-    });
+    expect(options.discovery).toEqual({ targetResolver });
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+    expect(options.signal).not.toBe(request.signal);
+    expect(options.signal?.aborted).toBe(false);
     expect(Object.keys(options).sort()).toEqual(["discovery", "signal"]);
     expect(JSON.stringify(options)).not.toContain("API_KEY");
     const body = await response.json();

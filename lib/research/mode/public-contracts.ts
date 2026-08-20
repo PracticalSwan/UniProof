@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { researchCatalogCountryCodeSchema } from "@/lib/research/catalog/countries";
 import { sourceTypeSchema } from "@/lib/validation/evidence";
 
 export const researchModeCategoryOrder = [
@@ -137,7 +138,7 @@ const researchDossierTargetSchema = z.object({
   university: z.object({
     id: publicIdSchema,
     name: z.string().trim().min(1).max(200),
-    countryCode: z.enum(["US", "GB", "TH"]),
+    countryCode: researchCatalogCountryCodeSchema,
     websiteUrl: z.url().refine((value) => {
       try {
         const parsed = new URL(value);

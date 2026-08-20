@@ -4,10 +4,11 @@ import {
   type ResearchCatalogProgram,
   type ResearchCatalogUniversity,
 } from "./schema";
+import type { ResearchCatalogCountryCode } from "./countries";
 
 export type ResearchCatalogFilters = {
   query?: string;
-  countryCode?: "US" | "GB" | "TH";
+  countryCode?: ResearchCatalogCountryCode;
   degreeLevel?: "bachelor" | "master";
   subjectArea?: string;
 };

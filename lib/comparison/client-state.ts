@@ -22,6 +22,8 @@ const comparisonTransportErrorSchema = z.object({
     "sensitive-input",
     "forbidden-origin",
     "internal-error",
+    "deployment-rate-limit",
+    "deployment-timeout",
     "network-error",
     "invalid-response",
   ]),
@@ -42,9 +44,18 @@ export const comparisonResearchOutcomeSchema = z.discriminatedUnion("state", [
 ]);
 
 export type ComparisonTransportError = Readonly<{
-  code: PublicResearchTransportError["code"] | "network-error" | "invalid-response";
+  code:
+    | PublicResearchTransportError["code"]
+    | "deployment-rate-limit"
+    | "deployment-timeout"
+    | "network-error"
+    | "invalid-response";
   message: string;
 }>;
+
+export function comparisonBatchShouldStop(result: { kind: string }): boolean {
+  return result.kind === "deployment-rate-limit" || result.kind === "deployment-timeout";
+}
 
 export type ComparisonResearchOutcome =
   | Readonly<{ target: ComparisonTarget; state: "dossier"; dossier: ResearchDossier }>
@@ -217,20 +228,24 @@ export function finalizeComparisonOutcomes(
 }
 
 export function deriveRetryTargetKeys(
+  submission: ComparisonSubmission,
   outcomes: readonly ComparisonResearchOutcome[],
 ): readonly string[] {
+  const outcomeByKey = new Map(
+    outcomes.map((outcome) => [comparisonTargetKey(outcome.target), outcome]),
+  );
   const keys: string[] = [];
-  const seen = new Set<string>();
-  for (const outcome of outcomes) {
+  for (const target of submission.targets) {
+    const key = comparisonTargetKey(target);
+    const outcome = outcomeByKey.get(key);
+    if (outcome === undefined) {
+      keys.push(key);
+      continue;
+    }
     const retryable = outcome.state === "transport-error"
       ? outcome.error.code !== "unsupported-target"
       : outcome.dossier.run.status !== "succeeded";
-    if (!retryable) continue;
-    const key = comparisonTargetKey(outcome.target);
-    if (!seen.has(key)) {
-      seen.add(key);
-      keys.push(key);
-    }
+    if (retryable) keys.push(key);
   }
   return keys;
 }

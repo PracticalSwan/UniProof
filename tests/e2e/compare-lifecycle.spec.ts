@@ -176,6 +176,45 @@ test.describe("Phase 4 Compare lifecycle and ownership", () => {
     expect(research.requests).toHaveLength(4);
   });
 
+  for (const status of [429, 504]) {
+    test(`raw deployment ${status} stops the sequential batch before the next target`, async ({ page, research }) => {
+      research.enqueueRaw("platform details must not be parsed", { status, contentType: "text/plain" });
+      await openCompare(page);
+      await selectDefaultComparisonTargets(page);
+      await submitComparison(page);
+
+      await expect(page.getByRole("heading", { name: "Comparison could not be calculated" })).toBeVisible();
+      await page.waitForTimeout(150);
+      expect(research.requests).toHaveLength(1);
+      await expect(page.getByRole("button", { name: "Retry incomplete/failed research" })).toHaveCount(1);
+    });
+  }
+
+  test("retry after a deployment stop replays the failed target and every target that was not dispatched", async ({ page, research }) => {
+    research.enqueueRaw("platform details must not be parsed", { status: 429, contentType: "text/plain" });
+    await openCompare(page);
+    await selectDefaultComparisonTargets(page);
+    await submitComparison(page);
+
+    await expect(page.getByRole("heading", { name: "Comparison could not be calculated" })).toBeVisible();
+    expect(research.requests).toHaveLength(1);
+
+    research.enqueueJson(mitResponse!);
+    research.enqueueJson(stanfordResponse!);
+    await page.getByRole("button", { name: "Retry incomplete/failed research" }).click();
+
+    await expect.poll(() => research.requests.length).toBe(3);
+    expect(research.requests[1]!.body).toMatchObject({
+      universityId: comparisonBrowserTargets.mit.universityId,
+      programId: comparisonBrowserTargets.mit.programId,
+    });
+    expect(research.requests[2]!.body).toMatchObject({
+      universityId: comparisonBrowserTargets.stanford.universityId,
+      programId: comparisonBrowserTargets.stanford.programId,
+    });
+    await expect(page.getByText("Comparison complete.")).toBeVisible();
+  });
+
   test("cancels during request three and never dispatches request four", async ({ page, research }) => {
     research.enqueueJson(mitResponse!);
     research.enqueueJson(stanfordResponse!);

@@ -11,6 +11,7 @@ import {
 } from "@/lib/research/contracts";
 import type { ResolvedResearchTarget } from "@/lib/research/discovery/types";
 import { normalizeResearchIdentity } from "@/lib/research/identity";
+import { hostMatchesOfficialRoot, normalizeOfficialHost } from "@/lib/research/official-host";
 import {
   buildNormalizedCandidateView,
   normalizeAcademicYear,
@@ -70,7 +71,7 @@ function normalizedPublisher(value: string): string {
 function hostFor(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
   try {
-    return new URL(value).hostname.toLowerCase().replace(/^www\./u, "").replace(/\.+$/u, "");
+    return normalizeOfficialHost(new URL(value).hostname);
   } catch {
     return undefined;
   }
@@ -81,12 +82,12 @@ function isResolvedUniversitySource(source: ResearchSource, target: ResolvedRese
   const publisher = normalizedPublisher(source.publisher);
   const targetName = target.universityName === undefined ? "" : normalizeResearchIdentity(target.universityName);
   const sourceHost = hostFor(source.url);
-  const officialHost = target.officialHost?.toLowerCase().replace(/^www\./u, "").replace(/\.+$/u, "");
+  const officialHost = target.officialHost === undefined ? undefined : normalizeOfficialHost(target.officialHost);
   const publisherMatches = targetName !== "" && (
     publisher === targetName || publisher.startsWith(`${targetName} `) || publisher.endsWith(` ${targetName}`)
   );
   const hostMatches = officialHost !== undefined && sourceHost !== undefined &&
-    (sourceHost === officialHost || sourceHost.endsWith(`.${officialHost}`));
+    hostMatchesOfficialRoot(sourceHost, officialHost);
   return publisherMatches || hostMatches;
 }
 
@@ -94,11 +95,11 @@ function sourceOwnerKey(source: ResearchSource, target: ResolvedResearchTarget):
   const publisher = normalizedPublisher(source.publisher);
   const targetName = target.universityName === undefined ? "" : normalizeResearchIdentity(target.universityName);
   const sourceHost = hostFor(source.url);
-  const officialHost = target.officialHost?.toLowerCase().replace(/^www\./u, "").replace(/\.+$/u, "");
+  const officialHost = target.officialHost === undefined ? undefined : normalizeOfficialHost(target.officialHost);
   if (
     isResolvedUniversitySource(source, target) ||
     (targetName !== "" && publisher === targetName) ||
-    (officialHost !== undefined && sourceHost !== undefined && (sourceHost === officialHost || sourceHost.endsWith(`.${officialHost}`)))
+    (officialHost !== undefined && sourceHost !== undefined && hostMatchesOfficialRoot(sourceHost, officialHost))
   ) {
     return `university:${(target.universityId ?? targetName) || "resolved-target"}`;
   }

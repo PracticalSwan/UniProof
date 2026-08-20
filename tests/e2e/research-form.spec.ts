@@ -56,6 +56,15 @@ test.describe("Research form and supported target acceptance", () => {
     await search.fill("gEoRgIa---tEcH");
     await expect(page.getByRole("button", { name: /Georgia Institute of Technology.*University research/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Bachelor of Science in Computer Science.*Georgia Institute of Technology/ })).toBeVisible();
+
+    await search.fill("U of T");
+    await expect(page.getByRole("button", { name: /University of Toronto.*University research/ })).toBeVisible();
+
+    await search.fill("TU Delft");
+    await expect(page.getByRole("button", { name: /Delft University of Technology.*University research/ })).toBeVisible();
+
+    await search.fill("UAlberta");
+    await expect(page.getByRole("button", { name: /University of Alberta.*University research/ })).toBeVisible();
   });
 
   test("combines country, degree, subject, and query filters with AND semantics and supports an empty result", async ({ page }) => {

@@ -4,6 +4,7 @@ import { createResearchPostHandler } from "@/lib/research/mode/handler";
 import { runPhase2Research } from "@/lib/research/orchestration";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
 const postResearch = createResearchPostHandler({
   catalog: researchCatalog,

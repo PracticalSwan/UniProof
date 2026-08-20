@@ -4,7 +4,7 @@ import { runProviderTransport, boundedJsonObject } from "@/lib/research/ai/struc
 import type { StructuredAdapterInput, StructuredProviderResult } from "@/lib/research/ai/types";
 import { RESEARCH_AI_MAX_OUTPUT_TOKENS } from "@/lib/security/research-limits";
 
-export const GEMINI_INTERACTIONS_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions";
+export const GEMINI_INTERACTIONS_ENDPOINT = "https://generativelanguage.googleapis.com/v1/interactions";
 export const GEMINI_PRIMARY_MODEL = "gemini-3.5-flash-lite";
 export const GEMINI_QUALITY_MODEL = "gemini-3.5-flash";
 

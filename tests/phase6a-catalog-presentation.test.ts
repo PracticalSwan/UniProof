@@ -3,9 +3,10 @@ import { describe, expect, it } from "vitest";
 import { researchCatalog } from "@/lib/research/catalog/data";
 import { bindCatalogOwnedResearchTarget } from "@/lib/research/catalog/presentation";
 import { buildGuideDossier, makeClaim } from "@/tests/fixtures/guide-dossiers";
+import { guideCatalogTarget, requireCatalogUniversity } from "@/tests/helpers/catalog-targets";
 
-const university = researchCatalog.universities[0]!;
-const program = researchCatalog.programs.find((item) => item.universityId === university.id)!;
+const { university, program } = guideCatalogTarget;
+const differentUniversity = requireCatalogUniversity("university-edinburgh");
 
 describe("shared Research dossier catalog binder", () => {
   it("replaces hostile application-owned official URLs with current catalog URLs", () => {
@@ -30,7 +31,7 @@ describe("shared Research dossier catalog binder", () => {
 
   it("rejects a program reassigned to another catalog university", () => {
     const dossier = buildGuideDossier({
-      universityId: researchCatalog.universities[1]!.id,
+      universityId: differentUniversity.id,
       programId: program.id,
     });
 

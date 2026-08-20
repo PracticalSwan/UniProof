@@ -43,7 +43,14 @@ interface GuideWorkspaceProps {
   catalog: ResearchCatalog;
 }
 
-const GUIDE_RETRYABLE_CODES = new Set(["internal-error", "network-error", "invalid-response", "guide-assessment-error"]);
+const GUIDE_RETRYABLE_CODES = new Set([
+  "internal-error",
+  "deployment-rate-limit",
+  "deployment-timeout",
+  "network-error",
+  "invalid-response",
+  "guide-assessment-error",
+]);
 
 function draftWithProfile(current: GuideDraft, profile: GuideApplicantProfile): GuideDraft {
   const english = profile.englishTest;
@@ -269,7 +276,7 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
         return;
       }
 
-      if (outcome.kind === "network-error" || outcome.kind === "invalid-response") {
+      if (outcome.kind !== "dossier") {
         dispatch({ type: "fail", sequence, error: outcome.error });
         return;
       }

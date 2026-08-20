@@ -13,6 +13,8 @@ import { defaultComparisonBrowserResponses } from "@/tests/fixtures/comparison-b
 import { succeededAllReadyResponse } from "@/tests/fixtures/research-dossiers";
 
 const production = process.env.UNIPROOF_E2E_PRODUCTION === "1";
+const e2ePort = process.env.UNIPROOF_E2E_PORT ?? "3102";
+const e2eOrigin = `http://127.0.0.1:${e2ePort}`;
 
 function directive(policy: string, name: string): string {
   return policy.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name} `)) ?? "";
@@ -52,7 +54,7 @@ function assertApprovedHeaders(headers: Record<string, string>, policy: string):
   } else {
     expect(directive(policy, "script-src")).toContain("'unsafe-eval'");
     expect(directive(policy, "style-src-elem")).toBe("style-src-elem 'self' 'unsafe-inline'");
-    expect(directive(policy, "connect-src")).toContain("ws://127.0.0.1:3102");
+    expect(directive(policy, "connect-src")).toContain(`ws://127.0.0.1:${e2ePort}`);
   }
 }
 
@@ -87,7 +89,7 @@ test.describe("Phase 4 Compare security and privacy", () => {
       nonce: (element as HTMLScriptElement).nonce,
     })));
     for (const script of scripts) {
-      if (script.src !== "") expect(new URL(script.src).origin).toBe("http://127.0.0.1:3102");
+      if (script.src !== "") expect(new URL(script.src).origin).toBe(e2eOrigin);
       if (script.src === "" && script.text.trim() !== "") expect(script.nonce).toBe(nonce);
     }
     await expect(page.locator("iframe, object, embed")).toHaveCount(0);

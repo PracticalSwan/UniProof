@@ -1,7 +1,7 @@
+/* eslint-disable @next/next/no-sync-scripts -- The nonce-bound Zod JIT disable must run as a parser-time external script before application chunks; next/script serializes the request nonce into client hydration state and can mismatch after navigation. */
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { cookies, headers } from "next/headers";
-import Script from "next/script";
 import { connection } from "next/server";
 
 import { AuthSessionProvider, type AuthUiState } from "@/components/auth/auth-session-provider";
@@ -70,10 +70,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     <html lang="en" className={inter.variable}>
+      <head>
+        <script
+          id="uniproof-zod-jitless"
+          src="/zod-jitless.js"
+          nonce={nonce}
+          suppressHydrationWarning
+        />
+      </head>
       <body>
-        <Script id="uniproof-zod-jitless" strategy="beforeInteractive" nonce={nonce}>
-          {"globalThis.__zod_globalConfig=globalThis.__zod_globalConfig||{};globalThis.__zod_globalConfig.jitless=true;"}
-        </Script>
         <RuntimeStyleNonce nonce={nonce} />
         <AuthSessionProvider initialState={authState}>
           <SavedRestoreProvider>

@@ -7,6 +7,8 @@ import nextConfig from "@/next.config";
 import {
   phase3dDevHarnessRootFiles,
   resolvePhase3dDevHarness,
+  resolvePlaywrightOrigin,
+  resolvePlaywrightPort,
 } from "@/tests/e2e/helpers/playwright-harness";
 
 describe("Phase 3D Playwright dev harness path safety", () => {
@@ -44,6 +46,16 @@ describe("Phase 3D Playwright dev harness path safety", () => {
       maxInactiveAge: 10 * 60 * 1000,
       pagesBufferLength: 8,
     });
+  });
+
+  it("uses the default Playwright port but accepts a bounded explicit override for isolated concurrent verification", () => {
+    expect(resolvePlaywrightPort(undefined)).toBe(3102);
+    expect(resolvePlaywrightPort("3112")).toBe(3112);
+    expect(resolvePlaywrightOrigin(undefined)).toBe("http://127.0.0.1:3102");
+    expect(resolvePlaywrightOrigin("3112")).toBe("http://127.0.0.1:3112");
+    for (const invalid of ["", "0", "65536", "3102.5", "abc", " 3112 "]) {
+      expect(() => resolvePlaywrightPort(invalid)).toThrow(/invalid Playwright port/i);
+    }
   });
 
   it("rejects inherited harness IDs that contain path traversal or separators", () => {

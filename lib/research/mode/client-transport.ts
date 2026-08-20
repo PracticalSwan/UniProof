@@ -9,6 +9,8 @@ import {
 export type ResearchClientTransportResult =
   | { kind: "dossier"; dossier: ResearchDossier }
   | { kind: "server-error"; error: PublicResearchTransportError }
+  | { kind: "deployment-rate-limit"; error: { code: "deployment-rate-limit"; message: string } }
+  | { kind: "deployment-timeout"; error: { code: "deployment-timeout"; message: string } }
   | { kind: "network-error"; error: { code: "network-error"; message: string } }
   | { kind: "invalid-response"; error: { code: "invalid-response"; message: string } }
   | { kind: "cancelled" };
@@ -19,6 +21,10 @@ const INVALID_RESPONSE_MESSAGE =
   "The research response could not be safely validated for display.";
 const NETWORK_ERROR_MESSAGE =
   "The research request could not be sent. Check the connection and try again.";
+const DEPLOYMENT_RATE_LIMIT_MESSAGE =
+  "The deployment is temporarily limiting research requests. Try again explicitly in a moment.";
+const DEPLOYMENT_TIMEOUT_MESSAGE =
+  "The deployment timed out before the research request completed. Try again explicitly.";
 
 function invalidResponse(): ResearchClientTransportResult {
   return {
@@ -228,6 +234,21 @@ export async function executeResearchRequest(
   }
 
   if (signal.aborted) return { kind: "cancelled" };
+
+  if (response.status === 429) {
+    cancelResponseBodyBestEffort(response);
+    return {
+      kind: "deployment-rate-limit",
+      error: { code: "deployment-rate-limit", message: DEPLOYMENT_RATE_LIMIT_MESSAGE },
+    };
+  }
+  if (response.status === 504) {
+    cancelResponseBodyBestEffort(response);
+    return {
+      kind: "deployment-timeout",
+      error: { code: "deployment-timeout", message: DEPLOYMENT_TIMEOUT_MESSAGE },
+    };
+  }
 
   if (!isJsonContentType(response) || !declaredLengthWithinBound(response)) {
     cancelResponseBodyBestEffort(response);

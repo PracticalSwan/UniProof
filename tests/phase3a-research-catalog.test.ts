@@ -319,8 +319,10 @@ describe("Phase 3A public research contracts", () => {
 describe("Phase 3A supported catalog", () => {
   it("checks in a bounded multi-country catalog with degree coverage", () => {
     expect(researchCatalog.universities.length).toBeGreaterThanOrEqual(10);
-    expect(researchCatalog.universities.length).toBeLessThanOrEqual(15);
-    expect(new Set(researchCatalog.universities.map((item) => item.countryCode))).toEqual(new Set(["US", "GB", "TH"]));
+    expect(researchCatalog.universities.length).toBeLessThanOrEqual(40);
+    expect(new Set(researchCatalog.universities.map((item) => item.countryCode))).toEqual(
+      new Set(["BE", "CA", "DE", "DK", "FI", "GB", "IT", "NL", "SE", "TH", "US"]),
+    );
     expect(researchCatalog.programs.length).toBeGreaterThanOrEqual(10);
     expect(researchCatalog.programs.length).toBeLessThanOrEqual(60);
     expect(new Set(researchCatalog.programs.map((item) => item.degreeLevel))).toEqual(new Set(["bachelor", "master"]));

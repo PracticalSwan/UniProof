@@ -15,6 +15,7 @@ import type { ResolvedResearchTarget } from "@/lib/research/discovery/types";
 import { extractResearchDocuments } from "@/lib/research/extraction/orchestrator";
 import type { ExtractionFailure, ExtractionStageResult, ExtractionTargetIdentity } from "@/lib/research/extraction/types";
 import { runDiscoveryRetrievalStage } from "@/lib/research/pipeline";
+import { researchAbortFailureCode } from "./execution-budget";
 import { reconcileResearchClaims } from "@/lib/research/reconciliation/orchestrator";
 import type { ReconciliationFailure, ReconciliationStageResult } from "@/lib/research/reconciliation/types";
 import {
@@ -169,17 +170,23 @@ export async function runPhase2Research(
 
   const request: ResearchRequest = { ...parsed.data, categories: canonicalizeResearchCategories(parsed.data.categories) };
   const requestedCategories = request.categories;
-  if (options.signal?.aborted) {
+  const initialAbortCode = options.signal?.aborted
+    ? researchAbortFailureCode(options.signal)
+    : undefined;
+  if (initialAbortCode !== undefined) {
     const updatedAt = clock.next();
     const completedAt = clock.next();
     const failures = requestedCategories.map((category) => ({
-      category, code: "cancelled" as const, message: failureMessage("cancelled"),
+      category, code: initialAbortCode, message: failureMessage(initialAbortCode),
     }));
     return resultOrThrow({
       run: {
         id: runId, status: "failed", createdAt, startedAt, updatedAt, completedAt, partial: false,
         providerAttempts: [], processedCategories: [], unprocessedCategories: requestedCategories,
-        failureCode: "cancelled", failureReason: "research run was cancelled before provider work began",
+        failureCode: initialAbortCode,
+        failureReason: initialAbortCode === "timeout"
+          ? "research run reached its whole-run deadline before provider work began"
+          : "research run was cancelled before provider work began",
       },
       candidateSources: [], sources: [], documents: [], candidates: [], claims: [], explanations: [],
       evidenceSummary: buildEvidenceSummary({
@@ -201,7 +208,10 @@ export async function runPhase2Research(
 
   if (!stage.resolution.resolved) {
     for (const category of requestedCategories) {
-      reasonByCategory.set(category, options.signal?.aborted ? "cancelled" : "source-discovery");
+      reasonByCategory.set(
+        category,
+        options.signal?.aborted ? researchAbortFailureCode(options.signal) : "source-discovery",
+      );
     }
     const processedCategories: ResearchCategory[] = [];
     const unprocessedCategories = [...requestedCategories];
@@ -276,6 +286,14 @@ export async function runPhase2Research(
 
   const processedCategories = canonicalizeResearchCategories(reconciliation?.completedCategories ?? []);
   const unprocessedCategories = requestedCategories.filter((category) => !processedCategories.includes(category));
+  const terminalAbortCode = options.signal?.aborted
+    ? researchAbortFailureCode(options.signal)
+    : undefined;
+  if (terminalAbortCode !== undefined) {
+    for (const category of unprocessedCategories) {
+      reasonByCategory.set(category, terminalAbortCode);
+    }
+  }
   const claims = (reconciliation?.claims ?? []).filter((claim) => processedCategories.includes(claim.category));
   const explanationByCategory = new Map(
     (reconciliation?.explanations ?? []).map((explanation) => [explanation.category, explanation]),

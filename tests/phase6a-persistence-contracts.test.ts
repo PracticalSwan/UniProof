@@ -16,9 +16,15 @@ import {
 import type { ResearchModeRequest } from "@/lib/research/mode/public-contracts";
 import { buildGuideDossier, makeClaim } from "@/tests/fixtures/guide-dossiers";
 import { makeComparisonDossier } from "@/tests/fixtures/comparison-dossiers";
+import {
+  guideCatalogTarget,
+  persistenceComparisonTargets,
+  requireCatalogProgram,
+  requireCatalogUniversity,
+} from "@/tests/helpers/catalog-targets";
 
-const university = researchCatalog.universities[0]!;
-const program = researchCatalog.programs.find((item) => item.universityId === university.id)!;
+const { university, program } = guideCatalogTarget;
+const differentUniversity = requireCatalogUniversity("university-edinburgh");
 
 const profile: GuideApplicantProfile = {
   citizenship: "Malaysia",
@@ -63,16 +69,12 @@ function guideResult() {
 
 function comparisonResult() {
   const targetA = {
-    universityId: researchCatalog.universities[4]!.id,
-    programId: researchCatalog.programs.find(
-      (item) => item.universityId === researchCatalog.universities[4]!.id,
-    )!.id,
+    universityId: persistenceComparisonTargets[0].university.id,
+    programId: persistenceComparisonTargets[0].program.id,
   };
   const targetB = {
-    universityId: researchCatalog.universities[5]!.id,
-    programId: researchCatalog.programs.find(
-      (item) => item.universityId === researchCatalog.universities[5]!.id,
-    )!.id,
+    universityId: persistenceComparisonTargets[1].university.id,
+    programId: persistenceComparisonTargets[1].program.id,
   };
   const submission = freezeComparisonSubmission(comparisonSubmissionSchema.parse({
     targets: [targetA, targetB],
@@ -187,7 +189,7 @@ describe("saved artifact runtime validation", () => {
       kind: "research",
       schemaVersion: 1,
       payload: {
-        request: { ...guideRequest, universityId: researchCatalog.universities[1]!.id },
+        request: { ...guideRequest, universityId: differentUniversity.id },
         dossier,
       },
     }, researchCatalog);
@@ -223,6 +225,46 @@ describe("saved artifact runtime validation", () => {
     expect(validation.boundArtifact.payload.dossier.target.program?.officialUrl).toBe(program.officialUrl);
     expect(validation.boundArtifact.payload.dossier.sources).toEqual(result.dossier.sources);
     expect(validation.artifact.payload.assessments[0]?.evidenceRefs).toHaveLength(2);
+  });
+
+  it("validates and rebinds a new-country version-1 Research snapshot", () => {
+    const delft = requireCatalogUniversity("university-tu-delft");
+    const delftProgram = requireCatalogProgram("program-tu-delft-computer-science-msc");
+    const dossier = buildGuideDossier({
+      universityId: delft.id,
+      programId: delftProgram.id,
+      universityName: delft.name,
+      programName: delftProgram.name,
+      universityWebsiteUrl: "https://stored.example/university",
+      programOfficialUrl: "https://stored.example/program",
+    });
+    dossier.target.university.countryCode = delft.countryCode;
+    dossier.target.program!.degreeLevel = delftProgram.degreeLevel;
+    dossier.target.program!.subjectArea = delftProgram.subjectArea;
+
+    const validation = validateSavedArtifact({
+      kind: "research",
+      schemaVersion: 1,
+      payload: {
+        request: {
+          universityId: delft.id,
+          programId: delftProgram.id,
+          categories: ["admissions", "tuition", "scholarships"],
+        },
+        dossier,
+      },
+    }, researchCatalog);
+
+    expect(validation.ok).toBe(true);
+    if (
+      !validation.ok ||
+      validation.artifact.kind !== "research" ||
+      validation.boundArtifact.kind !== "research"
+    ) return;
+    expect(validation.boundArtifact.payload.dossier.target.university.countryCode).toBe("NL");
+    expect(validation.boundArtifact.payload.dossier.target.university.websiteUrl).toBe(delft.websiteUrl);
+    expect(validation.boundArtifact.payload.dossier.target.program?.officialUrl).toBe(delftProgram.officialUrl);
+    expect(validation.artifact.payload.dossier.target.university.websiteUrl).toBe("https://stored.example/university");
   });
 
   it("rejects a removed catalog target without using stored official URLs", () => {

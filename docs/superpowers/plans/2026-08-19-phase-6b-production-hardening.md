@@ -1,451 +1,312 @@
 # Phase 6B Production Hardening Implementation Plan
 
-> **For agentic workers:** REQUIRED PROCEDURE: follow `AGENTS.md` model-specific delegation/review rules. Use TDD/systematic debugging and current primary documentation for Vercel/Supabase/provider behavior. Do not let a generic workflow authorize deployment or other external changes.
+> **Execution model:** ZERO SUBAGENTS. GLM-5.3 Max must perform implementation, debugging, security/privacy review, accessibility review, testing, documentation, and both final review passes in the main agent only. Do not spawn a reviewer, specialist, parallel worker, or any other child agent.
 
-**Goal:** Make the Phase 0–6A application safe and predictable for public hosting by adding a whole-run deadline, production-aware failure handling, CI/release gates, and an exact durable rate-limit/deployment configuration plan without deploying or mutating hosted services in this batch.
+**Goal:** Harden the reviewed Phase 6A UniProof application for a Vercel production environment without deploying it: add a truthful whole-Research execution deadline, opt in to host cancellation, safely classify platform rate-limit/timeout responses, migrate Gemini structured calls to stable v1 Interactions, freeze a durable WAF contract, add production-configuration verification and least-privilege CI, and rerun the complete Phase 0–6B local/built/security matrix.
 
-**Architecture:** Keep the application-level Research pipeline authoritative and bounded before platform termination, handle platform-generated failures explicitly, define Vercel WAF as the deployment-layer distributed abuse control, preserve nonce CSP/auth refresh, and add least-privilege CI using fixtures/local Supabase only. External Vercel/Supabase configuration is verified/read-only where possible and applied only in Phase 6C after explicit authorization.
+**Implementation status (2026-08-20):** implemented and locally verified. The final review additionally fixed release-verifier publication gaps, replaced the nonce-bearing `next/script` Zod bootstrap with a nonce-authorized first-party static bootstrap after reproducible development hydration/chunk instability, fixed Compare explicit retry after deployment 429/504 so undispatched immutable targets are retried rather than dropped, and made Auth/Saved browser verification derive one shared validated isolated Playwright origin rather than retaining hidden port-3102 assumptions. Phase 6C remains responsible for all hosted/live verification.
 
-**Tech Stack:** Next.js 16.3.1 Node runtime, Vercel Functions/Firewall, Supabase local stack, GitHub Actions, npm/Node 22, Vitest, Playwright, existing provider adapters.
+**Architecture:** Keep all Phase 0–6A product/evidence/auth/persistence semantics unchanged. The expensive public Research request gains one server-owned 240-second execution budget under a 300-second Vercel Node/Fluid function cap. That budget propagates through the existing AbortSignal path and must produce truthful `timeout` lifecycle failures while caller cancellation remains `cancelled`. Vercel request cancellation is enabled only for Research through repository configuration. Deployment-generated 429/504 responses are classified client-side before JSON parsing because WAF/platform responses are not application envelopes. Durable rate limiting itself remains a Phase 6C Vercel Firewall action; Phase 6B defines and tests the exact contract without adding an in-memory limiter or hidden production test mode.
 
-**Spec:** `docs/planning/phase-6-hardening-submission-readiness.md`, especially Sections 5, 7, 8, and 9.
+**Tech Stack:** Next.js 16.3.1 App Router / Node runtime, TypeScript 5, React 19.2.8, Zod 4.4.3, Vitest 4.1.10, Playwright 1.62.1, Supabase CLI 2.114.0 local-only, Vercel CLI 59.1.4 read-only/local validation, GitHub Actions, Gemini/Groq/OpenRouter structured REST adapters.
+
+**Spec:** `docs/planning/phase-6-hardening-submission-readiness.md`
 
 ## Global constraints
 
-- Phase 6A must be locally complete and its final regression matrix green before starting 6B.
-- No public/preview deployment in this batch.
-- No Vercel project creation/linking/env/domain/firewall mutation in this batch without separate explicit authorization.
-- No hosted Supabase mutation.
-- No live provider requests unless separately authorized; default verification uses injected deterministic transports/fixtures.
-- No CI workflow may use production provider keys, hosted database credentials, or deploy privileges.
-- No automatic GitHub/Vercel deployment workflow.
-- Do not replace current deterministic partial-result semantics with generic 500/timeout behavior.
-- Do not weaken provider attempt budgets to make tests pass.
-- Do not add an in-memory token bucket and call it distributed rate limiting.
-- Preserve `ui-flow-screenshots/`.
+- Canonical workspace: `D:\Side Projects\UniProof`; branch `main`; Phase 6A reviewed baseline commit `5d3b5de40f00730262c65dcdf83babd75e498ca9`.
+- Preserve every Phase 6A invariant recorded in `AGENT_MEMORY.md`: anonymous core use, Auth/RLS ownership, exact saved-artifact validation, account-bound memory-only restore, applicant/provider separation, current-catalog target rebinding, and all Research/Compare/Guide lifecycle rules.
+- ZERO SUBAGENTS for GLM-5.3 Max, including the final review. Main agent only.
+- Do not link or mutate hosted Supabase. Do not mutate Vercel project settings, Firewall/WAF, environment variables, domains, deployments, or Git integration. Do not send live Tavily/Brave/Gemini/Groq/OpenRouter requests. Do not mutate GitHub or Devpost. Do not commit/push unless a later explicit user instruction authorizes publication.
+- Do not touch, delete, or overwrite the ten protected `ui-flow-screenshots/` PNGs.
+- Do not add paid provider escalation. Provider order remains Tavily -> Brave discovery and Gemini -> Groq -> OpenRouter structured fallback.
+- Do not add `/api/compare`, `/api/guide`, applicant-aware provider prompts, AI scoring, admission probability, analytics, queues/workers, Redis, a Vercel Firewall SDK, or an application in-memory “distributed” rate limiter.
+- Prefer existing dependencies. `vercel.json`, GitHub Actions YAML, and application-owned utilities do not require a new runtime package.
+- Use TDD regression-first for every behavior or bug fix. Exercise the real path, not import-only/static evidence.
+- Evidence labels must remain exact: local/dev, built-production, local Supabase, local workflow/config validation, actual GitHub CI, preview deployment, production deployment are different evidence levels.
+- Current external facts revalidated on 2026-08-19 and must be checked again if implementation happens materially later:
+  - Vercel Fluid Compute is enabled by default; current documented Node default is 300 seconds. Hobby max is 300 seconds and the ordinary Pro/Enterprise max is 800 seconds. Do not design around the optional 30-minute beta.
+  - Next.js App Router supports `export const maxDuration`; Vercel request cancellation is a separate Node-only `supportsCancellation: true` function configuration.
+  - Vercel automatically supplies HSTS on deployment responses (`max-age=63072000`). UniProof must not add duplicate `includeSubDomains`/`preload` policy during 6B.
+  - Vercel WAF fixed-window rate limiting is available across plans; Log mode can observe before enforcement. UniProof’s proposed 20 requests / 60 seconds / source IP is a provisional product policy, not a Vercel default.
+  - Gemini Interactions core features are GA in stable `/v1`; current `gemini-3.5-flash-lite` and `gemini-3.5-flash` are stable and have free-tier availability. The checked-in adapter already uses the post-June-2026 `steps` + `response_format` schema but still targets `/v1beta/interactions`.
 
 ---
 
-## Task 1 — Revalidate mutable platform/provider assumptions before code
+## Canonical file responsibilities
 
-**Read first:** canonical Phase 6 spec, design/security docs, `/api/research`, Phase 2 orchestration/budget modules, proxy/browser policy, Playwright harness, package/Next config.
+**Create**
+- `lib/research/orchestration/execution-budget.ts` — caller-cancel vs whole-run-deadline composition and classification.
+- `lib/integrations/abortable-delay.ts` — tiny abort-aware retry-delay helper shared by Tavily and Brave.
+- `vercel.json` — minimal Research-only request-cancellation opt-in.
+- `.github/workflows/ci.yml` — least-privilege, no-deploy, no-live-provider CI.
+- `scripts/verify-release-config.mjs` — read-only production/configuration contract verifier that never prints secret values.
+- `docs/planning/phase-6-requirements-traceability.md` — requirement -> implementation -> evidence map through 6B.
+- `docs/operations/vercel-production.md` — exact Phase 6C Vercel/WAF/config runbook; no remote action in 6B.
 
-**Current-source checks:**
+**Modify**
+- `lib/security/research-limits.ts` — add 240,000 ms whole-run deadline and only genuinely needed client/platform bounds.
+- `app/api/research/route.ts` — `runtime = "nodejs"`, `maxDuration = 300`.
+- `lib/research/mode/handler.ts` — compose deadline after request validation, reuse the shared same-origin mutation guard where appropriate, pass the composed signal, dispose resources.
+- `lib/research/orchestration/orchestrator.ts` — map deadline-owned abort to `timeout`, caller abort to `cancelled`, preserve completed evidence, start no new stage after terminal signal.
+- `lib/integrations/tavily/search.ts`, `lib/integrations/brave/search.ts` — abort retry waits immediately; no retry dispatch after terminal signal.
+- `lib/research/ai/structured-task.ts` — prove global abort wins before retry/fallback dispatch and during backoff without expanding attempt budgets.
+- `lib/research/mode/client-transport.ts`, `lib/research/mode/client-state.ts`, Research/Compare/Guide workspaces — client-local deployment 429/504 outcomes before application JSON requirements, no auto-retry, previous-result preservation.
+- `lib/integrations/gemini/structured.ts` — stable `/v1/interactions`; preserve current new schema/model/privacy behavior.
+- provider adapter tests — freeze current Groq/OpenRouter/Tavily/Brave privacy/capability assumptions without live requests.
+- docs/status files only after observed implementation.
 
-- [ ] Vercel current maximum-duration mechanism and selected account-plan limits.
-- [ ] Whether Fluid Compute is enabled/expected and whether the selected plan supports the planned 240s function maximum.
-- [ ] Vercel current WAF rate-limit availability, pricing, fixed-window semantics, keys/actions, and whether configuration is dashboard/API/CLI-accessible.
-- [ ] Vercel current cancellation semantics/configuration for Node functions.
-- [ ] Current provider endpoints/models/privacy/free-route rules for Gemini/Groq/OpenRouter/Tavily/Brave.
-- [ ] Current Supabase/Auth behavior introduced in 6A.
-
-If any assumption materially changed, update `docs/planning/phase-6-hardening-submission-readiness.md` before implementation. Never code to stale platform limits.
-
----
-
-## Task 2 — Add an application-owned whole-Research deadline
-
-**Inspect exact orchestration ownership before editing. Expected owners:**
-- `app/api/research/route.ts`
-- `lib/research/orchestration/*`
-- existing shared timeout/cancellation utilities
-
-**Create/modify only at the smallest coherent layer:**
-- one central whole-run deadline constant/config;
-- deadline signal composition helper only if existing `AbortSignal` handling cannot express caller-cancel + server-deadline safely;
-- targeted tests under `tests/`.
-
-Planned limits:
-
-- [ ] application whole-run deadline: 210,000 ms;
-- [ ] Vercel route export `maxDuration = 240` seconds;
-- [ ] all existing shorter provider/stage deadlines remain unchanged unless a current-source conflict is proven.
-
-Required semantics:
-
-- [ ] start whole-run clock only after request validation/target resolution reaches the accepted Research dispatch boundary documented in the spec;
-- [ ] caller cancellation and server deadline are distinct reasons internally but both terminally stop new provider/discovery work;
-- [ ] whichever aborts first owns cancellation; later timers/listeners are cleaned up;
-- [ ] abort signal propagates through target resolution, discovery, retrieval, extraction, reconciliation, explanation, and finalization as currently supported;
-- [ ] after whole-run deadline, do not start a new retry, fallback provider, DNS lookup, retrieval, extraction task, semantic task, or explanation request;
-- [ ] preserve validated completed evidence/categories and truthfully mark unfinished categories operationally incomplete/partial rather than unknown;
-- [ ] explanation fallback remains deterministic and cannot delay terminal evidence finalization beyond deadline;
-- [ ] timer/listener resources are cleared on every success/error/cancel path;
-- [ ] no `Promise.race` branch leaves uncontrolled work running after the response.
-
-### RED/GREEN cases
-
-- [ ] deadline before any discovery result;
-- [ ] deadline after one category complete and another pending;
-- [ ] deadline during DNS/retrieval;
-- [ ] deadline during provider body read;
-- [ ] deadline between transient failure and retry dispatch;
-- [ ] deadline between Gemini failure and Groq fallback;
-- [ ] deadline during explanation does not mutate evidence;
-- [ ] caller abort wins before deadline;
-- [ ] deadline wins before later caller abort;
-- [ ] completion at/just before deadline;
-- [ ] timer cleanup verified with fake timers/open-handle check where practical;
-- [ ] no post-terminal provider-attempt history record implies an HTTP call that never occurred.
+**Tests to create/extend**
+- `tests/phase6b-research-deadline.test.ts`
+- `tests/phase6b-deployment-transport.test.ts`
+- `tests/phase6b-production-config.test.ts`
+- existing Phase 2D/provider tests
+- existing Research state/transport/orchestration tests
+- existing Research/Compare/Guide/Auth browser suites and local Supabase gates
 
 ---
 
-## Task 3 — Make deployment-generated 429/timeout failures first-class client outcomes
+## Task 1 — Revalidate mutable platform/provider assumptions
 
-**Inspect:**
-- Research client transport/public error contracts;
-- Compare sequential Research transport/error mapping;
-- Guide Research transport/error mapping;
-- existing UI retry/preserved-result behavior.
+- [ ] Read current official Vercel duration, cancellation, WAF, response-header, and project-configuration docs. Record source date/URL in the Phase 6 spec.
+- [ ] Verify local `vercel --version`. Use account/project commands read-only only if they return without prompting/mutation. If actual account/project/Fluid state cannot be established, record it as a 6C deployment gate rather than guessing.
+- [ ] Read current official Gemini API version/model/pricing/data-use docs, Groq model/structured-output/data docs, OpenRouter routing/privacy/ZDR docs, Tavily Search docs, and Brave Search API privacy/storage docs.
+- [ ] Inspect checked-in adapters before editing. Expected baseline: Gemini new `steps` schema but `/v1beta`; Groq `openai/gpt-oss-120b` strict schema; OpenRouter `require_parameters:true` + `data_collection:"deny"` and conditional `zdr:true`; Tavily answer/raw/auto parameters disabled; Brave URL/title discovery-only.
+- [ ] Freeze current 6B values: `RESEARCH_TOTAL_DEADLINE_MS = 240_000`, `maxDuration = 300`, WAF contract `POST /api/research`, fixed window 60s, source IP, threshold 20, Log-first.
+- [ ] Record privacy residuals truthfully: Gemini unpaid-tier public inputs may be used for product improvement/human review, so applicant/private data must remain mechanically excluded; Brave standard Search API query logs may be retained up to 90 days and raw API-result storage rights are restricted unless the plan grants them; do not claim universal ZDR for free providers.
 
-**Modify:** owning Research public transport/error contract and consumers only as necessary.
+**Verification:** after implementation/doc synchronization, active 6B requirements must contain no stale `210_000`, `210 seconds`, `maxDuration=240`, custom app-HSTS requirement, or Gemini `/v1beta` production target except explicitly historical/superseded notes.
 
-Requirements:
+## Task 2 — Add a truthful whole-Research execution budget
 
-- [ ] Recognize HTTP 429 even when Vercel WAF returns a non-application body.
-- [ ] Map 429 to one stable sanitized public code/message such as `rate-limited`; do not expose WAF internals/source IP/rule name.
-- [ ] Respect a bounded valid `Retry-After` for display only if supplied; do not auto-loop/retry at browser level.
-- [ ] Preserve prior Research/Compare/Guide results on rate-limit failure exactly as other recoverable refresh failures do.
-- [ ] Compare stops/marks remaining targets according to existing batch failure policy without fan-out or rapid blind retry.
-- [ ] Guide does not lose the applicant form/prior result.
-- [ ] Recognize platform 504/non-JSON HTML/empty timeout responses as sanitized upstream/timeout failures rather than JSON parser crashes.
-- [ ] Keep response-byte/content-type protections for application-owned success/error JSON.
+**Interface:**
+```ts
+export const RESEARCH_TOTAL_DEADLINE_MS = 240_000;
 
-**RED browser cases:** intercepted 429 JSON/HTML/empty body, 429 during second of four Compare targets, Guide refresh 429 with prior result, 504 during Research, repeated Retry click does not automatically spam requests.
+export type ResearchExecutionBudget = Readonly<{
+  signal: AbortSignal;
+  deadlineReached: () => boolean;
+  callerCancelled: () => boolean;
+  dispose: () => void;
+}>;
 
----
+export function createResearchExecutionBudget(
+  callerSignal: AbortSignal,
+  timeoutMs?: number,
+): ResearchExecutionBudget;
 
-## Task 4 — Prove hard platform timeout is not normal control flow
+export function researchAbortFailureCode(signal: AbortSignal): "timeout" | "cancelled";
+```
 
-**Create deterministic timing acceptance tests:**
+- [ ] RED fake-timer tests: caller pre-abort -> cancelled; caller abort during run -> cancelled; timer expiry -> timeout; first terminal owner wins a caller/deadline race; `dispose()` is idempotent and removes timer/listener behavior; no real multi-minute wait.
+- [ ] Implement an internal deadline reason that cannot be confused with arbitrary caller reasons. Never expose/serialize its stack/detail.
+- [ ] Do not leave a 240-second timer/listener attached after a normal quick request.
+- [ ] Focused tests GREEN.
 
-- [ ] simulate stage timings that approach 210s under fake/injected clocks without actually waiting minutes;
-- [ ] prove application produces a terminal partial/failed result before 240s;
-- [ ] prove no stage can intentionally set a timeout greater than remaining whole-run budget and then start after the budget;
-- [ ] clamp bounded retry/backoff to remaining budget;
-- [ ] prove response serialization/public dossier finalization cannot initiate new network work.
+## Task 3 — Route the deadline through handler/orchestration without losing partial evidence
 
-If observed normal deterministic fixture paths can exceed 210s because internal stage scheduling ignores remaining budget, fix scheduling rather than increasing the platform limit automatically.
+- [ ] RED tests with some categories completed before deadline. Expected: schema-valid partial dossier; completed categories unchanged; unfinished categories use `timeout` lifecycle failures.
+- [ ] Caller cancellation through the same path remains `cancelled`, not timeout.
+- [ ] Start the expensive-run timer only after content-type/JSON/public target/sensitive-input validation reaches accepted Research dispatch.
+- [ ] Handler passes only the composed signal to `runResearch` and always disposes the execution budget in `finally`.
+- [ ] **Replace** the handler-local `isAllowedResearchOrigin` implementation with the existing `isAllowedSameOriginMutation` from `lib/security/same-origin.ts`. Add regressions proving `Sec-Fetch-Site: same-origin` is accepted even when Next's internal request host is `localhost` but the browser origin is `127.0.0.1`, `Sec-Fetch-Site: none` remains allowed, `same-site`/`cross-site` are rejected, and clients without Fetch Metadata fall back to exact Origin comparison. Do not keep two origin-policy implementations.
+- [ ] At every post-await orchestration boundary compute the outer terminal code once from ownership, conceptually `const abortCode = signal?.aborted ? researchAbortFailureCode(signal) : undefined`. Use that code instead of a boolean `aborted` in extraction/reconciliation failure classification and final category reasoning.
+- [ ] Low-level discovery/retrieval code may internally label an aborted composed signal as `cancelled`; when the **outer 240s deadline** owns the composed signal, overwrite only the final `reasonByCategory` entries for **unprocessed categories** with `timeout` before final failures/evidence summary are built. When the caller owns the signal, keep `cancelled`. Never rewrite processed categories, validated claims, sources, or explanations merely because the signal became terminal later.
+- [ ] Once terminal, no new discovery, DNS/retrieval, extraction, reconciliation, explanation, retry, or fallback dispatch starts.
+- [ ] Normal deadline behavior stays inside the existing Research lifecycle/dossier contract. If a truly unexpected exception prevents a validated dossier, retain sanitized transport failure instead of fabricating evidence.
 
----
+## Task 4 — Make discovery retry waits abort-aware
 
-## Task 5 — Define and test the Vercel WAF rule contract without publishing it
+**Create:** `lib/integrations/abortable-delay.ts`
 
-**Create:**
+```ts
+export async function waitForRetryDelay(
+  milliseconds: number,
+  signal: AbortSignal | undefined,
+  sleep: (milliseconds: number) => Promise<void>,
+): Promise<boolean>;
+```
+
+- [ ] RED tests: deadline/caller abort during Tavily/Brave Retry-After resolves promptly and dispatches no retry; already-aborted signal does not sleep.
+- [ ] Implement a tiny helper with deterministic listener cleanup and injected sleep support.
+- [ ] Preserve current provider bounds: one retry; Brave/Tavily Retry-After max 1s; bounded query/result response; Tavily `basic`, no answer/raw/auto parameters.
+
+## Task 5 — Prove AI retry/fallback dispatch obeys the whole signal
+
+- [ ] Extend AI transport fake-timer tests for global abort during fetch, bounded body read, Retry-After wait, and immediately before retry/fallback reservation.
+- [ ] No new HTTP attempt is reserved/dispatched after terminal signal. Attempt history must never imply a call that did not happen.
+- [ ] Keep existing per-attempt 30s timeout, Retry-After 2s cap, output tokens, response bytes, and total/provider HTTP budgets. Do not increase them to “fit” the global budget.
+- [ ] Keep provider cleanup best-effort and sanitized; no prompt/body/error leakage.
+
+## Task 6 — Configure Vercel duration and cancellation without deployment
+
+- [ ] RED config test expects `app/api/research/route.ts` Node runtime and `export const maxDuration = 300`.
+- [ ] RED config test expects a minimal `vercel.json` with `supportsCancellation:true` scoped only to the Research function path/glob supported by current Vercel configuration semantics.
+- [ ] Keep `maxDuration` in Next route-segment config; do not duplicate it in `vercel.json` unless current Vercel behavior proves a need.
+- [ ] `vercel.json` must not add project IDs, regions, deploy commands, environment values, headers, HSTS, or broad all-function cancellation.
+- [ ] Prove the function glob against current official docs/schema/local static validation. If exact matching cannot be established without deployment, leave a clearly documented 6C blocker rather than inventing a path.
+- [ ] Local tests prove only signal propagation from `request.signal`; actual Vercel disconnect propagation remains 6C live evidence.
+
+## Task 7 — Classify raw deployment 429/504 before JSON parsing
+
+**Client-local outcomes:**
+```ts
+| { kind: "deployment-rate-limit"; error: { code: "deployment-rate-limit"; message: string } }
+| { kind: "deployment-timeout"; error: { code: "deployment-timeout"; message: string } }
+```
+
+Do not put these in the application server JSON error schema because WAF/platform responses can occur before application code.
+
+- [ ] RED tests: HTTP 429 with HTML/plain/empty/malformed/oversize body -> deployment-rate-limit without trusting/parsing body; HTTP 504 -> deployment-timeout.
+- [ ] Cancel response body best-effort/non-blocking. Never reflect Vercel/WAF body text, source IP, rule name, request IDs, or HTML.
+- [ ] No automatic browser retry. Do not create retry countdown/background retry behavior.
+- [ ] Ordinary application JSON errors continue through strict content-type/body/schema validation.
+- [ ] Research/Compare/Guide preserve previous displayed results on platform 429/504.
+- [ ] Preferred Compare rule: a terminal platform 429/504 stops the active sequential batch rather than amplifying rate-limited traffic; preserve already completed target/previous-result state and test it explicitly.
+- [ ] Guide retains applicant form/prior result and requires explicit user retry/reassess.
+
+## Task 8 — Migrate Gemini structured REST to stable v1
+
+- [ ] RED exact-endpoint test: `https://generativelanguage.googleapis.com/v1/interactions`.
+- [ ] Preserve current request: stable model ID, prompt input, `store:false`, no tools, current `response_format` JSON schema, bounded generation config, current minimal/low thinking policy.
+- [ ] Preserve current response parsing: `status:"completed"`, current `steps` model output and documented `output_text` compatibility. Do not reintroduce removed legacy `outputs` schema.
+- [ ] Keep `gemini-3.5-flash-lite` normal and `gemini-3.5-flash` quality escalation. Do not switch to a newer preview merely for novelty.
+- [ ] No live Gemini call in 6B; fixtures are the implementation evidence. Recheck actual endpoint/model live availability immediately before bounded 6C smoke.
+
+## Task 9 — Freeze provider privacy/cost invariants
+
+- [ ] Gemini: document that free-tier inputs/outputs may be used for product improvement/human review. Tests mechanically prove applicant/account/private saved markers cannot reach Gemini. Do not claim free Gemini is ZDR.
+- [ ] Groq: retain `openai/gpt-oss-120b`, strict JSON Schema, non-streaming, bounded output. Document inference is not retained by default but limited abuse/reliability logging can occur; do not mutate account data-control settings in 6B.
+- [ ] OpenRouter: test `require_parameters:true`, `data_collection:"deny"`; when `UNIPROOF_OPENROUTER_REQUIRE_ZDR=true`, test `zdr:true`; require concrete returned model and never persist `openrouter/free` as concrete model identity.
+- [ ] Tavily: public research query only; basic search; no generated answer/raw content/auto parameters; provider snippets remain discovery metadata, never final evidence truth.
+- [ ] Brave: public query only; URL/title/rank discovery-only; do not persist raw Search API response/snippets. Standard Search API query logs can be retained up to 90 days and storage rights depend on plan; do not claim free Brave is ZDR.
+- [ ] Provider failure remains partial/unknown through deterministic gates. Never resolve a provider privacy change by sending private data or enabling paid escalation.
+
+## Task 10 — Add a non-secret production configuration verifier
+
+**Create:** `scripts/verify-release-config.mjs`; optionally `npm run verify:release-config`.
+
+- [ ] RED tests for production profile: `NEXT_PUBLIC_APP_URL` exact HTTPS origin, no credentials/path/query/fragment, no local/loopback; `UNIPROOF_RESEARCH_MODE=live`; optional Auth either fully configured with exact HTTPS Supabase origin + publishable key or fully absent/disabled; service-role key not required.
+- [ ] Treat provider configuration as a **readiness matrix**, not “all fallbacks are mandatory.” For a release-ready live profile require at least one configured general-web discovery provider (`TAVILY_API_KEY` or `BRAVE_SEARCH_API_KEY`) **and** at least one configured structured AI provider (`GEMINI_API_KEY`, `GROQ_API_KEY`, or `OPENROUTER_API_KEY`). Missing secondary fallbacks are reported as reduced resilience, not invalid configuration. The checked-in direct official-URL discovery path remains a degraded fallback and does not justify declaring a zero-search-key production profile release-ready; similarly, a zero-AI-key profile can degrade truthfully but cannot complete extraction/reconciliation and is not release-ready.
+- [ ] Development/CI profile does not require production secrets and allows fixture/built anonymous tests.
+- [ ] Verifier prints names/status/reasons only. Never print secret values, lengths, prefixes, hashes, project refs, or fingerprints.
+- [ ] Keep `NEXT_PUBLIC_APP_URL` out of authorization/callback logic; it is a release correctness input, not a trust source.
+- [ ] No network calls from the verifier.
+
+## Task 11 — Correct TLS/HSTS/header ownership
+
+- [ ] Preserve nonce CSP, frame/referrer/content-type/permissions headers, `poweredByHeader:false`, exact Supabase connect origin, no third-party scripts.
+- [ ] Do **not** add app-owned HSTS merely to mirror Vercel. Add regression/static checks that UniProof does not inject `includeSubDomains`/`preload` or conflicting custom HSTS.
+- [ ] Phase 6C must verify Vercel’s actual HTTPS response carries HSTS on the canonical deployed origin. Local/built tests cannot prove platform HSTS.
+- [ ] Do not attempt to control the parent `vercel.app` domain.
+
+## Task 12 — Freeze the durable WAF contract, not a fake limiter
+
+**Create/update:** `docs/operations/vercel-production.md`.
+
+- [ ] Exact future rule: path equals `/api/research`; method equals POST; fixed window; source IP; 60 seconds; threshold 20; **Log first**.
+- [ ] After 6C observation of normal judge traffic and separate authorization/pricing review, enforce Rate Limit/default 429 only if threshold is safe.
+- [ ] Document NAT/shared university Wi-Fi false-positive risk and that 20/min is provisional, not a Vercel default.
+- [ ] Local 429 tests use fabricated transport Responses or Playwright interception. Never add a production env flag/header/backdoor that simulates WAF inside application code.
+- [ ] No deliberate provider/Vercel quota exhaustion or burst traffic in 6B.
+
+## Task 13 — Add least-privilege GitHub Actions CI
+
+**Create:** `.github/workflows/ci.yml`.
+
+- [ ] Triggers: `pull_request` and `push`; no `pull_request_target`.
+- [ ] Top-level `permissions: contents: read`; no write/deploy permissions.
+- [ ] Bounded `timeout-minutes` and concurrency cancellation for superseded ref runs.
+- [ ] Pin Node to the locally verified Node 22 line, preferably exact `22.19.0` unless implementation revalidates another exact baseline; `npm ci` from lockfile.
+- [ ] Resolve current official `actions/checkout`, `actions/setup-node`, and `supabase/setup-cli` release tags to their official **full 40-character commit SHAs** at implementation time. Use SHA in YAML and tag only as comment. Never invent a SHA or leave floating `@main`/`@v6`/`@v3`.
+- [ ] Prefer `package-manager-cache:false` in setup-node unless a cache is deliberately reviewed and justified.
+- [ ] Run Vitest, TypeScript, ESLint, production build, production dependency audit/workspace/release-config checks, deterministic Playwright with retries zero.
+- [ ] Local Supabase job uses Ubuntu/Docker and fixed CLI **2.114.0**; `db reset`, `db lint`, `db advisors --local` where exposed, `test db`, local Auth/Saved browser tests. Never `--linked` or remote DB.
+- [ ] No provider/Vercel/hosted Supabase secrets. No live providers, deployment, remote DB, or Devpost action.
+- [ ] Do not upload traces/screenshots by default. If failure artifacts are truly required, upload only a reviewed bounded sanitized path and prove it cannot contain `.env*`, cookies, Mailpit magic links/message bodies, private profiles, provider responses, or protected screenshots.
+- [ ] Locally validate workflow YAML/permissions/static contract, but do not say “CI is green” until GitHub actually executes it on an authorized pushed commit.
+
+## Task 14 — Release verifier and requirements traceability
+
+**Create:** `docs/planning/phase-6-requirements-traceability.md`.
+
+- [ ] Map every current MVP requirement to implementing files plus unit/dev/built/local-Supabase evidence; deployment-only requirements remain clearly `verified-live pending 6C`.
+- [ ] Release verifier checks protected screenshot count/path, required docs, no disposable Playwright snapshot publication, ignored secret-bearing paths not staged, provider/service-role client boundary, package/lock consistency, `vercel.json`, CI file, Gemini v1 endpoint, 240s/300s contract, no custom preload/includeSubDomains HSTS.
+- [ ] Verifier never reads/echoes `.env.local` or Supabase `.temp` values; path/ignored/staged state only.
+- [ ] Test verifier using synthetic env/file metadata, not real credentials.
+
+## Task 15 — Full browser/lifecycle regression on final source
+
+- [ ] Development: rerun all Research/Compare/Guide/Auth-Saved suites plus new 6B cases. Report observed counts; do not guess final totals before collection.
+- [ ] Built-production anonymous/core: all Research/Compare/Guide suites, no dev CSP exception.
+- [ ] Local Supabase Auth/Saved against local Mailpit. Authenticated built mode remains separately scoped because production CSP rejects local HTTP Supabase.
+- [ ] Deadline/browser fixtures use fake/intercepted timing; never wait 240 real seconds.
+- [ ] Repeat Guide lifecycle 5x, retries 0.
+- [ ] Repeat Auth/Saved/account-switch lifecycle 5x, retries 0.
+- [ ] Repeat deadline + raw deployment 429/504 + Compare stop-on-rate-limit lifecycle at least 5x, retries 0.
+- [ ] Inspect harness processes/output before cleanup. Remove only exact inactive disposable `output/playwright/phase3d-dev-app-<digits>` snapshots after containment/process checks. Never touch protected screenshots.
+
+## Task 16 — Final static/database/security gates
+
+Run and observe on final source:
+
+- [ ] `npx vitest run`
+- [ ] `npx tsc --noEmit`
+- [ ] `npx eslint .`
+- [ ] `npx next build` without optional Supabase config
+- [ ] local Supabase `db reset`, `db lint`, `db advisors --local`, `test db`
+- [ ] `npm audit --omit=dev`
+- [ ] `npm ci --dry-run --ignore-scripts`
+- [ ] workspace verifier
+- [ ] synthetic valid/invalid release-config verifier cases
+- [ ] `git diff --check` / CRLF-aware equivalent
+- [ ] UTF-8/trailing-whitespace/control scan
+- [ ] secret/client-boundary scan: no provider/service-role values; no provider key names in `app/`/`components/`; service role unused in ordinary Auth/Persistence/Supabase runtime; ignored Supabase `.temp` outside Git
+- [ ] protected screenshot manifest unchanged
+- [ ] docs relative-link/command/version verification
+
+## Task 17 — Main-agent-only two-pass final review
+
+**ZERO SUBAGENTS.**
+
+**Pass 1 — requirements/security traceability**
+- Compare final code/config/docs against every 6B spec/task/invariant.
+- Inspect deadline cause truthfulness, partial evidence preservation, no post-terminal dispatch, WAF contract/client behavior, production config secrecy, provider privacy, CI permissions/SHA pinning, and all Phase 6A regression invariants.
+
+**Pass 2 — fresh defect/complexity review**
+- Search for deadline/caller-abort races, live timers/listeners, retry waits outliving deadline, provider attempts after abort, stale response ownership, raw 429 body leakage, hidden retries, duplicate same-origin guards, duplicate HSTS, module-scope request/user mutable state under Fluid Compute, accidental live network calls in CI, secret artifacts, floating action tags, unnecessary dependencies, hidden test modes, and Phase 6C scope creep.
+- Fix each concrete defect regression-first. Any source fix invalidates affected verification and requires rerunning the appropriate full matrix before completion.
+
+## Task 18 — Documentation and Phase 6C handoff
+
+Update from observed implementation only:
+- `README.md`
+- `CHANGELOG.md`
+- `AGENT_MEMORY.md`
+- `LESSONS.md` only for reusable root-cause corrections
+- `docs/planning/tasks.md`
+- `docs/requirements.md`
+- `docs/design.md`
+- `docs/security.md`
+- `docs/security-threat-model.md`
+- `docs/planning/phase-6-hardening-submission-readiness.md`
+- `docs/superpowers/plans/2026-08-19-phase-6c-deployment-submission.md`
+- `docs/planning/phase-6-requirements-traceability.md`
 - `docs/operations/vercel-production.md`
-- optional non-secret machine-readable example such as `docs/operations/vercel-waf-rule.example.json` only if it matches a current official API/export format; otherwise keep exact settings in Markdown rather than inventing config.
 
-Document the planned rule:
-
-- [ ] target only `POST /api/research` on the UniProof project;
-- [ ] fixed window 60 seconds;
-- [ ] count by source IP on the intended Vercel plan;
-- [ ] initial threshold 20 requests/source/window;
-- [ ] first publish in Log mode for observation;
-- [ ] after normal-flow verification and explicit billable-use authorization, use Rate Limit with default 429 action;
-- [ ] no broad site-wide rule that can block static assets/auth callbacks;
-- [ ] no challenge requiring browser JS for API calls unless specifically tested and justified;
-- [ ] record rollback/disable steps before enforcement.
-
-**Local acceptance simulation:**
-
-Create client/browser tests that model the 20/60s external outcome without pretending they exercise Vercel itself:
-
-- [ ] normal single Research;
-- [ ] four-target Compare;
-- [ ] Guide Research;
-- [ ] one refresh/retry path;
-- [ ] 21st synthetic request receives rate-limit response and causes no provider call in the simulated boundary;
-- [ ] shared-source/NAT risk is documented as an operational tradeoff.
-
-Do not claim the WAF is active until Phase 6C observes it on Vercel.
-
----
-
-## Task 6 — Production environment contract and fail-closed configuration
-
-**Inspect/modify:**
-- `lib/env/public.ts`
-- `lib/env/server.ts`
-- setup/provider scripts only if needed
-- `docs/operations/vercel-production.md`
-
-Requirements:
-
-- [ ] classify variables as public, server-only provider, optional auth, deployment metadata;
-- [ ] anonymous static/core UI build must not crash solely because optional Supabase Auth config is absent if production auth is intentionally disabled;
-- [ ] account/save UI is enabled only when the required Supabase public/auth configuration is valid;
-- [ ] live Research stays explicit through `UNIPROOF_RESEARCH_MODE` and current provider configuration semantics;
-- [ ] never require `SUPABASE_SERVICE_ROLE_KEY` if runtime paths do not use it;
-- [ ] invalid provider keys are not detected by echoing/printing them;
-- [ ] no server secret gets a `NEXT_PUBLIC_` alias;
-- [ ] Preview and Production configuration are documented separately;
-- [ ] production canonical app URL cannot silently default to localhost.
-
-**RED cases:** malformed Supabase URL/key, missing auth config with auth disabled, partial auth config, missing production app URL, secret variable accidentally imported by client graph.
-
----
-
-## Task 7 — Production TLS/HSTS/header policy
-
-**Inspect:**
-- `next.config.ts`
-- `proxy.ts`
-- `lib/security/browser-policy.ts`
-- existing CSP/header E2E.
-
-**Plan/implementation:**
-
-- [ ] keep nonce CSP generated per HTML request;
-- [ ] preserve auth `Set-Cookie` behavior introduced by 6A;
-- [ ] add HSTS only conditionally for actual Production HTTPS responses, never local dev/HTTP;
-- [ ] initial header exactly `Strict-Transport-Security: max-age=31536000` unless current deployment review justifies a different bounded value;
-- [ ] do not use `includeSubDomains` or `preload` in the hackathon release by default;
-- [ ] do not attempt to set policy for parent `vercel.app`;
-- [ ] verify canonical origin redirect/host behavior in 6C rather than assuming config.
-
-**Tests:** development lacks HSTS; built production fixture with simulated HTTPS/production has intended header where implementation can model it; CSP still has no production script unsafe directives; header composition survives auth refresh.
-
-If Next static headers cannot safely distinguish the real production HTTPS environment, defer actual HSTS injection to a verified Vercel/project route configuration in 6C and keep this as an explicit release gate rather than shipping a misleading local conditional.
-
----
-
-## Task 8 — Add least-privilege CI with no deployment
-
-**Create:** `.github/workflows/ci.yml`
-
-Before implementation, inspect current official action versions and immutable commit SHAs where practical.
-
-Workflow design:
-
-- [ ] triggers: pull request and pushes to `main` as appropriate; no workflow_dispatch that mutates external state;
-- [ ] `permissions: contents: read` at top level;
-- [ ] concurrency group cancels superseded runs on the same ref;
-- [ ] explicit `timeout-minutes` per job;
-- [ ] Node 22 and npm lockfile cache;
-- [ ] `npm ci` from `package-lock.json`;
-- [ ] TypeScript, ESLint, Vitest, `next build`, production dependency audit/workspace verifier;
-- [ ] local Supabase migration reset/lint/pgTAP in a dedicated job or sequence, never hosted project;
-- [ ] Playwright browsers installed deterministically and core fixture/intercepted E2E run with retries zero;
-- [ ] production-built Playwright matrix run if duration fits the hackathon CI budget; if split into jobs, every required group is explicit and none is silently omitted;
-- [ ] no provider live mode;
-- [ ] no production env secrets;
-- [ ] no Vercel/Supabase remote deploy command;
-- [ ] failure artifacts are sanitized and narrowly selected;
-- [ ] never upload `.env*`, Supabase local generated secrets, auth cookies/session state, private profile fixtures, raw traces with secrets, or `ui-flow-screenshots/` as mutable output.
-
-**CI failure cases to validate:** test failure causes red workflow; missing generated Playwright browser does not fallback silently; local Supabase startup failure is visible; audit failure is not ignored unless a documented severity policy explicitly permits it.
-
----
-
-## Task 9 — Add release verification scripts only where deterministic and safe
-
-Prefer existing scripts. Add a new script only if it removes repeated error-prone manual checks.
-
-Potential exact paths if justified:
-- `scripts/verify-release.mjs`
-- `scripts/scan-client-boundary.mjs`
-
-Allowed deterministic checks:
-
-- [ ] required release files/license/docs exist;
-- [ ] forbidden provider secret variable names in client production graph;
-- [ ] built static contains no configured secret values (values supplied privately at runtime, never printed);
-- [ ] production CSP static assertions;
-- [ ] no dev-only test seam imported into production graph;
-- [ ] no `.env`/Playwright auth state/release screenshot private marker in Git-tracked set;
-- [ ] Phase 6 migration/test paths exist when persistence is enabled.
-
-Do not create a script that logs environment values, probes remote accounts, deletes residue broadly, or claims live verification from static checks.
-
----
-
-## Task 10 — Requirements traceability against the exact MVP
-
-**Create:** `docs/planning/phase-6-requirements-traceability.md`
-
-For every bullet/acceptance item in `docs/requirements.md`, record:
-
-- requirement ID/short text;
-- implementing files/modules;
-- unit/integration evidence;
-- dev browser evidence;
-- built browser evidence;
-- deployment/live evidence required or not applicable;
-- status: implemented/verified-local/verified-live/blocker;
-- notes/residual risk.
-
-Mandatory attention:
-
-- [ ] 10–15 university supported scope as actually cataloged;
-- [ ] Research evidence/source/unknown/conflict/freshness/direct official links;
-- [ ] Compare 2–4 targets/weights/coverage/suppression/no ranking;
-- [ ] Guide six states/privacy/no probability/checklist/timeline;
-- [ ] anonymous judge flow;
-- [ ] optional save/auth if implemented;
-- [ ] responsive/keyboard;
-- [ ] provider failure/partial behavior;
-- [ ] deployed no-critical-error requirement remains `verified-live` pending 6C, never marked complete locally.
-
-Any unexplained MVP requirement gap is a 6B blocker. Do not alter requirements merely to make traceability green unless product scope is intentionally changed and justified.
-
----
-
-## Task 11 — Current-provider policy/privacy release review
-
-Use only primary provider documentation. No live key use required.
-
-For each configured provider, create/update a concise table in the Phase 6 spec or `docs/operations/provider-release-check.md`:
-
-- [ ] endpoint and model/route;
-- [ ] free/paid eligibility assumption;
-- [ ] retention/data-control flag used by UniProof;
-- [ ] whether applicant/private data is sent (must be no);
-- [ ] current quota caveat;
-- [ ] failure/fallback behavior;
-- [ ] exact verification date/source.
-
-If a provider no longer supports the required privacy/capability/free route, mark release blocker or plan a bounded provider-order change. Do not switch models/routes during a documentation check without updating design/requirements and tests.
-
----
-
-## Task 12 — Full local browser acceptance expansion
-
-Re-run/extend all core flows on 6B source:
-
-### Research
-- [ ] success/partial/unknown/conflict/outdated;
-- [ ] provider/network/timeout/rate-limit sanitized errors;
-- [ ] cancellation and refresh with preserved prior result;
-- [ ] evidence/source/official links;
-- [ ] max-content stress.
-
-### Compare
-- [ ] 2/3/4 targets;
-- [ ] all weights/category coupling;
-- [ ] incomplete target and 429 mid-batch;
-- [ ] cancellation/retry/stale ownership;
-- [ ] evidence collisions;
-- [ ] responsive/mobile.
-
-### Guide
-- [ ] all six states;
-- [ ] saved/anonymous profile privacy after 6A;
-- [ ] partial Research/rate-limit/timeout;
-- [ ] deadlines/budget/scholarship/manual evidence;
-- [ ] cancellation/reassessment;
-- [ ] responsive/mobile.
-
-### Auth/Saved
-- [ ] signed-out core flows;
-- [ ] sign-in local session;
-- [ ] save/list/load/delete;
-- [ ] cross-account isolation;
-- [ ] no storage/provider leakage.
-
-### Security/browser
-- [ ] CSP violations zero;
-- [ ] XSS-shaped data inert;
-- [ ] no unexpected third-party requests;
-- [ ] no critical console/page errors;
-- [ ] keyboard and reduced motion;
-- [ ] source links use safe attributes/referrer policy.
-
-Use the established viewport matrix and content stress. Do not navigate to real external evidence links during automated acceptance.
-
----
-
-## Task 13 — Lifecycle stress and resource-leak checks
-
-Run at least five repetitions with Playwright retries zero for:
-
-- [ ] Research cancel/deadline/retry;
-- [ ] Compare multi-target cancellation/rate-limit ownership;
-- [ ] Guide post-response cancellation/reassess;
-- [ ] Auth refresh/signout/account switch/private request races;
-- [ ] saved-artifact capacity/concurrent save as appropriate.
-
-After tests:
-
-- [ ] inspect task-created Next/Supabase/test processes;
-- [ ] remove only validated inactive disposable Playwright snapshots under the exact authorized root;
-- [ ] never kill unrelated node/docker processes;
-- [ ] report environmental socket/resource failures separately from deterministic product defects and rerun the complete affected group after diagnosis.
-
----
-
-## Task 14 — Full static/build/security gate
-
-On final 6B source run and observe:
-
-- [ ] local Supabase reset/lint/pgTAP;
-- [ ] full Vitest;
-- [ ] TypeScript;
-- [ ] ESLint;
-- [ ] Next production build;
-- [ ] production dependency audit;
-- [ ] install dry-run as appropriate;
-- [ ] development Playwright full matrix;
-- [ ] built-production Playwright full matrix;
-- [ ] lifecycle repeats;
-- [ ] workspace verifier;
-- [ ] `git diff --check` with repository newline policy;
-- [ ] UTF-8/control scan;
-- [ ] secret-value scan without printing secrets;
-- [ ] provider `NEXT_PUBLIC_*`/client-boundary scan;
-- [ ] auth/private-data marker scan;
-- [ ] built static/source-map scan if maps exist;
-- [ ] protected screenshot integrity/no-touch evidence;
-- [ ] GitHub workflow YAML/schema/action-permission review.
-
-Do not say CI is green unless the workflow actually ran on GitHub; local workflow/config inspection is lower-level evidence. If no authorized Git push occurs, report CI as configured/unexecuted remotely.
-
----
-
-## Task 15 — Final security/privacy/over-engineering review
-
-Review specifically:
-
-- whole-run deadline correctness and post-abort work;
-- WAF threshold usability and pricing/authorization caveat;
-- platform 429/504 mapping;
-- auth + CSP Proxy composition from 6A;
-- RLS/service-role absence;
-- HSTS scope;
-- Vercel/CI secret handling;
-- workflow token permissions and untrusted PR behavior;
-- test artifact privacy;
-- provider policy assumptions;
-- any new abstraction/dependency that can be removed.
-
-Fix substantive local defects and rerun affected/full gates. Do not apply remote settings merely to close review findings.
-
----
-
-## Task 16 — Synchronize planning/status for Phase 6C handoff
-
-Update from observed local implementation only:
-
-- [ ] `docs/planning/phase-6-hardening-submission-readiness.md`
-- [ ] `docs/planning/tasks.md`
-- [ ] `docs/planning/phase-6-requirements-traceability.md`
-- [ ] `docs/requirements.md`
-- [ ] `docs/design.md`
-- [ ] `docs/security.md`
-- [ ] `docs/security-threat-model.md`
-- [ ] `docs/operations/vercel-production.md`
-- [ ] provider release check if created
-- [ ] `README.md` only for verified local setup/architecture changes
-- [ ] `CHANGELOG.md`
-- [ ] `AGENT_MEMORY.md`
-- [ ] `LESSONS.md` only for reusable corrections.
-
-Produce a Phase 6C handoff that clearly separates:
-
-- verified local behavior;
-- configured-but-not-applied Vercel/Supabase settings;
-- remote actions requiring authorization;
-- live provider/deployment evidence still missing;
-- exact rollback/stop conditions.
-
-**Stop condition:** Phase 6B ends before any public deployment or hosted-service mutation unless the user has separately authorized that exact action. Phase 6C owns external release execution.
+Phase 6C handoff must explicitly leave these external/unverified:
+- exact Vercel account/team/project and Fluid Compute state;
+- whether `maxDuration=300` is accepted by that selected project/plan;
+- real Vercel request-cancellation propagation;
+- WAF pricing/Log observation/enforcement;
+- hosted Supabase link/migration/Auth redirect/SMTP;
+- production HTTPS/TLS/Vercel-delivered HSTS/canonical host;
+- real production environment values;
+- bounded live provider smoke/current quota/privacy account controls;
+- actual GitHub CI run on exact commit;
+- preview -> production deployment/rollback;
+- release screenshots/demo/Devpost.
+
+## Completion standard
+
+Phase 6B is complete only when local code/configuration is production-ready **without claiming deployment**: the 240s application deadline is deterministic and truthful under caller/deadline races; the route has a 300s host cap and cancellation opt-in; no work is dispatched after terminal ownership; raw Vercel 429/504 outcomes are sanitized before JSON parsing with no retry storm; Gemini uses stable v1 Interactions with the current schema; provider privacy/cost invariants are frozen; WAF is an exact Phase 6C runbook instead of a fake app limiter; production configuration can be verified without exposing secrets; CI is least privilege/no-live-services; traceability is complete; every Phase 0–6A regression remains green; and the main agent finishes both review passes with no unresolved material defect.

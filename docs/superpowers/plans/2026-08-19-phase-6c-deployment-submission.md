@@ -162,8 +162,9 @@ After authorization:
 
 - [ ] link existing intended project or create exactly one new UniProof project;
 - [ ] do not delete/recreate an existing project to solve configuration issues;
-- [ ] verify `maxDuration=240` is valid on the selected plan or revise the app whole-run/host values per 6B before deployment;
+- [ ] verify the selected project has Fluid Compute/function behavior compatible with the Phase 6B contract: Research route `maxDuration=300`, repository `supportsCancellation:true` for Research, and 240-second application-owned deadline; if the project rejects or overrides those values, stop and revise/retest 6B rather than deploying with an assumed limit;
 - [ ] verify Node runtime/region settings are compatible with outbound retrieval and Supabase latency;
+- [ ] verify actual request-cancellation delivery in Preview with a bounded client abort test; local signal tests alone were not deployment evidence;
 - [ ] do not enable unreviewed analytics/third-party scripts.
 
 ---
@@ -180,7 +181,9 @@ Required process:
 - [ ] set `NEXT_PUBLIC_APP_URL` to the canonical Production URL at the correct stage;
 - [ ] set Supabase public URL/publishable key only where auth/save is enabled;
 - [ ] set provider keys server-only for Production; set Preview only if preview live-provider smoke is explicitly desired;
+- [ ] satisfy the Phase 6B release-readiness matrix without making every fallback mandatory: at least one general-web discovery key (Tavily or Brave) and at least one structured AI key (Gemini, Groq, or OpenRouter); missing secondary fallbacks are a resilience note, while zero providers in either required class block a live-production readiness claim;
 - [ ] set live Research mode deliberately; no implicit provider activation;
+- [ ] run the Phase 6B non-secret release-config verifier against **presence/scopes only** after configuration; never use it to print or fingerprint values;
 - [ ] keep `SUPABASE_SERVICE_ROLE_KEY` unset if the runtime does not require it;
 - [ ] verify no server secret has `NEXT_PUBLIC_` prefix;
 - [ ] never use `vercel env pull`/export merely to inspect values;
@@ -250,7 +253,7 @@ Run browser/HTTP checks against the exact Preview deployment.
 - [ ] nonce CSP present and unique between HTML requests;
 - [ ] production script CSP lacks dev unsafe directives;
 - [ ] static security headers correct;
-- [ ] no HSTS claim until final production-origin policy is intentionally verified;
+- [ ] do not treat Preview/local app headers as HSTS evidence; current Vercel platform HSTS is verified only against the final canonical production HTTPS response;
 - [ ] server/framework disclosure absent as intended.
 
 ### Anonymous modes
@@ -336,8 +339,8 @@ Against the final canonical production origin:
 
 - [ ] TLS certificate/hostname valid;
 - [ ] HTTP -> HTTPS/canonical redirects correct if an HTTP endpoint is platform-exposed;
-- [ ] HSTS present only as intentionally planned: `max-age=31536000`, no `includeSubDomains`, no `preload` by default;
-- [ ] if using only a `vercel.app` hostname and app-level HSTS cannot be scoped/meaningfully controlled as planned, document actual platform behavior rather than claiming ownership of parent domain policy;
+- [ ] observe the actual Vercel-delivered HSTS header on the final canonical HTTPS origin; current platform documentation expects `Strict-Transport-Security: max-age=63072000`, but record the deployed response rather than hard-coding a local claim;
+- [ ] verify UniProof did not add a conflicting application HSTS value, `includeSubDomains`, or `preload`; if hosting behavior differs from the current Vercel documentation, stop and document/review the actual platform policy rather than claiming ownership of the parent `vercel.app` domain;
 - [ ] nonce CSP correct on actual HTML and nonce changes per request;
 - [ ] production CSP lacks `unsafe-eval` and script `unsafe-inline`;
 - [ ] auth `Set-Cookie` and CSP both survive same response where refresh occurs;

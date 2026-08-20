@@ -11,10 +11,10 @@ import {
 import { researchCatalog } from "@/lib/research/catalog/data";
 import type { GuideApplicantProfile, GuideSubmission } from "@/lib/guide/contracts";
 import type { ResearchModeRequest } from "@/lib/research/mode/public-contracts";
+import { guideCatalogTarget } from "@/tests/helpers/catalog-targets";
 import { buildGuideDossier, makeClaim } from "./fixtures/guide-dossiers";
 
-const testUniversity = researchCatalog.universities[0]!;
-const testProgram = researchCatalog.programs.find((p) => p.universityId === testUniversity.id)!;
+const { university: testUniversity, program: testProgram } = guideCatalogTarget;
 
 const profile: GuideApplicantProfile = {
   citizenship: "Malaysia",

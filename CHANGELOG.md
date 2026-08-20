@@ -14,13 +14,18 @@ The project has not published a tagged release yet. Until the first release, com
 - Nonce-based production CSP, restrictive security headers, browser persistence/exfiltration tests, and isolated dev/built Playwright acceptance.
 - Phase 5 Guide Mode with a strict browser-memory applicant profile, one supported-program target, public-only Research request derivation, closed exact requirement registry, six deterministic assessment states, evidence-gated GPA/English/budget/scholarship/deadline logic, risks, application-fee/document checklist items, deadline timeline, in-memory dossier reuse, exact retry/correction ownership, target-scoped evidence, catalog-owned official links, accessibility/responsive acceptance, and privacy/security browser coverage.
 - Phase 6A optional Supabase passwordless email/PKCE authentication, server-derived private ownership, one RLS-protected immutable/versioned `saved_artifacts` table, strict bounded same-origin private APIs, explicit profile/Research/Comparison/Guide snapshot save/restore, account-bound memory-only restore handoff, and local Auth/Mailpit + pgTAP/browser acceptance.
+- Phase 6B production hardening with a truthful 240-second whole-Research deadline under a 300-second host ceiling, Research-only request-cancellation configuration, abort-aware provider retry waits, sanitized raw deployment 429/504 handling, stable Gemini `v1/interactions`, release-configuration verification, least-privilege SHA-pinned GitHub Actions CI, and Vercel/WAF operations traceability for Phase 6C.
+- Side Phase UCE catalog expansion from the original 10 universities/14 programs across GB/TH/US to **30 universities and 45 computing programs across 11 closed country codes**, with one shared browser-safe country vocabulary, preserved stable IDs/ownership, collision-safe aliases, narrow official-host normalization, source-frozen primary navigation metadata, and regression coverage for new-country Research/Compare/Guide plus saved-artifact rebinding.
 - GitHub-facing contribution, conduct, issue, and pull-request documentation.
 
 ### Changed
 
 - Reclassified the `shadcn` CLI from a production dependency to an exact development dependency because runtime application code does not import it.
 - Simplified Comparison result/provenance contracts by removing obsolete flat trade-off claim IDs and an impossible nullable result score state.
-- Expanded README, requirements, design, security, threat-model, roadmap, and Phase 5/6 runbooks to reflect the reviewed/browser-verified Phase 0–6A boundary while keeping Phase 6B/6C production/deployment scope explicit.
+- Expanded README, requirements, design, security, threat-model, roadmap, and Phase 5/6 runbooks to reflect the reviewed/browser-verified Phase 0–6B local boundary while keeping Phase 6C deployment/live-service scope explicit.
+- Replaced the nonce-bearing `next/script` Zod bootstrap with a nonce-authorized first-party static bootstrap to avoid development hydration/chunk instability without weakening CSP.
+- Fixed Compare retry ownership after deployment 429/504 stops so explicit Retry includes both the failed target and immutable targets that were never dispatched after the terminal platform response.
+- Made isolated Playwright origins authoritative across the Auth/Saved harness, including Mailpit Magic Link parsing and secondary browser contexts, removing hidden dependence on port 3102 during concurrent verification.
 
 ### Security
 

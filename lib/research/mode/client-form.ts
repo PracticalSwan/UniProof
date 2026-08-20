@@ -1,3 +1,4 @@
+import type { ResearchCatalogCountryCode } from "@/lib/research/catalog/countries";
 import { searchResearchCatalog } from "@/lib/research/catalog/search";
 import {
   normalizeResearchCatalogText,
@@ -15,7 +16,7 @@ import {
 
 export type ResearchFormState = {
   search: string;
-  countryCode?: "US" | "GB" | "TH";
+  countryCode?: ResearchCatalogCountryCode;
   degreeLevel?: "bachelor" | "master";
   subjectArea?: string;
   universityId?: string;

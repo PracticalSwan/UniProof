@@ -4,8 +4,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { signInWithLocalMagicLink } from "./helpers/auth-browser";
 import { fillGuideProfile } from "./helpers/guide-browser";
+import { resolvePlaywrightOrigin } from "./helpers/playwright-harness";
 
 const localOnly = process.env.UNIPROOF_E2E_LOCAL_SUPABASE === "1";
+const e2eOrigin = resolvePlaywrightOrigin(process.env.UNIPROOF_E2E_PORT);
 const runId = randomUUID().slice(0, 12);
 
 function testEmail(label: string): string {
@@ -83,8 +85,8 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
   });
 
   test("local-scope sign out leaves a second session for the same invented account signed in", async ({ browser, request }) => {
-    const first = await browser.newContext({ baseURL: "http://127.0.0.1:3102" });
-    const second = await browser.newContext({ baseURL: "http://127.0.0.1:3102" });
+    const first = await browser.newContext({ baseURL: e2eOrigin });
+    const second = await browser.newContext({ baseURL: e2eOrigin });
     const firstPage = await first.newPage();
     const secondPage = await second.newPage();
     try {
@@ -166,7 +168,7 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
     await page.goto("/saved");
     await expect(page.getByRole("heading", { name: "Applicant profile" })).toBeVisible();
     await page.getByRole("button", { name: "Restore" }).click();
-    await expect(page).toHaveURL(/\/guide$/u);
+    await expect(page).toHaveURL(/\/guide$/u, { timeout: 15_000 });
     await expect(page.getByLabel("Citizenship")).toHaveValue("Exampleland");
     await expect(page.getByLabel("Current country")).toHaveValue("Testland");
     await expect(page.locator("#guide-program-select")).toHaveValue("");
@@ -201,7 +203,7 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
     await createProfile(page);
     await page.goto("/saved");
     await page.getByRole("button", { name: "Restore" }).click();
-    await expect(page).toHaveURL(/\/guide$/u);
+    await expect(page).toHaveURL(/\/guide$/u, { timeout: 15_000 });
     await expect(page.getByLabel("Citizenship")).toHaveValue("Exampleland");
 
     const signOutResponsePromise = page.waitForResponse((response) =>
@@ -216,8 +218,8 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
   });
 
   test("cross-user saved artifact IDs are non-disclosing and mutations reject cross-origin requests", async ({ browser, request }) => {
-    const userA = await browser.newContext({ baseURL: "http://127.0.0.1:3102" });
-    const userB = await browser.newContext({ baseURL: "http://127.0.0.1:3102" });
+    const userA = await browser.newContext({ baseURL: e2eOrigin });
+    const userB = await browser.newContext({ baseURL: e2eOrigin });
     const pageA = await userA.newPage();
     const pageB = await userB.newPage();
     try {

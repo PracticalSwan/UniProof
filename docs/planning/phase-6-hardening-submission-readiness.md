@@ -1,6 +1,6 @@
 # Phase 6 — Hardening and Submission Readiness
 
-Status: **Phase 6A implemented and locally verified** as of 2026-08-19; Phase 6B/6C remain planned. Local Supabase Auth/Mailpit, migration/RLS, private saved-artifact APIs, explicit save/restore, and the full local regression matrix are implemented. No hosted Supabase mutation, Vercel project change, deployment, live provider request, or Devpost submission is claimed by Phase 6A.
+Status: **Phase 6A and Phase 6B implemented and locally verified** as of 2026-08-20; Phase 6C remains external/release work. Local Supabase Auth/Mailpit, migration/RLS, private saved-artifact APIs, explicit save/restore, the 240-second Research execution budget, host-cancellation configuration, deployment 429/504 handling, Gemini stable-v1 transport, release verification, and least-privilege CI are implemented. No hosted Supabase mutation, Vercel project/WAF change, deployment, live provider request, actual GitHub Actions run, or Devpost submission is claimed by Phase 6B.
 
 Detailed execution plans:
 
@@ -257,57 +257,61 @@ Never use `--linked`, a remote connection string, `migration repair`, or remote 
 
 ### 5.1 Whole-run time budget
 
-The current provider stages are individually bounded but the whole Research pipeline must finish before the hosting platform terminates the route.
+The current provider stages are individually bounded but the whole Research pipeline must finish before the hosting platform terminates the route. Current Vercel Fluid Compute documentation (revalidated 2026-08-19) gives Node functions a 300-second default/max on Hobby and a 300-second default with a larger ordinary maximum on Pro/Enterprise; Phase 6B deliberately targets the common 300-second baseline rather than a plan-specific larger limit or the optional 30-minute beta.
 
-Planned server-owned limits:
+Server-owned limits:
 
-- application whole-run deadline: **210 seconds** from accepted Research dispatch to finalization;
-- Vercel `app/api/research/route.ts` maximum function duration: **240 seconds**;
+- application whole-run deadline: **240 seconds** from accepted Research dispatch to finalization;
+- Vercel `app/api/research/route.ts`: `export const maxDuration = 300` seconds;
 - retain all existing smaller discovery/provider/stage deadlines and attempt ceilings.
 
-The 30-second difference is intentional finalization/serialization/cancellation headroom. When the 210-second application deadline expires, stop new discovery/provider retries/fallback dispatch, abort in-flight work where supported, preserve already validated evidence, and return the truthful partial/failed lifecycle through existing contracts. Never wait for Vercel's hard timeout as normal control flow.
+The 60-second difference is finalization/serialization/cancellation/platform headroom. When the 240-second application deadline expires, stop new discovery/provider retries/fallback dispatch, abort in-flight work where supported, preserve already validated evidence, and return the truthful partial/failed lifecycle through existing contracts with unfinished work classified as operational `timeout`. A real caller abort remains `cancelled`. Never wait for Vercel's hard timeout as normal control flow and never start the 240-second expensive-run timer for requests rejected before accepted Research dispatch.
 
-If the actual selected Vercel plan/runtime at deployment supports less than 240 seconds, Phase 6B must reduce the application deadline with at least the same safety headroom and rerun timeout/partial-result acceptance; do not silently rely on a larger documented plan limit.
+Phase 6B also opts only the Research function into Vercel Node request cancellation through repository configuration (`supportsCancellation: true`) so the existing `Request.signal` path can receive client disconnects where the deployed platform supports it. Local tests prove signal propagation and post-abort ownership; actual Vercel cancellation delivery remains Phase 6C live evidence. If the selected Vercel project has Fluid Compute disabled or rejects `maxDuration=300`, deployment remains blocked until the values are revised and the complete deadline/partial-result matrix is rerun; do not silently rely on a different account default.
 
 ### 5.2 Durable public abuse control
 
 The current in-process/single-flight/provider budgets are not distributed request abuse protection.
 
-Preferred deployment control: **Vercel WAF fixed-window rate limiting for `POST /api/research` by source IP**, because it executes before the expensive function/provider path and is shared across function instances.
+Preferred deployment control: **Vercel WAF fixed-window rate limiting for exactly `POST /api/research` by source IP**, because it executes before the expensive function/provider path and is shared across function instances. Current Vercel documentation (revalidated 2026-08-19) exposes fixed-window rate limiting on all plans, with IP as an included counting key and Log as a non-blocking action. The provider default is 100 requests/60 seconds; UniProof's proposed **20 requests/60 seconds** is a deliberately stricter provisional product policy, not a Vercel default.
 
 Initial operational plan:
 
-1. verify the selected Vercel plan's current rate-limit availability/pricing before enabling it;
-2. create the rule initially in **Log** mode and exercise the complete judge flow;
-3. use a 60-second window and an initial **20 requests/source** threshold;
-4. verify one Research + four-target Compare + Guide + intentional refresh/retry sequence stays below the threshold from one browser;
-5. verify burst traffic above threshold is observable;
-6. after explicit authorization for any billable WAF use, switch the rule to Rate Limit with the default 429 follow-up;
-7. rerun normal and over-limit acceptance.
+1. verify the selected Vercel account/project and current WAF pricing before enabling it;
+2. target path exactly `/api/research` and method exactly `POST`; do not rate-limit static assets, Auth callbacks, Saved APIs, or the whole site;
+3. create/publish the rule initially in **Log** mode and exercise the complete judge flow;
+4. use a fixed 60-second window and initial **20 requests/source-IP** threshold;
+5. verify one Research + four-target Compare + Guide + intentional refresh/retry sequence stays below the threshold from one browser and document shared-NAT/university-Wi-Fi false-positive risk;
+6. verify over-threshold traffic is observable at the WAF boundary without deliberately exhausting providers or creating abusive load;
+7. after normal-flow observation and explicit authorization/pricing review, switch to Rate Limit with Vercel's default 429 response only if the threshold is still appropriate;
+8. rerun normal and over-limit acceptance.
 
-If current pricing/account constraints make Vercel WAF unacceptable, public deployment remains blocked until another truly durable distributed control is designed and reviewed. Do **not** fall back to an in-memory token bucket and call Phase 6 complete.
+Phase 6B documents/tests this contract only; WAF publication/enforcement remains a Phase 6C external mutation. If pricing/account constraints make Vercel WAF unacceptable, public deployment remains blocked until another truly durable distributed control is designed and reviewed. Do **not** fall back to an in-memory token bucket/instance map/hidden test mode and call it distributed rate limiting.
 
-Application UI/client transport must handle deployment-generated 429 responses as a bounded actionable rate-limit failure without retry storms or loss of a prior result.
+Application UI/client transport must recognize a raw deployment-generated HTTP 429 **before** requiring application JSON/content type, discard/cancel its body without reflecting WAF internals, preserve prior Research/Compare/Guide state, and never auto-retry. Local tests fabricate/intercept the platform response; they do not claim the WAF is active.
 
 ### 5.3 Host cancellation verification
 
-Do not assume browser abort equals provider cancellation in production. Deploy-time testing must determine the actual Vercel Node runtime behavior and verify that:
+Vercel Node request cancellation is opt-in, not automatic. Phase 6B must add repository configuration with `supportsCancellation: true` scoped only to the Research function so the existing web-standard `Request.signal` path can receive disconnects when deployed. Local unit/browser tests then prove that an aborted request signal stops new retries/fallbacks/stages and preserves lifecycle ownership; they do **not** prove Vercel delivered the signal.
 
-- client disconnect/AbortSignal reaches the route when the platform supports it;
+Phase 6C deploy-time testing must determine the actual Vercel Node runtime behavior and verify that:
+
+- client navigation/abort/disconnect reaches the Research route after the configured cancellation opt-in;
+- caller abort remains distinguishable from the independent 240-second application deadline;
 - the route stops new fallback/retry work after cancellation/deadline;
-- no later provider call starts after ownership is cancelled;
-- platform timeout produces a safe user-visible failure if it occurs unexpectedly;
+- no later provider call starts after terminal ownership;
+- a platform hard timeout (normally HTTP 504) is treated client-side as a sanitized deployment-timeout outcome even if its body is HTML/plain/empty rather than application JSON;
 - sanitized logs do not contain prompts/source bodies/profile data/secrets.
 
-If platform cancellation is not delivered reliably, application-owned deadlines remain mandatory and the risk is documented rather than hidden.
+If platform cancellation is not delivered reliably, the 240-second application-owned deadline remains mandatory and the residual risk is documented rather than hidden. Do not add background/waitUntil work for provider calls merely to survive a cancelled user request.
 
 ### 5.4 Production secrets and environment separation
 
 Environment names must be explicit for Development/Preview/Production. Do not copy secrets into docs, screenshots, CLI output, Actions logs, or client bundles.
 
-Production requires at least the public app/Supabase variables and whichever server-only provider keys are intentionally configured. Provider keys and any Supabase secret/service-role key remain server-only; the service-role key should remain unset if ordinary runtime does not need it.
+Production configuration distinguishes **valid shape** from **release readiness**. `NEXT_PUBLIC_APP_URL` must be an exact non-local HTTPS origin and live Research must be deliberate. Optional Supabase Auth/save is either fully configured with a valid exact HTTPS Supabase origin plus publishable key or fully absent/disabled; ordinary runtime does not require the service-role key. Provider fallbacks remain individually optional, but a release-ready live Research profile requires at least one configured general-web discovery provider (`TAVILY_API_KEY` or `BRAVE_SEARCH_API_KEY`) and at least one configured structured AI provider (`GEMINI_API_KEY`, `GROQ_API_KEY`, or `OPENROUTER_API_KEY`). Missing secondary providers lower resilience rather than invalidating configuration. The checked-in direct official-URL discovery path remains a truthful degraded fallback, not justification for calling a zero-search-key production profile release-ready; a zero-AI-key profile similarly degrades but cannot complete extraction/reconciliation. All provider keys remain server-only.
 
-Vercel CLI may list variable names/configuration for verification. Do not use `vercel env pull` or equivalent secret export merely to inspect values. When values must be configured, use a separately authorized secret-entry path that does not echo them.
+Phase 6B adds a non-network release-configuration verifier that reports variable names/readiness reasons only, never values, lengths, prefixes, hashes, project refs, or credential fingerprints. Development/CI profiles remain usable without production secrets. Vercel CLI may list variable names/scopes for verification; do not use `vercel env pull` or equivalent secret export merely to inspect values. When values must be configured in Phase 6C, use a separately authorized secret-entry path that does not echo them.
 
 ### 5.5 Domain, TLS, HSTS, CSP, headers
 
@@ -323,20 +327,21 @@ Production acceptance must verify:
 - expected referrer/frame/content-type/permissions headers;
 - framework disclosure remains removed.
 
-HSTS default for this hackathon release: set only after HTTPS is proven on the final production origin, with `max-age=31536000`; **do not add `includeSubDomains` or `preload` by default**. Those directives affect hosts beyond this application and require deliberate domain-wide control/recovery planning. Do not attempt to control the parent `vercel.app` domain.
+Current Vercel documentation states that deployment responses automatically include `Strict-Transport-Security: max-age=63072000`. Phase 6B therefore **does not add an application-owned duplicate HSTS header** merely for production hardening and does not add `includeSubDomains` or `preload`. Phase 6C must verify the actual deployed canonical HTTPS response and record the observed platform header. If hosting changes away from Vercel or the platform no longer supplies HSTS, that is a fresh deployment/security decision rather than a reason to guess locally. Do not attempt to control the parent `vercel.app` domain.
 
 ### 5.6 Current provider/privacy/terms check
 
-Immediately before production live smoke, re-open current official documentation for Tavily, Brave, Gemini, Groq, OpenRouter, Supabase, and any active structured provider. Verify:
+Phase 6B must freeze the current provider assumptions in tests/docs **without making live calls**, and Phase 6C must re-open the primary documentation again immediately before the one bounded live smoke.
 
-- endpoint/model still exists;
-- intended free route/account configuration is still valid;
-- configured privacy/data-collection controls still mean what the code assumes;
-- no paid escalation was introduced;
-- provider terms allow the public university-source usage;
-- provider keys remain server-only.
+Current 2026-08-19 release assumptions:
 
-A provider-policy change that invalidates a privacy or free-route invariant is a release blocker or requires an explicit architecture change; do not silently relax the invariant.
+- **Gemini:** migrate the existing Interactions adapter from `/v1beta/interactions` to the stable `/v1/interactions` surface while preserving the already-updated `steps`/`response_format` schema, `store:false`, no tools, `gemini-3.5-flash-lite` normal path, and `gemini-3.5-flash` quality escalation. Both models are currently stable and free-tier-capable. Google's unpaid Gemini terms state submitted content/responses may be used to improve products and may receive human review, so **only public university/source material may reach Gemini**; applicant/account/private saved data remains mechanically excluded. Do not claim free Gemini is ZDR.
+- **Groq:** retain `openai/gpt-oss-120b` strict structured output. Groq currently does not retain ordinary inference customer data by default, but may temporarily retain inputs/outputs for reliability/abuse investigation for up to 30 days unless account data controls/ZDR are enabled. Phase 6B does not mutate those account settings.
+- **OpenRouter:** retain `require_parameters:true`, `data_collection:"deny"`, and conditional request-level `zdr:true` when `UNIPROOF_OPENROUTER_REQUIRE_ZDR` is enabled. Require the concrete routed model ID rather than treating `openrouter/free` as a concrete model. Do not widen routing to data-collecting providers.
+- **Tavily:** retain public-query Search only, `search_depth:"basic"`, `include_answer:false`, `include_raw_content:false`, and `auto_parameters:false`; do not make unsupported blanket ZDR claims. Retrieved source evidence still comes through UniProof's own bounded retrieval/evidence path rather than trusting provider snippets as final evidence.
+- **Brave:** retain public-query discovery and application use of URL/title/rank only. Brave's standard Search API privacy notice currently retains query records for up to 90 days for billing/troubleshooting and Enterprise offers ZDR; general API data storage is restricted unless the subscribed plan grants storage rights. Therefore UniProof must not persist raw Brave responses/snippets and must not claim the standard/free-credit route is ZDR.
+
+For every provider, verify before release that endpoint/model still exists, the intended account/free-route configuration remains usable, privacy/data controls still mean what tests/docs assume, provider keys remain server-only, and no paid escalation was introduced. A provider-policy change that invalidates the public-only/privacy/cost invariant is a release blocker or explicit architecture change; never silently relax the invariant.
 
 ### 5.7 CI / GitHub Actions
 
@@ -344,17 +349,18 @@ Add a least-privilege CI workflow only; do not add automatic production deployme
 
 Required CI properties:
 
-- `permissions: contents: read` by default;
-- no provider/Supabase production secrets on pull-request jobs;
-- pinned Node major compatible with the project (Node 22 at planning time) and lockfile-driven `npm ci`;
-- deterministic Vitest, TypeScript, ESLint, production build, production dependency audit/workspace checks;
+- trigger on `pull_request` and normal `push`; never use `pull_request_target` for untrusted contribution code;
+- top-level `permissions: contents: read` and no write/deploy token permissions;
+- no provider/Vercel/hosted-Supabase production secrets on CI jobs;
+- pin the Node 22 line to the exact project baseline verified during implementation and use lockfile-driven `npm ci`;
+- pin third-party Actions such as checkout/setup-node/Supabase setup by their **full 40-character commit SHA**, resolving that SHA from the official action repository at implementation time and keeping the human-readable release tag only as a YAML comment; never invent a SHA or leave floating `@main`/major tags;
+- deterministic Vitest, TypeScript, ESLint, production build, production dependency audit/workspace/release-configuration checks;
 - Playwright browser acceptance in fixture/intercepted mode with retries zero;
-- local Supabase migrations/db lint/pgTAP tests when database code exists, using a local container only;
-- bounded `timeout-minutes` and concurrency cancellation for superseded branch runs;
-- upload only sanitized failure artifacts; never upload `.env*`, auth cookies, raw provider responses, private profiles, or secret-bearing traces;
-- Actions and third-party setup actions pinned to reviewed immutable versions/commit SHAs where practical.
+- local Supabase reset/db lint/advisors/pgTAP/Auth-Saved tests using the fixed locally verified Supabase CLI 2.114.0 and local containers only; never `--linked` or a remote DB;
+- bounded `timeout-minutes` and concurrency cancellation for superseded branch/PR runs;
+- do not upload traces/screenshots by default; if a failure artifact is indispensable, upload only a deliberately sanitized bounded path and prove it cannot contain `.env*`, auth cookies, Mailpit magic links/message bodies, provider responses, private profiles, Supabase `.temp`, or `ui-flow-screenshots/`.
 
-CI must not call live AI/search providers, mutate hosted Supabase, change Vercel, publish releases, or submit Devpost.
+CI must not call live AI/search providers, mutate hosted Supabase, call Vercel deployment/config APIs, publish releases, or submit Devpost. Local workflow/config validation is not a green GitHub CI run; Phase 6C/publication evidence must record an actual Actions run on the exact pushed commit.
 
 ### 5.8 Requirements traceability and final local audit
 
@@ -634,6 +640,14 @@ Re-check mutable sources during implementation/deployment. Current planning used
 - Supabase local development/testing: `https://supabase.com/docs/guides/local-development/cli-workflows` and `https://supabase.com/docs/guides/local-development/cli/testing-and-linting`
 - Supabase migration CLI: `https://supabase.com/docs/reference/cli/v0/supabase-migration`
 - Vercel function duration/payload limits: `https://vercel.com/docs/functions/configuring-functions/duration` and `https://vercel.com/docs/functions/limitations`
+- Vercel Node request cancellation / function config: `https://vercel.com/docs/functions/functions-api-reference`
+- Vercel automatic response headers/HSTS: `https://vercel.com/docs/headers/response-headers`
 - Vercel WAF rate limiting/pricing: `https://vercel.com/docs/vercel-firewall/vercel-waf/rate-limiting` and `https://vercel.com/docs/vercel-firewall/vercel-waf/usage-and-pricing`
 - Vercel CLI project/env inspection: `https://vercel.com/docs/cli/project` and `https://vercel.com/docs/cli/env`
+- Gemini stable API versions / Interactions: `https://ai.google.dev/gemini-api/docs/api-versions` and `https://ai.google.dev/gemini-api/docs/interactions-overview`
+- Gemini unpaid-service data terms: `https://ai.google.dev/gemini-api/terms`
+- Groq model/data controls: `https://console.groq.com/docs/model/openai/gpt-oss-120b` and `https://console.groq.com/docs/your-data`
+- OpenRouter provider privacy/capability routing: `https://openrouter.ai/docs/guides/routing/provider-selection` and `https://openrouter.ai/docs/guides/features/zdr`
+- Tavily Search parameters/credits: `https://docs.tavily.com/documentation/api-reference/endpoint/search` and `https://docs.tavily.com/documentation/api-credits`
+- Brave Search API privacy/storage: `https://api-dashboard.search.brave.com/documentation/resources/privacy-notice` and the current Brave Search API terms/documentation linked from `https://api-dashboard.search.brave.com/documentation`
 - Pixel Forge Devpost overview/rules/schedule: `https://pixel-forge-ai-hackathon-08.devpost.com/`

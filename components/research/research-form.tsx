@@ -4,6 +4,10 @@ import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  researchCatalogCountryCodes,
+  researchCatalogCountryLabels,
+} from "@/lib/research/catalog/countries";
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import type {
   ResearchFormField,
@@ -34,12 +38,6 @@ interface ResearchFormProps {
 
 const FREE_TEXT_PRIVACY_HELP =
   "Use these fields only for public university/program research context. Do not include personal documents, IDs, account details, academic records, or other sensitive information.";
-
-const countryLabels: Record<string, string> = {
-  US: "United States",
-  GB: "United Kingdom",
-  TH: "Thailand",
-};
 
 export function ResearchForm({
   formState,
@@ -133,9 +131,11 @@ export function ResearchForm({
             disabled={disabled}
           >
             <option value="">All countries</option>
-            <option value="US">United States</option>
-            <option value="GB">United Kingdom</option>
-            <option value="TH">Thailand</option>
+            {researchCatalogCountryCodes.map((countryCode) => (
+              <option key={countryCode} value={countryCode}>
+                {researchCatalogCountryLabels[countryCode]}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -208,7 +208,7 @@ export function ResearchForm({
                 >
                   <span className="min-w-0 break-words text-sm font-semibold">{university.name}</span>
                   <span className="text-xs text-muted-foreground">
-                    {countryLabels[university.countryCode]} · University research
+                    {researchCatalogCountryLabels[university.countryCode]} · University research
                   </span>
                 </button>
               </li>
@@ -217,6 +217,7 @@ export function ResearchForm({
               const owner = catalog.universities.find(
                 (university) => university.id === program.universityId,
               );
+              if (owner === undefined) return null;
               return (
                 <li key={program.id} className="min-w-0">
                   <button
@@ -232,7 +233,7 @@ export function ResearchForm({
                   >
                     <span className="min-w-0 break-words text-sm font-semibold">{program.name}</span>
                     <span className="min-w-0 break-words text-xs text-muted-foreground">
-                      {owner?.name} · {countryLabels[owner?.countryCode ?? "US"]} ·{" "}
+                      {owner.name} · {researchCatalogCountryLabels[owner.countryCode]} ·{" "}
                       {program.degreeLevel === "bachelor" ? "Bachelor" : "Master"}
                     </span>
                   </button>

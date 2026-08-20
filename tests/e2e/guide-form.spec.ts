@@ -23,6 +23,17 @@ test.describe("Guide form", () => {
     await expect(page.getByText("Select a supported program.")).toBeVisible();
   });
 
+  test("finds and selects expanded supported programs by university alias", async ({ page }) => {
+    await openGuide(page);
+    await page.getByLabel("Search programs").fill("TU Delft");
+    const select = page.locator("#guide-program-select");
+    await expect(select.locator('option[value="program-tu-delft-computer-science-msc"]')).toContainText(
+      "MSc Computer Science - Delft University of Technology",
+    );
+    await select.selectOption("program-tu-delft-computer-science-msc");
+    await expect(select).toHaveValue("program-tu-delft-computer-science-msc");
+  });
+
   test("program selection populates target", async ({ page }) => {
     await openGuide(page);
     await selectGuideProgram(page);

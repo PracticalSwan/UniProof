@@ -42,9 +42,9 @@ Provider use must be re-checked against current documentation, API terms, licens
 
 ## Supported Research Catalog
 
-The checked-in catalog under `lib/research/catalog/` contains public identity and navigation metadata only. It currently identifies 10 universities and 14 verified computing programs across the United States, United Kingdom, and Thailand, including 10 bachelor-level and 4 taught-master-level entries. It contains no tuition, deadline, admission-threshold, scholarship, ranking, outcome, or other decision facts.
+The checked-in catalog under `lib/research/catalog/` contains public identity and navigation metadata only. It identifies 30 universities and 45 computing programs across Belgium, Canada, Denmark, Finland, Germany, Italy, the Netherlands, Sweden, Thailand, the United Kingdom, and the United States. It contains no tuition, deadline, admission-threshold, scholarship, ranking, outcome, or other decision facts.
 
-Catalog university names, countries, official homepages, program names, degree levels, subject labels, and canonical official program URLs were checked against the owning university's official pages on 2026-08-17. Prefer stable current canonical course routes over year-specific archived routes when the university publishes both; the Phase 3A review replaced superseded year-specific Imperial Computing and UCL Computer Science links with their current stable official course routes. That date verifies catalog identity/navigation only; it is not evidence freshness for any factual research claim. The release process must re-check redirects, program currency, and broken official links before publication.
+The original Phase 3A identities/links were checked on 2026-08-17. Side Phase UCE revalidated the 20 added universities, 31 added programs, relevant scope distinctions, and the MIT institutional homepage on 2026-08-20; the exact source-freeze ledger is `docs/research/2026-08-19-university-catalog-expansion-sources.md`. Prefer stable current canonical course routes over year-specific archived routes when the university publishes both. These dates verify catalog identity/navigation only; they are not evidence freshness for any factual research claim. The release process must re-check redirects, program currency, and broken official links before publication.
 
 ## Evidence Independence and Authority
 

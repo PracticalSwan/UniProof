@@ -125,9 +125,10 @@ export function GuideProfileForm({
               <option value="">Select a supported program</option>
               {visiblePrograms.map((program) => {
                 const university = catalog.universities.find((u) => u.id === program.universityId);
+                if (university === undefined) return null;
                 return (
                   <option key={program.id} value={program.id}>
-                    {program.name} - {university?.name ?? "Unknown university"}
+                    {program.name} - {university.name}
                   </option>
                 );
               })}

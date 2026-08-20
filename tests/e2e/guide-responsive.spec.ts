@@ -1,12 +1,8 @@
 import { test, expect, type ResearchRouteController } from "./helpers/research-browser";
-import { openGuide, selectGuideProgram, fillGuideProfile, submitGuide } from "./helpers/guide-browser";
+import { guideFixtureTarget, openGuide, selectGuideProgram, fillGuideProfile, submitGuide } from "./helpers/guide-browser";
 import { buildGuideDossier, makeClaim } from "@/tests/fixtures/guide-dossiers";
-import { researchCatalog } from "@/lib/research/catalog/data";
 
-const target = {
-  university: researchCatalog.universities[0]!,
-  program: researchCatalog.programs.find((program) => program.universityId === researchCatalog.universities[0]!.id)!,
-};
+const target = guideFixtureTarget;
 
 const sourceIds = Array.from({ length: 12 }, (_, index) => `source-${index + 1}`);
 const longEvidence = "Evidence segment αβγ🙂 ".repeat(90).slice(0, 2000);

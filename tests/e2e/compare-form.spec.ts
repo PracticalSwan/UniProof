@@ -26,6 +26,22 @@ test.describe("Phase 4 Compare form", () => {
     await expect(page.getByLabel("Support weight")).toHaveValue("0");
   });
 
+  test("finds expanded Canada and EU targets through the bounded result list", async ({ page }) => {
+    await openCompare(page);
+    const search = page.getByLabel("Search supported universities and programs");
+    const results = page.locator('[aria-label="Catalog search results"]');
+
+    await search.fill("U of T");
+    await expect(results.getByRole("button", { name: /University of TorontoUniversity target/ })).toBeVisible();
+
+    await search.fill("TU Delft");
+    await expect(results.getByRole("button", { name: /Delft University of TechnologyUniversity target/ })).toBeVisible();
+
+    await page.getByLabel("Country filter").selectOption("DE");
+    await search.fill("RWTH");
+    await expect(results.getByRole("button", { name: /RWTH Aachen UniversityUniversity target/ })).toBeVisible();
+  });
+
   test("validates target count and invalid weights before any Research dispatch", async ({ page, research }) => {
     await page.goto("/compare");
     await page.getByRole("button", { name: "Compare", exact: true }).click();

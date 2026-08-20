@@ -263,15 +263,17 @@ Execution plan: `docs/superpowers/plans/2026-08-19-phase-6a-identity-persistence
 
 Execution plan: `docs/superpowers/plans/2026-08-19-phase-6b-production-hardening.md`.
 
-- [ ] Re-verify current Vercel/provider/Supabase platform limits and policies before implementation; update the Phase 6 specification first if mutable assumptions changed.
-- [ ] Add one application-owned whole-Research deadline below the hosting hard limit, propagate terminal cancellation through all stages, stop new retries/fallback work after expiry, and preserve already validated partial evidence.
-- [ ] Handle deployment-generated 429/504/non-JSON failures as sanitized first-class Research/Compare/Guide outcomes without retry storms or loss of prior results.
-- [ ] Define and locally exercise the durable Vercel WAF contract for only `POST /api/research`; do not substitute an in-memory limiter for distributed abuse control or claim the WAF is active before deployment.
-- [ ] Finalize production environment separation, secret/client-boundary checks, canonical HTTPS/CSP/header behavior, and a conservative HSTS policy without `includeSubDomains`/`preload` by default.
-- [ ] Add least-privilege GitHub Actions CI with no live providers, hosted database mutations, production secrets, or automatic deployment.
-- [ ] Create requirement-to-code/test/deployment traceability for every MVP requirement; leave deployment-only requirements unverified until Phase 6C.
-- [ ] Re-check provider endpoints/models/free-route/privacy assumptions from official sources and block release rather than silently weakening privacy/capability constraints.
-- [ ] Run full Phase 0–6B dev/built browser, lifecycle stress, local Supabase, static/build/audit, secret/privacy/client-boundary, protected-artifact, and final security/over-engineering review gates.
+- [x] Re-verify current Vercel/provider platform limits and policies before implementation and again before 6C live smoke. Current 2026-08-19 planning baseline replaces the stale 210s/240s assumption with a 240s application deadline beneath a common 300s Fluid Node baseline; do not guess the actual selected project/plan state.
+- [x] Add one server-owned 240,000ms whole-Research execution budget, keep caller abort=`cancelled` distinct from deadline=`timeout`, propagate the composed signal through all existing stages, make Tavily/Brave retry waits abort-aware, stop new retries/fallback work after terminal ownership, and preserve already validated partial evidence.
+- [x] Configure Research Node `maxDuration=300` plus Vercel `supportsCancellation:true` for the Research function only; local tests prove signal behavior while actual Vercel disconnect propagation remains Phase 6C live evidence.
+- [x] Handle raw deployment/WAF HTTP 429 and platform 504 before application JSON/content-type parsing as sanitized client-local Research/Compare/Guide outcomes, with no body reflection, retry storm, or loss of prior results; stop an active Compare batch on terminal platform rate-limit/timeout rather than amplifying traffic.
+- [x] Define and locally exercise the exact durable Vercel WAF contract for only `POST /api/research`: fixed-window source-IP 20 requests/60s, Log-first, shared-NAT risk documented. Do not substitute an in-memory limiter/hidden test mode or claim WAF is active before Phase 6C.
+- [x] Migrate Gemini structured calls from the current new-schema `/v1beta/interactions` endpoint to stable `/v1/interactions` while retaining `gemini-3.5-flash-lite` -> `gemini-3.5-flash`, `store:false`, no tools, strict structured output, and public-source-only inputs; freeze Groq/OpenRouter/Tavily/Brave privacy/cost invariants without live calls.
+- [x] Add a non-secret release-configuration verifier: production canonical app URL must be an exact non-local HTTPS origin; live Research configuration explicit; optional Supabase Auth either fully valid or absent; no service-role requirement; verifier never prints secret values/fingerprints or becomes an authorization trust source.
+- [x] Preserve production nonce CSP/header behavior and **do not add duplicate app-owned HSTS**; current Vercel documentation supplies HSTS and Phase 6C must verify the actual deployed header/TLS/canonical origin. Keep `includeSubDomains`/`preload` out of UniProof policy unless a future explicit domain-wide review authorizes them.
+- [x] Add least-privilege GitHub Actions CI: `permissions: contents: read`, no `pull_request_target`, no provider/Vercel/hosted-Supabase secrets or deploy actions, full-SHA-pinned official actions, deterministic local Supabase/Playwright/static gates, and no secret-bearing artifact uploads. Do not claim CI is green until GitHub actually runs the workflow on an authorized pushed commit.
+- [x] Create requirement-to-code/test/deployment traceability plus a deterministic release verifier; leave deployment-only requirements unverified until Phase 6C and never inspect/echo `.env.local` or Supabase `.temp` secret values.
+- [x] Run full Phase 0–6B dev/built browser, deadline/429/cancel lifecycle repeats, local Supabase, static/build/audit, secret/privacy/client-boundary, protected-artifact, and **main-agent-only two-pass final review with zero subagents** gates. Final development Research/Compare/Guide passed **69/69 + 59/59 + 52/52 = 180/180** on isolated origins, and a fresh built-production Research/Compare/Guide run also passed **180/180**. High-risk repeats passed with retries zero: Guide lifecycle **60/60**, Compare deployment 429/504 plus retry-after-stop **15/15**, and local Auth/Saved **21/21** with a separate fresh **7/7** run. Local Supabase lint/advisors and pgTAP **40/40** passed; Vitest **588/588**, TypeScript, ESLint, production build, release/workspace verifiers, dependency audit, and installation dry-run were green on the final executable tree.
 
 ### Phase 6C — Deployment and Submission
 
@@ -292,6 +294,28 @@ Execution plan: `docs/superpowers/plans/2026-08-19-phase-6c-deployment-submissio
 - [ ] Draft the exact Devpost submission for user review, run a final production/repository/video/rules audit, and submit only after final explicit authorization.
 - [ ] Verify the submitted project and live links afterward and synchronize final Phase 6 evidence without overstating any skipped/unobserved external check.
 
+## Side Phase UCE — University Catalog Expansion
+
+Canonical specification: `docs/planning/side-phase-university-catalog-expansion.md`.
+
+One-batch implementation runbook: `docs/superpowers/plans/2026-08-19-side-phase-university-catalog-expansion.md`.
+
+This side phase expands the checked-in supported catalog without changing the Research evidence model, Compare scoring model, Guide applicant/privacy boundary, Phase 6A saved-artifact schema, provider routing, or Phase 6 deployment authorization boundaries. The four agreed university batches are implementation/source-review groupings only; implementation exposes the complete expanded catalog atomically after all source and regression gates pass.
+
+- [x] Re-freeze the live baseline before implementation and preserve every newer Phase 6A/6B fix/current working-tree change rather than resetting to a historical commit.
+- [x] Source-freeze all 20 approved Canada/US/EU university identities and every selected computing program from current primary official sources/ROR where applicable; unresolved campus/college/program/canonical-URL ambiguity blocks data edits rather than becoming guessed catalog data.
+- [x] Add one browser-safe closed country source for exactly `BE`, `CA`, `DE`, `DK`, `FI`, `GB`, `IT`, `NL`, `SE`, `TH`, `US` and reuse it across catalog schema, public Research dossier, search/form types, and Research/Compare country controls.
+- [x] Expand the bounded university schema from max 15 to max 40 while keeping the program max at 60; ship exactly 30 universities via an independent release-manifest test rather than making the schema unbounded/exact-count-only.
+- [x] Add all 20 universities and source-frozen applicant-meaningful CS/AI/Data Science-related programs in one deterministic catalog edit; preserve every existing university/program ID and ownership, keep catalog data identity/navigation-only, and keep batch priority out of production ranking/order metadata.
+- [x] Reject normalized cross-university canonical-name/alias collisions, omit ambiguous aliases such as bare `UW`, preserve NFKC deterministic search/owner projection, and never add fuzzy/model-assisted target retargeting.
+- [x] Regression-prove and narrowly align trusted official-host normalization for leading `www.`/true subdomains without broad registrable-domain trust; preserve all existing Phase 2 authority/corroboration/SSRF boundaries.
+- [x] Remove semantic test/fixture dependence on catalog array positions; use explicit stable IDs while retaining the intentional generic catalog ordering tests.
+- [x] Prove new Canada/EU/US targets bind through strict Research public/server/client contracts, remain practically discoverable in Research/Compare/Guide, preserve Compare/Guide deterministic semantics, and introduce no applicant/provider or internal-public-data leak.
+- [x] Prove Phase 6A saved-artifact version-1 backward compatibility for original targets plus new-country Research/Comparison/Guide targets; add no migration/version bump/auto-refresh/re-score/reassess path for additive catalog rows.
+- [x] Run the complete current focused/full Vitest, type, lint, build, audit, dev/built Playwright, repeated lifecycle, local persistence/Auth where applicable, security/privacy, secret/client-boundary, generated-residue, protected-screenshot, workspace/diff, and all landed Phase 6B verification gates.
+- [x] Perform a two-pass defect-first source/spec then code/security/privacy review, fix verified findings regression-first, and synchronize README/requirements/design/data-sources/security/threat-model/tasks/changelog/memory only from observed final behavior and counts.
+- [ ] Repository commit/push is now separately authorized by the owner and is the remaining publication step for this reviewed candidate. Hosted Supabase/Vercel/WAF/Devpost mutation, deployment, and live Research provider smoke remain outside this side phase and deferred to Phase 6C.
+
 ## Scope Control
 
-Defer until P0 is stable: global university coverage, document uploads, automatic application submission, admission-probability prediction, complex multi-agent production orchestration, multilingual UI, browser extensions, and counselor collaboration.
+Defer until P0 is stable: arbitrary/global university coverage beyond the checked-in supported catalog, document uploads, automatic application submission, admission-probability prediction, complex multi-agent production orchestration, multilingual UI, browser extensions, and counselor collaboration.

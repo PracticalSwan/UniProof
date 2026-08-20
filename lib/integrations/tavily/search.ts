@@ -8,6 +8,7 @@ import {
 } from "@/lib/security/research-limits";
 import { normalizeCandidateSource } from "@/lib/research/discovery/dedupe";
 import { readBoundedJson } from "@/lib/integrations/read-bounded-response";
+import { waitForRetryDelay } from "@/lib/integrations/abortable-delay";
 import type { DiscoveryQuery, ProviderSearchResult } from "@/lib/research/discovery/types";
 
 type TavilyFetch = typeof fetch;
@@ -97,9 +98,22 @@ export async function searchTavily(
         return failure("failed", "authentication", retryCount, startedAt, "Tavily authentication failed");
       }
       if (response.status === 429 || response.status >= 500) {
+        try {
+          void response.body?.cancel("provider status body discarded")?.catch(() => undefined);
+        } catch {
+          // Status classification and bounded retry behavior must not depend
+          // on an untrusted provider body cleanup promise.
+        }
         if (retryCount < 1) {
           retryCount += 1;
-          await sleep(safeRetryAfter(response.headers.get("retry-after")));
+          const mayRetry = await waitForRetryDelay(
+            safeRetryAfter(response.headers.get("retry-after")),
+            options.signal,
+            sleep,
+          );
+          if (!mayRetry) {
+            return failure("skipped", "budget", retryCount, startedAt, "Tavily call budget was reached");
+          }
           continue;
         }
         return failure("failed", response.status === 429 ? "rate-limit" : "upstream", retryCount, startedAt, "Tavily did not return a usable response");
@@ -148,7 +162,10 @@ export async function searchTavily(
       }
       if (retryCount < 1) {
         retryCount += 1;
-        await sleep(0);
+        const mayRetry = await waitForRetryDelay(0, options.signal, sleep);
+        if (!mayRetry) {
+          return failure("skipped", "budget", retryCount, startedAt, "Tavily call budget was reached");
+        }
         continue;
       }
       const isTimeout = error instanceof Error && error.name === "AbortError";

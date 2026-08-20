@@ -129,8 +129,21 @@ Relevant reusable skills live under `C:\Users\LOQ\.codex\skills`. Use only the s
 - `security-review`, `secret-scanning`: application security and credential exposure checks.
 - `documentation-verification`: README, setup, links, commands, and factual doc checks.
 - `agent-task-mapping`, `custom-agent-usage`: specialist routing when delegation materially helps.
+- `codex-lsp:lsp`: language-server diagnostics, definitions, references, symbols, and rename safety when the active host exposes the Codex LSP plugin.
 
 Do not use repository-irrelevant skills merely because they are installed. In particular, NVIDIA RAG Blueprint and competition-specific workflows are not UniProof defaults.
+
+## Language-Aware Code Intelligence
+
+`codex-lsp` is an installed operator tool, not a UniProof dependency. Do not vendor, reinstall, or add a project package merely to obtain it. When the active host exposes its `lsp` MCP tools and the target language is supported:
+
+- Use `lsp.status` when server availability is unknown or an LSP call reports a missing server.
+- Prefer `lsp.symbols`, `lsp.goto_definition`, and `lsp.find_references` over broad lexical search for symbol ownership, definitions, usages, and semantic change impact. Keep lexical search for exact text, configuration, documentation, generated content, or cases where LSP coverage is incomplete.
+- After editing supported source files, use `lsp.diagnostics` with `severity: "error"` as a fast focused gate when it provides quicker feedback than a full repository check.
+- In Codex, prefer native `apply_patch`/write/edit/multiedit mutation tools over shell-driven file rewrites when practical so the installed Codex LSP `PostToolUse` hook can run automatically. If a supported source file must be changed through a generic shell command, run focused `lsp.diagnostics` explicitly afterward because the hook does not match generic command execution.
+- For semantic renames, use `lsp.prepare_rename` first. Use `lsp.rename` only when the requested mutation is in scope, then inspect the resulting diff because rename applies workspace edits.
+- Treat LSP output as complementary evidence, not completion proof. It does not replace repository tests, TypeScript/type checks, lint, builds, browser checks, security review, or final diff inspection.
+- In ChatGPT sessions using CodexPro and Remote Desktop Commander where the `lsp` namespace is not surfaced directly, use CodexPro structured symbol/reference/impact search as the normal semantic fallback. Remote Desktop Commander may invoke the already-installed local LSP MCP for a focused read-only diagnostic or navigation check when that is materially better; do not add dependencies or project configuration solely to emulate a missing tool surface.
 
 ## Research and AI Safety
 

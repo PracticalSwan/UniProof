@@ -7,6 +7,7 @@ import {
   RESEARCH_MAX_SOURCES_PER_DOMAIN,
   RESEARCH_MAX_SOURCES_PER_RUN,
 } from "@/lib/security/research-limits";
+import { hostMatchesOfficialRoot } from "@/lib/research/official-host";
 import { canonicalizeOutboundUrl, validateOutboundUrlSyntax } from "@/lib/security/outbound-url";
 
 const SOURCE_PRIORITY: Record<CandidateSource["sourceType"], number> = {
@@ -53,8 +54,8 @@ export function normalizeCandidateSource(
   if (canonicalUrl === null) return null;
   const domain = hostnameFor(canonicalUrl);
   if (domain === undefined) return null;
-  const trustedHost = defaults.trustedOfficialHost?.toLowerCase().replace(/\.+$/, "");
-  const isTrustedOfficial = trustedHost !== undefined && (domain === trustedHost || domain.endsWith(`.${trustedHost}`));
+  const trustedHost = defaults.trustedOfficialHost;
+  const isTrustedOfficial = trustedHost !== undefined && hostMatchesOfficialRoot(domain, trustedHost);
   const parsed = candidateSourceSchema.safeParse({
     ...input,
     url: canonicalUrl,

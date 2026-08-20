@@ -45,11 +45,19 @@ const serverErrorMessages: Record<string, string> = {
 };
 
 const clientErrorMessages = {
+  "deployment-rate-limit": "The deployment is temporarily limiting research requests. Try again explicitly in a moment.",
+  "deployment-timeout": "The deployment timed out before the research request completed. Try again explicitly.",
   "network-error": "The research request could not be sent. Check the connection and try again.",
   "invalid-response": "The research response could not be safely validated for display.",
 } as const;
 
-const recoverableRetryCodes = new Set(["internal-error", "network-error", "invalid-response"]);
+const recoverableRetryCodes = new Set([
+  "internal-error",
+  "deployment-rate-limit",
+  "deployment-timeout",
+  "network-error",
+  "invalid-response",
+]);
 
 function researchErrorMessage(code: string): string {
   if (code in serverErrorMessages) return serverErrorMessages[code];

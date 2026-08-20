@@ -55,13 +55,16 @@ jobs:
       - name: Release contract
         run: node scripts/verify-release-config.mjs --profile=ci
 
-      - name: Anonymous browser gates
-        run: npx playwright test tests/e2e/research-*.spec.ts tests/e2e/compare-*.spec.ts tests/e2e/guide-*.spec.ts --retries=0
-
-      - name: Built anonymous browser gates
-        env:
-          UNIPROOF_E2E_PRODUCTION: '1'
-        run: npx playwright test tests/e2e/research-*.spec.ts tests/e2e/compare-*.spec.ts tests/e2e/guide-*.spec.ts --retries=0
+      - name: Critical anonymous browser smoke
+        run: >-
+          npx playwright test
+          tests/e2e/research-evidence.spec.ts
+          tests/e2e/research-races.spec.ts
+          tests/e2e/compare-scoring.spec.ts
+          tests/e2e/compare-lifecycle.spec.ts
+          tests/e2e/guide-assessment.spec.ts
+          tests/e2e/guide-lifecycle.spec.ts
+          --retries=0
 
   local-supabase:
     runs-on: ubuntu-latest

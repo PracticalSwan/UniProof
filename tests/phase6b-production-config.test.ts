@@ -130,8 +130,10 @@ describe("repository release contract", () => {
     expect(result.some((issue) => issue.variable === ".env.example")).toBe(false);
   });
 
-  it("verifies local release files and configuration without secret-bearing output", () => {
-    const result = verifyRepositoryReleaseContracts(process.cwd());
+  it("verifies release files and configuration without secret-bearing output", () => {
+    const result = verifyRepositoryReleaseContracts(process.cwd(), {
+      requireProtectedScreenshots: process.env.GITHUB_ACTIONS !== "true",
+    });
     expect(result.issues).toEqual([]);
     expect(result.checked).toEqual(expect.arrayContaining([
       ".github/workflows/ci.yml",

@@ -44,6 +44,31 @@ test.describe("Research evidence semantics", () => {
     await expect(page.getByText(/converted|conversion/i)).toHaveCount(0);
   });
 
+  test("renders a source-gap warning while preserving supported claim evidence", async ({ page, research }) => {
+    const response: ResearchModeResponse = {
+      ...succeededAllReadyResponse,
+      dossier: {
+        ...succeededAllReadyResponse.dossier,
+        categories: succeededAllReadyResponse.dossier.categories.map((row) =>
+          row.category === "admissions" && row.state === "ready"
+            ? {
+                ...row,
+                sourceGap: {
+                  code: "retrieval",
+                  message: "Available sources could not be retrieved completely.",
+                },
+              }
+            : row,
+        ),
+      },
+    };
+    await render(page, research, response);
+
+    await expect(page.getByText(/Some selected sources could not be retrieved or processed/i)).toBeVisible();
+    await expect(page.getByText(/Compare and Guide will not treat this category as definitive/i)).toBeVisible();
+    await expect(page.getByRole("button", { name: "View evidence for Published application code" })).toBeVisible();
+  });
+
   test("conflict renders every competing value and keeps evidence/source associations separate without preferring a winner", async ({ page, research }) => {
     await render(page, research, conflictResponse);
 

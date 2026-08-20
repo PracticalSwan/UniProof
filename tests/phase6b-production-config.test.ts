@@ -32,6 +32,24 @@ describe("release configuration verifier", () => {
     ]));
   });
 
+  it("accepts a production profile that deliberately omits Gemini and uses Groq as structured AI", () => {
+    const result = evaluateReleaseConfiguration({
+      NEXT_PUBLIC_APP_URL: "https://uniproof.example",
+      UNIPROOF_RESEARCH_MODE: "live",
+      TAVILY_API_KEY: "test",
+      GROQ_API_KEY: "test",
+    }, "production");
+    expect(result).toMatchObject({
+      releaseReady: true,
+      authConfigured: false,
+      structuredAiProviderClassesConfigured: { gemini: false, groq: true, openrouter: false },
+    });
+    expect(result.issues).toEqual([]);
+    expect(result.resilienceNotes).toEqual(expect.arrayContaining([
+      "GEMINI_API_KEY is not configured; structured AI fallback resilience is reduced.",
+    ]));
+  });
+
   it("accepts fully configured HTTPS auth and does not require the service-role key", () => {
     const result = evaluateReleaseConfiguration({
       ...productionEnv,
@@ -137,6 +155,7 @@ describe("repository release contract", () => {
     expect(result.issues).toEqual([]);
     expect(result.checked).toEqual(expect.arrayContaining([
       ".github/workflows/ci.yml",
+      ".vercelignore",
       "app/api/research/route.ts",
       "docs/planning/phase-6-requirements-traceability.md",
       "docs/operations/vercel-production.md",

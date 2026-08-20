@@ -1,0 +1,14 @@
+# User-owned/private local material that is never deployment input.
+ui-flow-screenshots/
+
+# Disposable local verification output.
+output/
+test-results/
+playwright-report/
+coverage/
+
+# Local service/runtime state and secrets.
+supabase/.temp/
+.env
+.env.*
+!.env.example

@@ -134,6 +134,11 @@ export const publicResearchFailureSchema = z.object({
 }).strict();
 export type PublicResearchFailure = z.infer<typeof publicResearchFailureSchema>;
 
+const publicSourceGapFailureSchema = publicResearchFailureSchema.refine(
+  (failure) => failure.code === "retrieval" || failure.code === "normalization",
+  { message: "source gaps must describe retrieval or normalization failures" },
+);
+
 const researchDossierTargetSchema = z.object({
   university: z.object({
     id: publicIdSchema,
@@ -196,6 +201,7 @@ const readyCategorySchema = z.object({
   state: z.literal("ready"),
   claims: z.array(publicResearchClaimSchema).min(1).max(500),
   explanation: publicEvidenceExplanationSchema,
+  sourceGap: publicSourceGapFailureSchema.optional(),
   hasConflict: z.boolean(),
   hasOutdated: z.boolean(),
 }).strict();

@@ -32,7 +32,9 @@ POST /api/research
       |
       +--> Tavily -> Brave -> direct/structured degraded discovery
       +--> bounded DNS-pinned public retrieval
-      +--> Gemini -> Groq -> OpenRouter structured extraction/reconciliation
+      +--> structured AI extraction/reconciliation
+           hosted release: Groq -> OpenRouter
+           Gemini adapter retained/tested but not configured publicly
       |
       v
 validated ResearchDossier
@@ -106,7 +108,7 @@ The checked-in MVP catalog contains **30 universities and 45 computing programs 
 - Supabase SSR/Auth + PostgreSQL/RLS for optional private saved snapshots
 - Tavily primary discovery with Brave Search fallback
 - ROR and approved structured/public sources
-- Gemini free primary structured AI, Groq Free fallback, OpenRouter Free final fallback
+- Provider-neutral structured AI adapters for Gemini, Groq, and OpenRouter; the hosted hackathon release uses Groq -> OpenRouter and intentionally leaves Gemini unconfigured because current Gemini API terms are incompatible with an API client likely to be accessed by under-18 applicants
 - Vitest unit/integration testing
 - Playwright browser/E2E testing
 
@@ -114,7 +116,7 @@ The checked-in MVP catalog contains **30 universities and 45 computing programs 
 
 ### Prerequisites
 
-- Node.js `>=20.9.0`
+- Node.js `22.x` (the package/lockfile release contract is pinned to Node 22)
 - npm `10.9.3` or compatible npm from the declared package manager
 
 ### Install
@@ -153,7 +155,7 @@ supabase db reset
 supabase test db
 ```
 
-Configure only the local public browser values `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the local Supabase stack in your ignored local environment, then start Next.js normally. Local Magic Links are delivered to the Supabase Mailpit development inbox. **Do not put a service-role key in browser variables or ordinary saved-artifact routes.** Hosted Supabase configuration is intentionally deferred to Phase 6C.
+Configure only the local public browser values `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the local Supabase stack in your ignored local environment, then start Next.js normally. Local Magic Links are delivered to the Supabase Mailpit development inbox. **Do not put a service-role key in browser variables or ordinary saved-artifact routes.** The public hackathon deployment intentionally leaves hosted Supabase browser/Auth variables absent because production email delivery is not configured; anonymous Research/Compare/Guide remains the judge-facing release.
 
 ### Verification commands
 
@@ -221,11 +223,17 @@ Contributions are welcome while the project remains under active hackathon devel
 
 Never use a real person's academic/private information in fixtures, bug reports, screenshots, or traces.
 
-## Development status
+## Release status
 
-Phase 0–6B are implemented through the local reviewed/browser-verified boundary. Optional Supabase passwordless Auth, user-scoped RLS persistence, explicit saved profile/Research/Comparison/Guide snapshots, the 240-second Research execution budget, Research-only host-cancellation configuration, sanitized deployment 429/504 handling, Gemini stable-v1 transport, release-configuration verification, and least-privilege GitHub Actions CI are implemented locally. Durable Vercel WAF enforcement, hosted Supabase/Auth verification, actual GitHub Actions execution, public deployment, production TLS/HSTS/domain verification, live-provider smoke, and Devpost submission remain Phase 6C work.
+The anonymous Phase 0–6C application is release-configured for Vercel at **https://uniproof-beta.vercel.app**. The expensive public Research route is protected by one Vercel WAF rule scoped exactly to `POST /api/research`, fixed-window **20 requests / 60 seconds / source IP**, returning 429 on excess. Production browser policy uses request nonces, `connect-src 'self'`, private/no-store caching, and Vercel-delivered HSTS. Hosted discovery is Tavily -> Brave; hosted structured AI is Groq -> OpenRouter. Gemini and hosted Supabase Auth/save are intentionally absent from the public environment for the release reasons documented above.
 
-No README statement should be treated as proof of a live public deployment or currently available service endpoint.
+The Phase 6 source-resilience review also changed evidence semantics for partial source failure: a category may preserve supported claims from usable sources while exposing a sanitized source-gap warning. Such claims remain visible in Research but are not definitive scoring/planning evidence in Compare or Guide. Program-scoped Research now always retains the catalog-owned official program page as a trusted direct source candidate even when web discovery succeeds.
+
+The bounded release smoke budget is exhausted at **3/3 accepted live Research executions**. The third call returned a schema-valid HTTP 200 dossier but admissions remained operationally incomplete with zero claims; it exposed the direct-program-source defect above, which was fixed and regression-tested without exceeding the quota. Do not reinterpret that smoke as a successful live evidence result.
+
+The final hardened executable source passed **602/602 Vitest tests**, TypeScript, ESLint, production build, release/workspace verification, `npm audit --omit=dev` with zero vulnerabilities, and **104/104 deterministic hosted Preview Research/Compare/Guide browser acceptance** before the documentation-only release synchronization. Release screenshots under `docs/assets/screenshots/phase-6/` were captured from that verified hosted UI with deterministic intercepted Research fixtures; they demonstrate presentation behavior and are not represented as live-provider outputs.
+
+Devpost remains deliberately **not submitted** until the final approximately three-minute public demo video is supplied and reviewed. Draft submission text, recording script, and the final checklist are under `docs/submission/`.
 
 ## License
 

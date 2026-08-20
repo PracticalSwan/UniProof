@@ -218,6 +218,7 @@ export function verifyRepositoryReleaseContracts(
     "package.json",
     "package-lock.json",
     ".gitignore",
+    ".vercelignore",
     "vercel.json",
     "next.config.ts",
     "app/api/research/route.ts",
@@ -260,6 +261,9 @@ export function verifyRepositoryReleaseContracts(
       ) {
         issues.push(issue("package-lock.json", "package.json and the lockfile root dependency contract must match."));
       }
+      if (manifest.engines?.node !== "22.x" || lockRoot?.engines?.node !== "22.x") {
+        issues.push(issue("package.json", "Release builds must pin the Vercel Node.js major to 22.x in both manifest and lockfile."));
+      }
     } catch {
       issues.push(issue("package-lock.json", "package.json and package-lock.json must be valid JSON."));
     }
@@ -277,6 +281,23 @@ export function verifyRepositoryReleaseContracts(
     ]) {
       if (!gitignore.includes(requiredPattern)) {
         issues.push(issue(".gitignore", `Release ignore contract is missing required pattern: ${requiredPattern.trim()}.`));
+      }
+    }
+  }
+
+  if (existsSync(path.join(root, ".vercelignore"))) {
+    const vercelignore = readText(root, ".vercelignore");
+    for (const requiredPattern of [
+      "ui-flow-screenshots/\n",
+      "output/\n",
+      "test-results/\n",
+      "supabase/.temp/\n",
+      ".env\n",
+      ".env.*\n",
+      "!.env.example\n",
+    ]) {
+      if (!vercelignore.includes(requiredPattern)) {
+        issues.push(issue(".vercelignore", `Vercel deployment ignore contract is missing required pattern: ${requiredPattern.trim()}.`));
       }
     }
   }

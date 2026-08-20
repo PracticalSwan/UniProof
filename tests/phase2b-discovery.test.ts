@@ -75,6 +75,91 @@ describe("Phase 2B discovery", () => {
     if (programOnly.resolved) expect(programOnly.target.universityName).toBeUndefined();
   });
 
+  it("prefers the catalog program URL for direct evidence while retaining the university root trust host", async () => {
+    const resolution = await resolveResearchTarget(
+      request({
+        target: {
+          university: { id: "u-1" },
+          program: { id: "p-1", universityId: "u-1" },
+        },
+        categories: ["admissions"],
+      }),
+      {
+        resolveUniversity: () => ({
+          id: "u-1",
+          name: "Example University",
+          countryCode: "US",
+          websiteUrl: "https://example.edu/",
+        }),
+        resolveProgram: () => ({
+          id: "p-1",
+          universityId: "u-1",
+          name: "BSc Computing",
+          degreeLevel: "bachelor",
+          subjectArea: "Computer Science",
+          officialUrl: "https://cs.example.edu/programs/bsc",
+        }),
+      },
+    );
+
+    expect(resolution.resolved).toBe(true);
+    if (!resolution.resolved) return;
+    expect(resolution.target.officialUrl).toBe("https://cs.example.edu/programs/bsc");
+    expect(resolution.target.officialHost).toBe("example.edu");
+  });
+
+  it("retains the catalog-owned direct program page alongside successful web discovery", async () => {
+    const parsed = request({
+      target: {
+        university: { id: "u-1" },
+        program: { id: "p-1", universityId: "u-1" },
+      },
+      categories: ["admissions"],
+    });
+    const result = await discoverResearch(parsed, {
+      enableRor: false,
+      targetResolver: {
+        resolveUniversity: () => ({
+          id: "u-1",
+          name: "Example University",
+          countryCode: "US",
+          websiteUrl: "https://example.edu/",
+        }),
+        resolveProgram: () => ({
+          id: "p-1",
+          universityId: "u-1",
+          name: "BSc Computing",
+          degreeLevel: "bachelor",
+          subjectArea: "Computer Science",
+          officialUrl: "https://cs.example.edu/programs/bsc",
+        }),
+      },
+      tavilySearch: async (query) => {
+        const candidate = normalizeCandidateSource(
+          { url: "https://example.edu/admissions", sourceType: "university" },
+          {
+            discoveryProvider: "tavily",
+            requestedCategory: query.category,
+            discoveryQueryId: query.id,
+          },
+        );
+        return { outcome: "success", candidates: candidate === null ? [] : [candidate], retryCount: 0 };
+      },
+      braveSearch: async () => ({ outcome: "empty", candidates: [], retryCount: 0 }),
+    });
+
+    expect(result.candidateSources.map((candidate) => candidate.url)).toEqual(expect.arrayContaining([
+      "https://cs.example.edu/programs/bsc",
+      "https://example.edu/admissions",
+    ]));
+    expect(result.providerAttempts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ provider: "direct", category: "admissions", outcome: "success" }),
+    ]));
+    expect(result.categoryAssociations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ url: "https://cs.example.edu/programs/bsc", categories: ["admissions"] }),
+    ]));
+  });
+
   it("rejects a supplied university name that conflicts with a resolved program university", async () => {
     const conflict = await resolveResearchTarget(
       request({
@@ -315,7 +400,7 @@ describe("Phase 2B discovery", () => {
     });
     expect(braveCalls).toBe(0);
     expect(result.coveredCategories).toEqual(["admissions"]);
-    expect(result.providerAttempts.map((attempt) => attempt.provider)).toEqual(["tavily", "tavily"]);
+    expect(result.providerAttempts.map((attempt) => attempt.provider)).toEqual(["tavily", "direct", "tavily"]);
   });
 
   it("falls through to Brave and canonicalizes fragments with domain/run budgets", () => {

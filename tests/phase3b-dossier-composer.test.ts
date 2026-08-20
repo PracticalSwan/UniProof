@@ -255,6 +255,31 @@ describe("Phase 3B dossier composer", () => {
     expect(dossier.categories[0]?.claims[0]?.representativeSourceId).toBe("source-1");
   });
 
+  it("projects a sanitized source gap alongside supported claims", () => {
+    const base = buildResult([
+      { id: "claim-gap", category: "admissions", property: "Application deadline", value: "2027-01-15", status: "verified" },
+    ]);
+    const result = researchResultSchema.parse({
+      ...base,
+      failures: [{
+        category: "admissions",
+        code: "retrieval",
+        message: "raw internal retrieval detail that must not reach the browser",
+      }],
+    });
+
+    const dossier = composeResearchDossier(result, selectedTarget);
+    const row = dossier.categories[0]!;
+    expect(row.state).toBe("ready");
+    if (row.state !== "ready") throw new Error("expected ready source-gap row");
+    expect(row.sourceGap).toEqual({
+      code: "retrieval",
+      message: "Available sources could not be retrieved completely.",
+    });
+    expect(row.sourceGap?.message).not.toContain("raw internal");
+    expect(row.claims).toHaveLength(1);
+  });
+
   it("composes all seven ready categories in canonical order", () => {
     const categories = ["support", "research", "outcomes", "program-structure", "scholarships", "tuition", "admissions"] as ResearchCategory[];
     const result = buildResult(categories.map((category, index) => ({

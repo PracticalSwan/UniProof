@@ -83,6 +83,8 @@ export function isGuideClaimDefinitiveEligible(
   claim: PublicResearchClaim,
   dossier: ResearchDossier,
 ): boolean {
+  const categoryRow = dossier.categories.find((row) => row.category === claim.category);
+  if (categoryRow?.state !== "ready" || categoryRow.sourceGap !== undefined) return false;
   if (!isDefinitiveStatus(claim.verificationStatus)) return false;
   if (!claimHasEligibleSource(claim, dossier)) return false;
   return true;

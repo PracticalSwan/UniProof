@@ -223,7 +223,9 @@ export function finalizeGuideResult(
   try {
     const assessment = assessGuideRequirements(sub, dos);
     const plan = buildGuidePlan(sub, dos, assessment);
-    const hasIncomplete = dos.categories.some((row) => row.state === "incomplete");
+    const hasIncomplete = dos.categories.some(
+      (row) => row.state === "incomplete" || (row.state === "ready" && row.sourceGap !== undefined),
+    );
     const status = dos.run.status === "partial" || hasIncomplete ? "partial" : "complete";
 
     return {

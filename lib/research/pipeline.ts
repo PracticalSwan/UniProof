@@ -28,6 +28,7 @@ export type DiscoveryRetrievalCategoryState = {
   category: ResearchCategory;
   discoveryStatus: DiscoveryCategoryStatus;
   complete: boolean;
+  hasUsableDocument: boolean;
   reason?: ResearchFailure["code"];
 };
 
@@ -176,7 +177,8 @@ export async function runDiscoveryRetrievalStage(
   const categoryStates: DiscoveryRetrievalCategoryState[] = request.categories.map((category) => {
     const discoveryState = discoveryByCategory.get(category);
     const discoveryStatus = discoveryState?.status ?? "failed";
-    if (discoveryStatus === "empty") return { category, discoveryStatus, complete: true };
+    const hasUsableDocument = [...documentCategorySets.values()].some((categories) => categories.has(category));
+    if (discoveryStatus === "empty") return { category, discoveryStatus, complete: true, hasUsableDocument: false };
     if (discoveryStatus !== "covered") {
       const reason: ResearchFailure["code"] = discoveryState?.reason === "cancelled"
         ? "cancelled"
@@ -185,12 +187,12 @@ export async function runDiscoveryRetrievalStage(
           : discoveryState?.reason === "source-limit"
             ? "source-limit"
             : "source-discovery";
-      return { category, discoveryStatus, complete: false, reason };
+      return { category, discoveryStatus, complete: false, hasUsableDocument, reason };
     }
     const retrievalReason = failedCategories.get(category);
     return retrievalReason === undefined
-      ? { category, discoveryStatus, complete: true }
-      : { category, discoveryStatus, complete: false, reason: retrievalReason };
+      ? { category, discoveryStatus, complete: true, hasUsableDocument }
+      : { category, discoveryStatus, complete: false, hasUsableDocument, reason: retrievalReason };
   });
 
   const documentCategories = Object.fromEntries(

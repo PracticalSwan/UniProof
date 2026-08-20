@@ -1,6 +1,6 @@
 # Phase 6 — Hardening and Submission Readiness
 
-Status: **Phase 6A and Phase 6B implemented and locally verified** as of 2026-08-20; Phase 6C remains external/release work. Local Supabase Auth/Mailpit, migration/RLS, private saved-artifact APIs, explicit save/restore, the 240-second Research execution budget, host-cancellation configuration, deployment 429/504 handling, Gemini stable-v1 transport, release verification, and least-privilege CI are implemented. No hosted Supabase mutation, Vercel project/WAF change, deployment, live provider request, actual GitHub Actions run, or Devpost submission is claimed by Phase 6B.
+Status: **Phase 6A/6B implemented and Phase 6C release execution substantially complete** as of 2026-08-20. The public Vercel project, Preview acceptance, active Research WAF, hosted provider configuration, security/header checks, release screenshots, and bounded three-call live smoke have been executed. Hosted Supabase Auth/save is intentionally absent from the public deployment because production email delivery is not configured; the anonymous core remains releaseable. Devpost final submission is the only deliberate publication hold and remains blocked until the final demo video is supplied, verified, and explicitly approved.
 
 Detailed execution plans:
 
@@ -29,7 +29,7 @@ The starting baseline for this plan was the reviewed Phase 0–5 working tree re
 - Guide still sends only public target/intake/year context to Research; applicant data remains provider-separated.
 - Production CSP still uses request nonces and no third-party runtime analytics/scripts.
 - Phase 6A now adds Supabase SSR Auth refresh, local migration/RLS, strict private saved-artifact APIs, and optional explicit profile/Research/Comparison/Guide snapshot persistence.
-- Public deployment remains blocked on durable abuse limiting, host duration/cancellation behavior, production secrets/domain/TLS/HSTS, hosted Auth/RLS/email verification, and live smoke.
+- Public release now has durable Vercel WAF enforcement, verified Preview security/header behavior, bounded hosted provider configuration, and release screenshots. Hosted Auth/save is intentionally disabled rather than partially configured; the remaining final release gates are exact-SHA CI/Production promotion plus the separately held Devpost video/submission step.
 
 Do not rewrite Phase 2–5 evidence semantics during Phase 6. Phase 6 is a hardening/release phase, not a new AI reasoning phase.
 
@@ -597,17 +597,21 @@ Hosted Supabase mutation is **not** required to call the local implementation ba
 - full requirements traceability has no unexplained MVP gap;
 - complete local dev+built/security/privacy matrix and final review pass.
 
-### Phase 6C complete when
+### Phase 6C release gate
 
-- authorized remote Supabase migrations/RLS/Auth configuration are verified;
-- authorized Vercel preview and production deployment are verified;
-- durable rate limiting is actually active and observed;
-- bounded live smoke passes;
-- final production security/secret/privacy checks pass;
-- release README/screenshots/demo are based on verified behavior;
-- exact public repository/deployed commit are traceable;
-- current Devpost requirements are rechecked;
-- Devpost submission is completed only after explicit final authorization.
+For the anonymous hackathon release:
+
+- hosted Supabase Auth/save must be either fully configured and verified **or intentionally absent**; the current release chooses absence because production email delivery is not configured;
+- authorized Vercel Preview and exact-SHA Production deployment must be verified;
+- durable rate limiting must be active and observed;
+- the bounded live-smoke budget must be truthfully recorded. For this release, all **3/3** accepted calls are consumed; the final call returned a schema-valid but operationally incomplete dossier, so no successful live-evidence claim is made;
+- final Production security/secret/privacy/client-bundle checks must pass;
+- README/screenshots/demo materials must describe only verified behavior and clearly distinguish deterministic fixture screenshots from live provider output;
+- exact public repository/deployed commit must be traceable and its GitHub Actions run green;
+- current Devpost requirements must be rechecked;
+- Devpost submission remains outside the release-completion claim until the final video is supplied and the exact submission is explicitly authorized.
+
+The application may therefore be **production-released and submission-ready except for Devpost posting** while the final-video hold remains active. Do not label the Devpost entry submitted or complete before that hold is released.
 
 ## 10. Explicit exclusions
 

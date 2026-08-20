@@ -351,7 +351,7 @@ export async function discoverResearch(input: unknown, options: DiscoveryOptions
         }
       }
 
-      if (!candidateFound && query.kind === "category") {
+      if (query.kind === "category") {
         const direct = directDiscovery(resolution.target, query);
         const directResult: ProviderSearchResult = {
           outcome: direct.outcome,

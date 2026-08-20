@@ -1,60 +1,67 @@
 # Vercel Production Operations
 
-This runbook describes the Phase 6C operator checks for a future Vercel deployment. Phase 6B does not execute any of these hosted mutations.
+This runbook records the Phase 6C Vercel release contract and the observed 2026-08-20 configuration. Devpost publication is a separate final gate.
 
-## Before deployment
+## Current release configuration
 
-1. Run the complete local Phase 6B verification matrix on the exact commit intended for release.
-2. Run `node scripts/verify-release-config.mjs --profile=production` in an environment that contains the intended production variable **names and values**. The verifier reports only variable names and sanitized requirements; do not paste its environment into tickets, logs, or chat.
-3. Confirm `NEXT_PUBLIC_APP_URL` is the exact canonical non-loopback HTTPS origin and `UNIPROOF_RESEARCH_MODE=live`.
-4. Configure at least one discovery provider (`TAVILY_API_KEY` or `BRAVE_SEARCH_API_KEY`) and at least one structured-AI provider (`GEMINI_API_KEY`, `GROQ_API_KEY`, or `OPENROUTER_API_KEY`). Missing fallback providers reduce resilience but do not invalidate the release.
-5. Configure Supabase Auth only as a complete pair: `NEXT_PUBLIC_SUPABASE_URL` plus `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. The project does not require a service-role credential for normal application persistence.
-6. Verify the selected Vercel project accepts the 300-second Research function duration and that the app remains on the expected Node runtime.
+- Canonical origin: `https://uniproof-beta.vercel.app`
+- Runtime contract: Node `22.x`; Research function cap 300 seconds; application-owned Research deadline 240 seconds.
+- Research mode: `live` in Preview and Production.
+- Discovery: Tavily primary, Brave fallback.
+- Structured AI in the hosted release: Groq primary, OpenRouter fallback.
+- Gemini: adapter remains implemented/tested, but `GEMINI_API_KEY` is intentionally absent from Preview/Production because current Gemini API terms prohibit API clients directed toward or likely to be accessed by under-18 users.
+- Hosted Supabase Auth/save: intentionally absent from the public environment because production email delivery is not configured. Anonymous Research/Compare/Guide is the judge-facing release.
+- `.vercelignore` excludes private env files, protected `ui-flow-screenshots/`, and generated verification output from deployment input.
 
-## Request cancellation contract
+## WAF contract — active
 
-`vercel.json` opts `app/api/research/route.ts` into Vercel request cancellation. No other route is opted in. The application itself owns a 240-second terminal Research deadline, leaving headroom under the 300-second host ceiling.
+Exactly one durable custom rate-limit rule is enabled:
 
-During Phase 6C, verify with a real preview deployment that disconnecting an in-flight Research request propagates cancellation to the Node handler and that provider work stops without additional retries or fallbacks. Do not infer this from local `AbortController` tests alone.
-
-## WAF rate-limit contract
-
-Do not implement a second application-level limiter merely to imitate platform protection. If the selected Vercel plan supports the required WAF rule, configure and verify this exact contract in Phase 6C:
-
-- route: `POST /api/research`
+- method: `POST`
+- path: `/api/research`
 - key: source IP
-- window: fixed 60 seconds
+- algorithm: fixed window
 - threshold: 20 requests
-- initial action: **Log**
+- window: 60 seconds
+- excess action: HTTP 429
 
-Observe legitimate traffic first. Only after verifying match behavior, pricing, and false-positive risk should an operator separately authorize a blocking/enforcement action. Application clients do not automatically retry raw deployment HTTP 429 or 504 responses.
+Do not add a second in-process limiter merely to duplicate this protection. Application clients classify raw deployment/WAF 429 and platform 504 before body/schema parsing and do not automatically retry them.
 
-## Hosted Supabase checks
+## Security / privacy observations
 
-Before production persistence is declared verified:
+Preview verification observed:
 
-- apply the committed migrations through the authorized hosted workflow;
-- verify RLS and grants with two distinct authenticated test accounts;
-- verify anonymous users cannot read/write saved artifacts;
-- verify cross-user artifact identifiers do not disclose another user's row;
-- verify sign-out invalidates private API access;
-- confirm no service-role credential is exposed to browser or ordinary runtime paths.
+- private/no-cache/no-store application responses;
+- request-nonce CSP with `connect-src 'self'` and no production `unsafe-eval`/`unsafe-inline` script policy;
+- `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, COOP/CORP, restrictive Permissions Policy;
+- Vercel HSTS: `max-age=63072000; includeSubDomains; preload`;
+- no provider key names or configured secret values in the browser bundle;
+- no browser source-map files or `sourceMappingURL` references.
 
-Local Supabase evidence is not hosted-service evidence.
+UniProof does not duplicate Vercel's HSTS at the application layer.
 
-## Post-deployment verification
+## Release smoke evidence
 
-Verify the exact deployed commit and record the evidence level separately for:
+The owner-authorized live Research budget was capped at three accepted executions and is exhausted at **3/3**. Do not make another live Research call as part of this release.
 
-- canonical HTTPS host and redirect behavior;
-- production security headers, CSP, and HSTS behavior supplied by the actual edge path;
-- Research success, cancellation, application deadline, raw platform 429/504 handling, and no blind retry;
-- Compare batch stop after platform throttling/timeout;
-- Guide and Saved/Auth lifecycle;
-- live provider fallback behavior without logging provider payloads or credentials;
-- WAF log behavior if the rule was authorized;
-- the exact GitHub Actions run for the deployed commit.
+The third pass used University of Waterloo Bachelor of Computer Science admissions. The request returned HTTP 200 and a schema-valid public response, but the category remained operationally incomplete with zero claims. That pass exposed two deterministic resilience defects subsequently fixed without another live call:
+
+1. usable same-category claims now survive another selected source failing retrieval/normalization, with a sanitized `sourceGap` marker;
+2. program-scoped Research always retains the catalog-owned official program URL as a trusted direct candidate, even when general web discovery succeeds.
+
+Source-gap claims remain visible in Research but are non-definitive in Compare and Guide. The corrected executable source passed 602/602 Vitest tests and 104/104 deterministic hosted Preview Research/Compare/Guide browser acceptance cases. This does **not** convert the live smoke into a successful evidence-producing run; residual live-provider/source variability remains an explicit release limitation.
+
+## Exact-SHA production procedure
+
+1. Run the short final local gates on the exact staged source: focused/full Vitest as appropriate, TypeScript, ESLint, production build, release/workspace verifier, dependency audit, secret/client-bundle audit, and final diff review.
+2. Stage only intended release files. Never stage `ui-flow-screenshots/`, `.env*`, generated output, or temporary `.ai-bridge` files.
+3. Commit and push `main`.
+4. Verify `origin/main` equals the local release SHA.
+5. Require GitHub Actions to complete successfully on that exact SHA.
+6. Deploy that exact committed source to Vercel Production.
+7. Confirm `https://uniproof-beta.vercel.app` serves the new deployment and verify the deployment metadata is tied to the expected Git SHA.
+8. Run only deterministic post-deploy checks: route/navigation availability, headers/CSP/cache, WAF configuration, browser/client-bundle privacy, and runtime logs. **Do not perform another live Research call.**
 
 ## Rollback
 
-If a deployment introduces a material regression, stop publication/submission work, preserve evidence, and use the platform's reversible rollback/promote mechanism for a previously verified deployment. Do not rewrite Git history or delete hosted data as a rollback shortcut. Re-run the affected production checks after rollback before calling the service recovered.
+If the exact-SHA production deployment introduces a material regression, stop publication work and use Vercel's reversible rollback/promote mechanism for the previously verified deployment. Do not rewrite Git history, delete hosted data, or remove security controls as a rollback shortcut. Re-run the affected deterministic production checks after rollback.

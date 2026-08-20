@@ -178,7 +178,7 @@ function indexDossier(dossier: ResearchDossier): IndexedDossier {
   const sources = new Map(dossier.sources.map((source) => [source.id, source]));
   const claimsByMetric = new Map<ComparisonMetricId, PublicResearchClaim[]>();
   for (const row of dossier.categories) {
-    if (row.state !== "ready") continue;
+    if (row.state !== "ready" || row.sourceGap !== undefined) continue;
     for (const claim of row.claims) {
       const definition = lookupComparisonMetric(claim.property);
       if (definition === undefined || definition.category !== claim.category) continue;
@@ -395,6 +395,7 @@ function preliminaryDimension(
   const row = indexed.categories.get(category);
   if (row === undefined || row.state === "incomplete") return unscored("category-incomplete");
   if (row.state === "unknown") return unscored("category-unknown");
+  if (row.sourceGap !== undefined) return unscored("category-incomplete");
 
   for (const definition of comparisonMetricsForDimension(dimension)) {
     const claims = indexed.claimsByMetric.get(definition.id) ?? [];

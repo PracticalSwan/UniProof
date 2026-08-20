@@ -58,6 +58,13 @@ function ReadySection({
           and the official target link.
         </p>
       ) : null}
+      {row.sourceGap !== undefined ? (
+        <p className="mt-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-[13px] font-medium text-muted-foreground">
+          Some selected sources could not be retrieved or processed. The claims below come only
+          from successfully processed sources, so Compare and Guide will not treat this category
+          as definitive.
+        </p>
+      ) : null}
 
       <div className="mt-4 border-l-[3px] border-l-primary/60 pl-4">
         <p className="text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">

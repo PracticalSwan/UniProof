@@ -23,6 +23,26 @@
 - Preserve `ui-flow-screenshots/`; release screenshots go elsewhere.
 - If a critical security/privacy/RLS/rate-limit/deployment gate fails, stop release progression, fix locally, reverify, and redeploy a new candidate. Do not rationalize a failed gate because the deadline is close.
 
+## 2026-08-20 execution baseline and owner constraints
+
+- The historical execution baseline was `6867ce25b28aa5747e84465fe3ee2b94588b31eb` on `main`; Phase 6C has since advanced beyond it with source-gap/direct-program resilience fixes, Node 22 release pinning, `.vercelignore`, release screenshots, and submission documentation. The final exact release SHA is intentionally established only after the final reviewed commit; `ui-flow-screenshots/` remains owner-owned local material and is never release input.
+- The pre-6C cleanup is part of this release: Compare uses five raw 0–100 relative sliders with positive-total `raw / sum(raw)` normalization and version-1 snapshot compatibility; Guide contains the reviewed profile alignment/title-casing fixes; the checked-in catalog is 30 universities / 45 computing programs / 11 country codes.
+- The owner explicitly authorizes Phase 6C deployment/configuration/review work and up to **three live quota passes** for acceptance testing. A quota pass means one accepted live `/api/research` execution; fixture/intercepted browser checks do not consume this budget. Never intentionally trigger provider fallback merely to spend the allowance.
+- Allocate the maximum three live passes conservatively. A multi-target Compare consumes one pass per target, so a live 3-target Compare is prohibited by this budget; verify deployed Compare sequencing/scoring with deterministic intercepted responses unless the remaining budget safely permits a 2-target live run.
+- **Hard submission hold:** the owner has not supplied the final approximately three-minute demo video. Do not submit Devpost, click a final submission control, or represent Phase 6C as fully complete until the owner supplies the finished video, the video is verified for content/duration/public accessibility, the exact Devpost draft is re-audited against it, and the owner gives final authorization for that exact submission.
+- Current Gemini API terms (effective March 23, 2026) prohibit using Gemini API as part of an API Client directed toward or likely to be accessed by people under 18. UniProof targets university applicants, a population that can include under-18 users. Therefore the public release must **not configure `GEMINI_API_KEY` in Preview/Production** unless a later terms/account basis clearly resolves that incompatibility. Keep Gemini code/tests intact, but use the next configured structured provider (Groq, then OpenRouter) in the hosted release and document the deployed order truthfully.
+- Production account/save remains optional. If no production-capable SMTP is already available through an approved secret-safe path, do not expose a broken Magic Link experience to judges: leave Supabase browser Auth/save configuration absent from the public Vercel environment, while hosted migrations/RLS may still be verified separately as release-infrastructure evidence.
+
+### Execution result through the final pre-commit gate
+
+- Vercel Preview configuration is live with Tavily -> Brave discovery, Groq -> OpenRouter structured AI, `UNIPROOF_RESEARCH_MODE=live`, no hosted Gemini key, and no hosted Supabase browser/Auth variables.
+- One WAF rule is enabled for exact `POST /api/research`, source-IP fixed window, 20 requests/60 seconds, excess 429.
+- The hardened executable source passed 602/602 Vitest tests, TypeScript, ESLint, production build, release/workspace checks, dependency audit, and 104/104 deterministic hosted Preview Research/Compare/Guide acceptance cases.
+- The live Research allowance is exhausted at 3/3. The third accepted call returned HTTP 200/schema-valid but an operationally incomplete admissions category with zero claims; it exposed source-resilience defects that were fixed with deterministic regressions without a fourth live call.
+- Eight release screenshots were captured from the verified hosted Preview with intercepted deterministic fixtures under `docs/assets/screenshots/phase-6/`; they are presentation evidence, not live-provider-output evidence.
+- Devpost draft/script/checklist are prepared under `docs/submission/`. Final Devpost posting remains blocked on the final video and exact submission authorization.
+- The remaining external release sequence is deliberately short: final source/secret gates -> exact staged diff -> commit/push -> exact-SHA GitHub Actions green -> exact-SHA Production deploy -> deterministic production route/header/WAF/log verification. No additional live Research call is permitted.
+
 ---
 
 ## Task 1 — Re-read current release state and re-verify mutable external facts
@@ -358,14 +378,14 @@ Treat any cross-user cache/session or CSP failure as critical rollback/blocker.
 
 Use public university/program context only and the normal provider order. Never use a real applicant profile.
 
-Budget:
+Budget (owner-authorized ceiling: three accepted live `/api/research` executions across Preview + Production):
 
-- [ ] one representative end-to-end live Research run on one supported program;
+- [ ] one representative end-to-end live Research run on one supported program; repeat once on Production if the first live run was Preview-only and the evidence materially adds confidence;
 - [ ] no deliberate provider failure/fallback triggering;
 - [ ] inspect returned evidence/source lifecycle and sanitization;
-- [ ] one 3-target Compare may use normal Research calls only if explicitly included in the authorized quota budget; otherwise verify Compare from already validated fixture/saved safe results;
-- [ ] Guide uses invented applicant marker and one normal Research request if not already covered;
-- [ ] one client cancellation only if it can be done early without intentionally wasting multiple provider requests;
+- [ ] do **not** run a live 3-target Compare under the current three-pass ceiling. A live 2-target Compare is allowed only if exactly two passes remain and it is more valuable than the remaining single-flow smoke; otherwise verify deployed Compare from deterministic intercepted Research responses;
+- [ ] Guide uses invented applicant data and deterministic/intercepted Research by default; spend one remaining live Research pass on Guide only when that privacy/integration evidence is still needed and total live accepted runs remain <=3;
+- [ ] one client cancellation only if it can happen before an accepted live Research execution or without intentionally wasting provider work; otherwise retain the deterministic deployed/local cancellation evidence;
 - [ ] no more calls merely to chase non-deterministic content once the smoke objective is satisfied.
 
 Verify:
@@ -538,6 +558,8 @@ Script target:
 - [ ] No private/secret data visible.
 - [ ] Verify final video link visibility before submission.
 
+**Owner hold (2026-08-20):** prepare and rehearse the script/checklist now, but the actual final recording will be supplied later by the owner. Until that file/link is supplied and verified, Tasks 27–29 remain blocked regardless of deployment readiness.
+
 Video recording/upload itself is an external/publication action if uploaded to a service and requires the applicable authorization.
 
 ---
@@ -620,6 +642,8 @@ If Production changed after the last audit, rerun the affected gates before subm
 ## Task 28 — Devpost submission only after final explicit authorization
 
 **External publication/submission gate:** do not click/execute final submission without an explicit user instruction approving the exact reviewed submission.
+
+**Additional hard gate from the owner:** no final Devpost submission is permitted until the owner supplies the finished demo video and this phase verifies that it is the intended final recording, approximately three minutes, visibly demonstrates the problem/product/meaningful AI integration, contains no secret/private material, and is publicly accessible to judges. Deployment and draft preparation may finish before the video, but the release state must remain `submission-ready / pending final video` rather than `submitted` or `Phase 6C complete`.
 
 When authorized:
 

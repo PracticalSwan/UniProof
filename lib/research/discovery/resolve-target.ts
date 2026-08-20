@@ -186,7 +186,7 @@ export async function resolveResearchTarget(
     target.programName = resolvedProgram.name;
     target.degreeLevel = resolvedProgram.degreeLevel;
     target.subjectArea ??= resolvedProgram.subjectArea;
-    if (target.officialUrl === undefined) target.officialUrl = resolvedProgram.officialUrl;
+    target.officialUrl = resolvedProgram.officialUrl;
     target.officialHost ??= safeHost(resolvedProgram.officialUrl);
   } else if (suppliedProgram?.name !== undefined) {
     target.programName = suppliedProgram.name;

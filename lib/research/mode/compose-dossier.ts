@@ -157,6 +157,18 @@ function publicFailureFor(
   return { code, message: failureMessages[code] };
 }
 
+function publicSourceGapFor(
+  category: ResearchCategory,
+  failures: readonly ResearchFailure[],
+): PublicResearchFailure | undefined {
+  const code = failures
+    .filter((failure) => failure.category === category)
+    .map((failure) => failure.code)
+    .filter((failureCode) => failureCode === "retrieval" || failureCode === "normalization")
+    .sort((left, right) => failurePrecedence.indexOf(left) - failurePrecedence.indexOf(right))[0];
+  return code === undefined ? undefined : { code, message: failureMessages[code] };
+}
+
 function publicSourceFor(source: ResearchResult["sources"][number]): PublicResearchSource {
   return {
     id: source.id,
@@ -246,6 +258,7 @@ export function composeResearchDossier(
       };
     }
 
+    const sourceGap = publicSourceGapFor(category, validated.failures);
     return {
       category,
       state: "ready" as const,
@@ -256,6 +269,7 @@ export function composeResearchDossier(
         summary: explanation.summary,
         fallback: explanation.fallback,
       },
+      ...(sourceGap === undefined ? {} : { sourceGap }),
       hasConflict: categoryClaims.some((claim) => claim.verificationStatus === "conflicting"),
       hasOutdated: categoryClaims.some((claim) => claim.verificationStatus === "outdated"),
     };

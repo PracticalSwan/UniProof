@@ -13,7 +13,7 @@ import {
   type ComparisonTarget,
 } from "@/lib/comparison/contracts";
 import { makeComparisonDossier, type ComparisonFixtureClaim } from "@/tests/fixtures/comparison-dossiers";
-import type { ResearchDossier, ResearchModeCategory } from "@/lib/research/mode/public-contracts";
+import { researchDossierSchema, type ResearchDossier, type ResearchModeCategory } from "@/lib/research/mode/public-contracts";
 
 const targetA = { universityId: "university-mit", programId: "program-mit-artificial-intelligence-decision-making-bs" } as const;
 const targetB = { universityId: "university-stanford", programId: "program-stanford-computer-science-bs" } as const;
@@ -285,6 +285,31 @@ describe("Phase 4 deterministic scoring", () => {
     expect(scored(result, 1, "research")).toMatchObject({ state: "unscored", reason: "no-eligible-metric" });
     expect(scored(result, 0, "affordability")).toMatchObject({ state: "unscored", reason: "category-not-researched" });
     expect(scored(result, 1, "support")).toMatchObject({ state: "unscored", reason: "category-incomplete" });
+  });
+
+  it("treats source-gap claims as unscored rather than definitive comparison evidence", () => {
+    const categories: ResearchModeCategory[] = ["tuition"];
+    const weights: ComparisonPriorityWeights = { affordability: 100, research: 0, scholarships: 0, outcomes: 0, support: 0 };
+    const base = dossier(targetA, [tuition("a-gap", 10_000)], { categories });
+    const withGap = researchDossierSchema.parse({
+      ...base,
+      categories: base.categories.map((row) => row.state === "ready"
+        ? {
+            ...row,
+            sourceGap: {
+              code: "retrieval",
+              message: "Available sources could not be retrieved completely.",
+            },
+          }
+        : row),
+    });
+    const result = scoreComparison(submission({ categories, weights }), [
+      withGap,
+      dossier(targetB, [tuition("b", 20_000)], { categories }),
+    ]);
+
+    expect(scored(result, 0, "affordability")).toMatchObject({ state: "unscored", reason: "category-incomplete" });
+    expect(scored(result, 1, "affordability")).toMatchObject({ state: "unscored", reason: "insufficient-peers" });
   });
 
   it("computes weighted evidence coverage and suppresses sparse fit at both boundaries", () => {

@@ -9,8 +9,9 @@ import {
   type GuideReusableDossier,
 } from "@/lib/guide/client-state";
 import { researchCatalog } from "@/lib/research/catalog/data";
+import { isGuideClaimDefinitiveEligible } from "@/lib/guide/assessment";
 import type { GuideApplicantProfile, GuideSubmission } from "@/lib/guide/contracts";
-import type { ResearchModeRequest } from "@/lib/research/mode/public-contracts";
+import { researchDossierSchema, type ResearchModeRequest } from "@/lib/research/mode/public-contracts";
 import { guideCatalogTarget } from "@/tests/helpers/catalog-targets";
 import { buildGuideDossier, makeClaim } from "./fixtures/guide-dossiers";
 
@@ -175,6 +176,35 @@ describe("finalizeGuideResult", () => {
       expect(result.result.assessments.length).toBeGreaterThan(0);
       expect(result.result.status).toBe("complete");
     }
+  });
+
+  it("treats ready source-gap evidence as non-definitive and the Guide result as partial", () => {
+    const claim = makeClaim({ id: "gpa-source-gap", property: "Minimum GPA", value: 3.0, unit: "4.0" });
+    const base = buildGuideDossier({
+      universityId: testUniversity.id,
+      programId: testProgram.id,
+      admissionsClaims: [claim],
+    });
+    const dossier = researchDossierSchema.parse({
+      ...base,
+      categories: base.categories.map((row) => row.category === "admissions" && row.state === "ready"
+        ? {
+            ...row,
+            sourceGap: {
+              code: "retrieval",
+              message: "Available sources could not be retrieved completely.",
+            },
+          }
+        : row),
+    });
+    const admissionsRow = dossier.categories.find((row) => row.category === "admissions");
+    expect(admissionsRow?.state).toBe("ready");
+    if (admissionsRow?.state !== "ready") throw new Error("expected ready admissions row");
+    expect(isGuideClaimDefinitiveEligible(admissionsRow.claims[0]!, dossier)).toBe(false);
+
+    const result = finalizeGuideResult(submission, request, dossier, researchCatalog);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.result.status).toBe("partial");
   });
 
   it("rejects mismatched target", () => {

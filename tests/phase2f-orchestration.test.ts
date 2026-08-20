@@ -462,6 +462,148 @@ describe("Phase 2F orchestration", () => {
     expect(result.run.providerAttempts.some((attempt) => attempt.stage === "retrieval")).toBe(false);
   });
 
+  it("preserves supported claims from usable sources when another selected source fails retrieval", async () => {
+    const goodUrl = "https://example.edu/admissions-good";
+    const badUrl = "https://example.edu/admissions-bad";
+    const result = await runPhase2Research(
+      { target: { university: { name: "Example University" } }, categories: ["admissions"] },
+      baseOptions({
+        discovery: {
+          enableRor: false,
+          tavilySearch: async (query: { category?: TestCategory }) => ({
+            outcome: "success" as const,
+            candidates: query.category === "admissions"
+              ? [candidate(goodUrl, "admissions"), candidate(badUrl, "admissions")]
+              : [],
+            retryCount: 0,
+          }),
+          braveSearch: async () => ({ outcome: "empty" as const, candidates: [], retryCount: 0 }),
+        },
+        retrieve: async (url: string) => url === badUrl
+          ? {
+              ok: false as const,
+              code: "http-status" as const,
+              message: "source returned an unsupported HTTP status",
+              safeUrl: "https://example.edu/",
+            }
+          : retrieval(url),
+      }),
+    );
+
+    expect(result.run.status).toBe("succeeded");
+    expect(result.run.processedCategories).toEqual(["admissions"]);
+    expect(result.run.unprocessedCategories).toEqual([]);
+    expect(result.claims).toHaveLength(1);
+    expect(result.failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "admissions", code: "retrieval" }),
+    ]));
+    expect(result.evidenceSummary.categoriesFailed).toEqual([]);
+  });
+
+  it("keeps the catalog-owned program page usable when a discovered web source fails retrieval", async () => {
+    const programUrl = "https://cs.example.edu/programs/bsc";
+    const discoveredUrl = "https://example.edu/admissions-search";
+    const result = await runPhase2Research(
+      {
+        target: {
+          university: { id: "u-1" },
+          program: { id: "p-1", universityId: "u-1" },
+        },
+        categories: ["admissions"],
+      },
+      baseOptions({
+        discovery: {
+          enableRor: false,
+          targetResolver: {
+            resolveUniversity: () => ({
+              id: "u-1",
+              name: "Example University",
+              countryCode: "US",
+              websiteUrl: "https://example.edu/",
+            }),
+            resolveProgram: () => ({
+              id: "p-1",
+              universityId: "u-1",
+              name: "BSc Computing",
+              degreeLevel: "bachelor",
+              subjectArea: "Computer Science",
+              officialUrl: programUrl,
+            }),
+          },
+          tavilySearch: async (query: { category?: TestCategory }) => ({
+            outcome: "success" as const,
+            candidates: query.category === "admissions" ? [candidate(discoveredUrl, "admissions")] : [],
+            retryCount: 0,
+          }),
+          braveSearch: async () => ({ outcome: "empty" as const, candidates: [], retryCount: 0 }),
+        },
+        retrieve: async (url: string) => url === discoveredUrl
+          ? {
+              ok: false as const,
+              code: "http-status" as const,
+              message: "source returned an unsupported HTTP status",
+              safeUrl: "https://example.edu/",
+            }
+          : retrieval(url),
+      }),
+    );
+
+    expect(result.candidateSources.map((source) => source.url)).toContain(programUrl);
+    expect(result.documents.map((document) => document.canonicalUrl)).toContain(programUrl);
+    expect(result.run.status).toBe("succeeded");
+    expect(result.run.processedCategories).toEqual(["admissions"]);
+    expect(result.claims).toHaveLength(1);
+    expect(result.failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "admissions", code: "retrieval" }),
+    ]));
+    expect(result.evidenceSummary.categoriesFailed).toEqual([]);
+  });
+
+  it("does not convert a source-gap category with zero final claims into evidence unknown", async () => {
+    const goodUrl = "https://example.edu/admissions-good";
+    const badUrl = "https://example.edu/admissions-bad";
+    const result = await runPhase2Research(
+      { target: { university: { name: "Example University" } }, categories: ["admissions"] },
+      baseOptions({
+        discovery: {
+          enableRor: false,
+          tavilySearch: async (query: { category?: TestCategory }) => ({
+            outcome: "success" as const,
+            candidates: query.category === "admissions"
+              ? [candidate(goodUrl, "admissions"), candidate(badUrl, "admissions")]
+              : [],
+            retryCount: 0,
+          }),
+          braveSearch: async () => ({ outcome: "empty" as const, candidates: [], retryCount: 0 }),
+        },
+        retrieve: async (url: string) => url === badUrl
+          ? {
+              ok: false as const,
+              code: "http-status" as const,
+              message: "source returned an unsupported HTTP status",
+              safeUrl: "https://example.edu/",
+            }
+          : retrieval(url),
+        extraction: {
+          runTask: async () => ({
+            payload: { claims: [] },
+            provider: "gemini" as const,
+            model: "injected-model",
+            attempts: [],
+          }),
+        },
+      }),
+    );
+
+    expect(result.run.status).toBe("failed");
+    expect(result.run.processedCategories).toEqual([]);
+    expect(result.run.unprocessedCategories).toEqual(["admissions"]);
+    expect(result.evidenceSummary.categoriesUnknown).toEqual([]);
+    expect(result.failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "admissions", code: "retrieval" }),
+    ]));
+  });
+
   it("cancels before discovery without provider or network work", async () => {
     const controller = new AbortController();
     controller.abort();

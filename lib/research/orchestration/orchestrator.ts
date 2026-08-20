@@ -236,7 +236,7 @@ export async function runPhase2Research(
     .filter((state) => state.complete && state.discoveryStatus === "empty")
     .map((state) => state.category);
   const extractionCategories = stage.categoryStates
-    .filter((state) => state.complete && state.discoveryStatus === "covered")
+    .filter((state) => state.discoveryStatus === "covered" && (state.complete || state.hasUsableDocument))
     .map((state) => state.category);
 
   let extraction: ExtractionStageResult | undefined;
@@ -284,7 +284,12 @@ export async function runPhase2Research(
     for (const category of decisionEligibleCategories) reasonByCategory.set(category, "cancelled");
   }
 
-  const processedCategories = canonicalizeResearchCategories(reconciliation?.completedCategories ?? []);
+  const reconciliationCompletedCategories = canonicalizeResearchCategories(reconciliation?.completedCategories ?? []);
+  const reconciledClaims = reconciliation?.claims ?? [];
+  const claimBearingCategories = new Set(reconciledClaims.map((claim) => claim.category));
+  const processedCategories = reconciliationCompletedCategories.filter((category) =>
+    !reasonByCategory.has(category) || claimBearingCategories.has(category)
+  );
   const unprocessedCategories = requestedCategories.filter((category) => !processedCategories.includes(category));
   const terminalAbortCode = options.signal?.aborted
     ? researchAbortFailureCode(options.signal)
@@ -294,15 +299,22 @@ export async function runPhase2Research(
       reasonByCategory.set(category, terminalAbortCode);
     }
   }
-  const claims = (reconciliation?.claims ?? []).filter((claim) => processedCategories.includes(claim.category));
+  const claims = reconciledClaims.filter((claim) => processedCategories.includes(claim.category));
   const explanationByCategory = new Map(
     (reconciliation?.explanations ?? []).map((explanation) => [explanation.category, explanation]),
   );
   const explanations: EvidenceExplanation[] = processedCategories
     .map((category) => explanationByCategory.get(category))
     .filter((explanation): explanation is EvidenceExplanation => explanation !== undefined);
-  const failures = buildFailures(requestedCategories, processedCategories, reasonByCategory);
-  const failedCategories = unprocessedCategories.filter((category) => failures.some((failure) => failure.category === category));
+  const terminalFailures = buildFailures(requestedCategories, processedCategories, reasonByCategory);
+  const sourceGapFailures: ResearchFailure[] = processedCategories.flatMap((category) => {
+    const code = reasonByCategory.get(category);
+    return code === "retrieval" || code === "normalization"
+      ? [{ category, code, message: failureMessage(code) }]
+      : [];
+  });
+  const failures = [...terminalFailures, ...sourceGapFailures];
+  const failedCategories = unprocessedCategories.filter((category) => terminalFailures.some((failure) => failure.category === category));
   const evidenceSummary = buildEvidenceSummary({ claims, processedCategories, unprocessedCategories, failedCategories });
   const providerAttempts = normalizeProviderAttempts([
     ...stage.providerAttempts,

@@ -288,20 +288,20 @@ Execution plan: `docs/superpowers/plans/2026-08-19-phase-6b-production-hardening
 
 Execution plan: `docs/superpowers/plans/2026-08-19-phase-6c-deployment-submission.md`.
 
-- [ ] Re-check live Devpost rules/schedule/deliverables and all mutable hosting/provider assumptions immediately before release.
-- [ ] Use installed Supabase/Vercel/GitHub CLIs read-only first to prove exact accounts/projects/repository; never guess a similarly named target.
-- [ ] Link the exact hosted Supabase project only after explicit authorization, run remote migration dry-run first, and apply only the reviewed migration set after separate database-mutation authorization; never use remote reset or migration-history repair as routine release steps.
-- [ ] Configure and verify production Auth URLs/email delivery/RLS with invented accounts only if authentication is enabled; if production email cannot be made reliable, preserve anonymous judge flows and do not present broken account/save behavior as ready.
-- [ ] Link/create/configure the exact Vercel project and environment only after authorization; verify Git integration side effects, runtime duration, secrets, canonical origin, and rollback target before deployment.
-- [ ] Publish the exact `POST /api/research` WAF rule in Log mode, observe normal judge traffic, then enable rate limiting only after explicit authorization for the final rule/any billable use; verify the resulting 429 path.
-- [ ] Deploy an authorized Preview first and pass deployed functional/security/auth/privacy/responsive acceptance before any Production promotion.
-- [ ] Deploy/promote the exact verified candidate to Production only after explicit authorization, then verify TLS/HSTS/CSP/headers/cache/session behavior and durable rate limiting on the canonical origin.
-- [ ] Run a deliberately bounded authorized live-provider smoke using public research context and invented applicant markers; do not force provider fallbacks, exhaust quotas, fan out, or generate abusive load.
-- [ ] Verify hosted auth/save/load/delete/cross-user isolation with exact invented test records where production auth is enabled, then remove only those test records/accounts when authorized.
-- [ ] Bind the tested Production deployment to the exact public Git source; run final staged/publication secret checks and observe CI on the exact authorized pushed commit.
-- [ ] Prepare README architecture/screenshots and the approximately three-minute demo only from verified deployed behavior; keep release screenshots outside protected `ui-flow-screenshots/`.
-- [ ] Draft the exact Devpost submission for user review, run a final production/repository/video/rules audit, and submit only after final explicit authorization.
-- [ ] Verify the submitted project and live links afterward and synchronize final Phase 6 evidence without overstating any skipped/unobserved external check.
+- [x] Re-check live Devpost rules/schedule/deliverables and mutable hosting/provider assumptions. On 2026-08-20 the event title was `Pixel Forge AI Hackathon ($18,000+ in Prizes)`, submissions remained open, and the deadline remained 2026-08-22 16:00 UTC / 23:00 ICT.
+- [x] Prove the exact Vercel/GitHub targets read-only before mutation. The release target is `PracticalSwan/UniProof` `main` and Vercel project `uniproof` under `practicalswans-projects`; no similarly named target was guessed.
+- [x] Keep hosted Supabase unlinked/unconfigured for the judge-facing release because production email delivery is not configured. Local Auth/RLS/persistence evidence remains valid, but hosted account/save is intentionally not advertised or partially enabled.
+- [x] Configure the exact Vercel project/environment for anonymous live Research: Tavily + Brave discovery, Groq + OpenRouter structured AI, `UNIPROOF_RESEARCH_MODE=live`, canonical app origin, no Gemini key, and no Supabase browser/Auth variables.
+- [x] Enable and inspect the single durable `POST /api/research` WAF rule: source-IP fixed window, 20 requests/60 seconds, 429 on excess. No second app-level limiter was added.
+- [x] Deploy verified Preview candidates and pass deterministic deployed acceptance. The final hardened executable Preview passed **104/104** Research/Compare/Guide browser cases; security/header/client-bundle checks were also observed without spending live provider quota.
+- [ ] Promote the **final committed exact-SHA candidate** to Production after the final release commit/CI, then verify canonical TLS/HSTS/CSP/headers/cache/WAF/log behavior. Earlier production/preview deployments are evidence but are not a substitute for this exact-SHA final step.
+- [x] Consume the authorized live-provider budget without exceeding it: **3/3 accepted Research executions used**. The last returned HTTP 200/schema-valid but operationally incomplete admissions with zero claims, exposing resilience defects that were fixed deterministically. No fourth live call is permitted and no successful-live-evidence smoke claim is made.
+- [x] Verify the hosted judge release intentionally has no Auth/save surface because hosted Supabase browser variables are absent; therefore no production auth test records/accounts were created or require cleanup.
+- [ ] Bind the final Production deployment to the exact public Git SHA, require that SHA's GitHub Actions run to pass, and record the final deployment/SHA evidence.
+- [x] Prepare release README/architecture/security/operations/traceability updates plus **8 reviewed screenshots** under `docs/assets/screenshots/phase-6/`; protected `ui-flow-screenshots/` remains untouched/untracked.
+- [x] Draft `docs/submission/devpost-draft.md`, `demo-script.md`, and `demo-checklist.md` from verified behavior with explicit live-smoke limitations and no hosted-Auth overclaim.
+- [ ] **Devpost final submission remains intentionally blocked** until the final approximately three-minute video is supplied, verified, reconciled with the draft, and explicitly authorized. Do not post before then.
+- [ ] After the video hold is released and Devpost is actually submitted, verify the submitted project/live links and append final submission evidence without overstating any skipped/unobserved check.
 
 ## Side Phase UCE — University Catalog Expansion
 

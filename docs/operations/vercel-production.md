@@ -1,6 +1,6 @@
 # Vercel Production Operations
 
-This runbook records the Phase 6C Vercel release contract and the observed 2026-08-20 configuration. Devpost publication is a separate final gate.
+This runbook records the Phase 6C Vercel release contract and the observed final-release state, most recently verified on 2026-08-21. Devpost publication is a separate final gate.
 
 ## Current release configuration
 
@@ -29,16 +29,16 @@ Do not add a second in-process limiter merely to duplicate this protection. Appl
 
 ## Final Production release evidence
 
-- Release source SHA: `21d645baaf9eca381a167246d22538c23bb29427`.
-- GitHub Actions: run `32367630411`, conclusion `success`; both `application` and `local-supabase` jobs succeeded.
-- Vercel Production deployment: `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` / `https://uniproof-ba5rt3slh-practicalswans-projects.vercel.app`.
+- Release source SHA: `30466aa59febd926c279928683118c72f0d1f63f` (`fix: complete final release hardening`).
+- GitHub Actions: run `32398691369`, conclusion `success`; both `application` and `local-supabase` jobs succeeded.
+- Vercel Production deployment: `dpl_GmeqEnMk5cKiC5jsY1KajyrXFEhy` / `https://uniproof-6znv1tj0z-practicalswans-projects.vercel.app`, verified `READY`, target `production`, on 2026-08-21.
 - Canonical alias: `https://uniproof-beta.vercel.app`.
-- Vercel metadata records both `githubCommitSha` and release metadata `releaseSha` as the release source SHA above.
-- Runtime: Node `22.x`; deployment state `READY`, target `production`.
+- Vercel metadata records `githubCommitSha` as the release source SHA above, with GitHub organization `PracticalSwan`, repository `UniProof`, and ref `main`.
+- Runtime: Node `22.x`. The Vercel project setting still displays `24.x`, but the repository's `package.json` `engines.node: "22.x"` overrides the project setting for builds and functions per current Vercel documentation, so the deployment satisfies the Node 22 contract and the setting was intentionally left unchanged.
 
 ## Security / privacy observations
 
-Final Production verification observed:
+Final Production verification of the 2026-08-21 release deployment observed:
 
 - HTTP 200 for `/`, `/research`, `/compare`, and `/guide` on the canonical origin;
 - private/no-cache/no-store application responses;
@@ -46,9 +46,11 @@ Final Production verification observed:
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, COOP/CORP, restrictive Permissions Policy;
 - Vercel HSTS: `max-age=63072000; includeSubDomains; preload`;
 - all 15 browser script bundles on `/research` remained same-origin;
-- five configured local secret values were compared against the deployed browser bundles without printing them and produced zero matches;
+- six configured local secret values were compared against the deployed browser bundles without printing them and produced zero matches;
 - no provider key names/provider identifiers, browser source-map references, Vercel toolbar, or Vercel runtime analytics markers were found in the deployed page/bundles;
-- recent exact-deployment log inspection showed the expected successful GET smoke traffic, no error-level entries, and no HTTP 5xx entries in the observed window.
+- recent exact-deployment log inspection showed only the expected successful GET verification traffic, no error-level entries, and no HTTP 5xx entries in the observed window;
+- a bounded desktop/mobile Playwright smoke of `/`, `/research`, `/compare`, and `/guide` rendered every route, completed `/` -> `/research` navigation, and produced zero console errors and zero page errors;
+- a non-provider `GET /api/research` request returned the expected HTTP 405, confirming the deployed Research function responds without invoking providers.
 
 UniProof does not duplicate Vercel's HSTS at the application layer.
 

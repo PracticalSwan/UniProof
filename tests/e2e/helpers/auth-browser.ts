@@ -21,7 +21,7 @@ async function latestMagicLink(request: APIRequestContext): Promise<string | nul
   if (!messageResponse.ok()) return null;
   const detail = await messageResponse.json() as Record<string, unknown>;
   const text = JSON.stringify(detail);
-  const match = /http:\/\/127\.0\.0\.1:\d{1,5}\/auth\/confirm\?token_hash=[A-Za-z0-9._~-]+(?:&amp;|&)type=email/u.exec(text);
+  const match = /http:\/\/127\.0\.0\.1:\d{1,5}\/auth\/confirm\?state=[a-f0-9]{32}(?:&amp;|&)token_hash=[A-Za-z0-9._~-]+(?:&amp;|&)type=email/u.exec(text);
   if (match?.[0] === undefined) return null;
   const link = match[0].replace("&amp;", "&");
   try {
@@ -33,11 +33,11 @@ async function latestMagicLink(request: APIRequestContext): Promise<string | nul
   }
 }
 
-export async function signInWithLocalMagicLink(
+export async function requestLocalMagicLink(
   page: Page,
   mailpit: APIRequestContext,
   email: string,
-): Promise<void> {
+): Promise<string> {
   await clearLocalMailpit(mailpit);
   await page.goto("/auth");
   await page.getByLabel("Email address").fill(email);
@@ -50,6 +50,15 @@ export async function signInWithLocalMagicLink(
     return link !== null;
   }, { timeout: 10_000 }).toBe(true);
   if (link === null) throw new Error("Local Mailpit did not return a test magic link.");
+  return link;
+}
+
+export async function signInWithLocalMagicLink(
+  page: Page,
+  mailpit: APIRequestContext,
+  email: string,
+): Promise<void> {
+  const link = await requestLocalMagicLink(page, mailpit, email);
   await page.goto(link);
   await expect(page).toHaveURL(/\/saved$/u, { timeout: 15_000 });
   const supabaseCookies = (await page.context().cookies()).filter((cookie) => cookie.name.startsWith("sb-"));

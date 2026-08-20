@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { comparisonSubmissionSchema, freezeComparisonSubmission, type ComparisonPriorityWeights } from "@/lib/comparison/contracts";
 import { scoreComparison } from "@/lib/comparison/scoring";
@@ -13,6 +13,7 @@ import {
   serializedUtf8Bytes,
   validateSavedArtifact,
 } from "@/lib/persistence/contracts";
+import { deleteSavedArtifact, saveSavedArtifact } from "@/lib/persistence/client";
 import type { ResearchModeRequest } from "@/lib/research/mode/public-contracts";
 import { buildGuideDossier, makeClaim } from "@/tests/fixtures/guide-dossiers";
 import { makeComparisonDossier } from "@/tests/fixtures/comparison-dossiers";
@@ -50,6 +51,10 @@ const guideRequest: ResearchModeRequest = {
   programId: program.id,
   categories: ["admissions", "tuition", "scholarships"],
 };
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function guideResult() {
   const dossier = buildGuideDossier({
@@ -182,6 +187,50 @@ describe("saved artifact request contract", () => {
   });
 });
 
+describe("saved artifact mutation outcome ownership", () => {
+  it("treats Save and Delete 5xx responses as ambiguous and never retries automatically", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: "persistence-unavailable",
+        message: "Private saved snapshots are temporarily unavailable.",
+      }), { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: "persistence-unavailable",
+        message: "Private saved snapshots are temporarily unavailable.",
+      }), { status: 503 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const saved = await saveSavedArtifact({ kind: "profile", schemaVersion: 1, payload: profile });
+    const deleted = await deleteSavedArtifact("00000000-0000-4000-8000-000000000001");
+
+    expect(saved).toMatchObject({ ok: false, ambiguousMutation: true });
+    expect(deleted).toMatchObject({ ok: false, ambiguousMutation: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps semantic Save and Delete 4xx responses definitive", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: "snapshot-capacity-reached",
+        message: "Delete an older saved snapshot before saving another one.",
+      }), { status: 409 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: "snapshot-not-found",
+        message: "The requested saved snapshot was not found.",
+      }), { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const saved = await saveSavedArtifact({ kind: "profile", schemaVersion: 1, payload: profile });
+    const deleted = await deleteSavedArtifact("00000000-0000-4000-8000-000000000001");
+
+    expect(saved).toMatchObject({ ok: false, error: { error: "snapshot-capacity-reached" } });
+    expect(saved).not.toHaveProperty("ambiguousMutation");
+    expect(deleted).toMatchObject({ ok: false, error: { error: "snapshot-not-found" } });
+    expect(deleted).not.toHaveProperty("ambiguousMutation");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("saved artifact runtime validation", () => {
   it("rejects a Research request that does not bind to the stored dossier target/categories", () => {
     const dossier = guideResult().dossier;
@@ -225,6 +274,18 @@ describe("saved artifact runtime validation", () => {
     expect(validation.boundArtifact.payload.dossier.target.program?.officialUrl).toBe(program.officialUrl);
     expect(validation.boundArtifact.payload.dossier.sources).toEqual(result.dossier.sources);
     expect(validation.artifact.payload.assessments[0]?.evidenceRefs).toHaveLength(2);
+  });
+
+  it("rejects a Guide snapshot whose derived assessment was tampered independently of its evidence", () => {
+    const result = guideResult();
+    const tampered = structuredClone(result);
+    (tampered.assessments[0]! as { detail: string }).detail = "Forged historical assessment detail.";
+
+    expect(validateSavedArtifact({
+      kind: "guide",
+      schemaVersion: 1,
+      payload: tampered,
+    }, researchCatalog)).toMatchObject({ ok: false, code: "snapshot-invalid" });
   });
 
   it("validates and rebinds a new-country version-1 Research snapshot", () => {
@@ -313,6 +374,68 @@ describe("saved artifact runtime validation", () => {
       if (!validation.ok || validation.artifact.kind !== "comparison") continue;
       expect(validation.artifact.payload.submission.weights).toEqual(weights);
     }
+  });
+
+  it("rejects a Comparison snapshot whose derived score was tampered independently of its evidence", () => {
+    const result = comparisonResult();
+    const tampered = structuredClone(result);
+    const scored = Object.values(tampered.score.targets[0]!.dimensions).find((dimension) => dimension.state === "scored");
+    if (scored === undefined || scored.state !== "scored") throw new Error("expected a scored fixture dimension");
+    (scored as { score: number }).score = scored.score === 0 ? 1 : 0;
+
+    expect(validateSavedArtifact({
+      kind: "comparison",
+      schemaVersion: 1,
+      payload: tampered,
+    }, researchCatalog)).toMatchObject({ ok: false, code: "snapshot-invalid" });
+  });
+
+  it("accepts only a deployment-stopped sequential Comparison outcome prefix", () => {
+    const base = comparisonResult();
+    const extraPrograms = [
+      requireCatalogProgram("program-ucl-computer-science-bsc"),
+      requireCatalogProgram("program-imperial-computing-beng"),
+    ];
+    const extraTargets = extraPrograms.map((item) => ({
+      universityId: item.universityId,
+      programId: item.id,
+    }));
+    const submission = freezeComparisonSubmission(comparisonSubmissionSchema.parse({
+      ...base.submission,
+      targets: [...base.submission.targets, ...extraTargets],
+    }));
+    const dossiers = base.outcomes.flatMap((outcome) => outcome.state === "dossier" ? [outcome.dossier] : []);
+    const outcomes = [
+      ...base.outcomes,
+      {
+        target: extraTargets[0]!,
+        state: "transport-error" as const,
+        error: {
+          code: "deployment-rate-limit" as const,
+          message: "The deployment is temporarily limiting research requests. Try again explicitly in a moment.",
+        },
+      },
+    ];
+    const score = scoreComparison(submission, dossiers);
+    const payload = {
+      submission,
+      status: "partial" as const,
+      outcomes,
+      score,
+      tradeoffs: buildComparisonTradeoffs(score, dossiers, submission),
+    };
+
+    expect(validateSavedArtifact({
+      kind: "comparison",
+      schemaVersion: 1,
+      payload,
+    }, researchCatalog)).toMatchObject({ ok: true });
+
+    expect(validateSavedArtifact({
+      kind: "comparison",
+      schemaVersion: 1,
+      payload: { ...payload, outcomes: base.outcomes },
+    }, researchCatalog)).toMatchObject({ ok: false, code: "snapshot-invalid" });
   });
 
   it("rejects reordered comparison outcomes as internally invalid", () => {

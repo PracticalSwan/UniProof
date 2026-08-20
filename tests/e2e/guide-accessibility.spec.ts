@@ -86,6 +86,7 @@ test.describe("Guide accessibility and keyboard acceptance", () => {
     await openGuide(page);
     await submitGuide(page);
     const targetSelect = page.getByLabel("Supported program");
+    await expect(page.getByLabel("Search programs")).toBeFocused();
     await expect(targetSelect).toHaveAttribute("aria-invalid", "true");
     await expect(targetSelect).toHaveAttribute("aria-describedby", "guide-error-target");
     await expect(page.locator("#guide-error-target")).toContainText("Select a supported program.");
@@ -96,6 +97,7 @@ test.describe("Guide accessibility and keyboard acceptance", () => {
     await page.getByLabel("Test type").selectOption("ielts");
     await submitGuide(page);
     const overall = page.getByLabel("Overall score");
+    await expect(overall).toBeFocused();
     await expect(overall).toHaveAttribute("aria-invalid", "true");
     await expect(overall).toHaveAttribute("aria-describedby", "guide-error-englishOverall");
     await expect(page.locator("#guide-error-englishOverall")).toContainText("Enter your overall score.");

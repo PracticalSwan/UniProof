@@ -44,10 +44,24 @@ function truncateCodePoints(value: string, maximum: number): { value: string; tr
 }
 
 function textContent(node: HtmlNode): string {
-  if (node.nodeName === "#text") return (node as DefaultTreeAdapterTypes.TextNode).value;
-  if (!isElement(node) || IGNORED_SUBTREES.has(node.tagName)) return "";
-  if (node.tagName === "br") return " ";
-  return node.childNodes.map(textContent).join(" ");
+  const fragments: string[] = [];
+  const stack: HtmlNode[] = [node];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current.nodeName === "#text") {
+      fragments.push((current as DefaultTreeAdapterTypes.TextNode).value);
+      continue;
+    }
+    if (!isElement(current) || IGNORED_SUBTREES.has(current.tagName)) continue;
+    if (current.tagName === "br") {
+      fragments.push(" ");
+      continue;
+    }
+    for (let index = current.childNodes.length - 1; index >= 0; index -= 1) {
+      stack.push(current.childNodes[index]!);
+    }
+  }
+  return fragments.join(" ");
 }
 
 function sectionChunks(sections: readonly NormalizedSection[]): NormalizedSection[] {
@@ -91,44 +105,57 @@ export function normalizeHtml(
     buffer += text;
   };
 
-  const visit = (node: HtmlNode, insideTableRow = false): void => {
+  const root = parseFragment(input);
+  type VisitFrame =
+    | { kind: "node"; node: HtmlNode; insideTableRow: boolean }
+    | { kind: "flush" };
+  const stack: VisitFrame[] = [];
+  for (let index = root.childNodes.length - 1; index >= 0; index -= 1) {
+    stack.push({ kind: "node", node: root.childNodes[index]!, insideTableRow: false });
+  }
+  while (stack.length > 0) {
+    const frame = stack.pop()!;
+    if (frame.kind === "flush") {
+      flush();
+      continue;
+    }
+    const { node, insideTableRow } = frame;
     if (node.nodeName === "#text") {
       addText((node as DefaultTreeAdapterTypes.TextNode).value);
-      return;
+      continue;
     }
-    if (!isElement(node) || IGNORED_SUBTREES.has(node.tagName)) return;
+    if (!isElement(node) || IGNORED_SUBTREES.has(node.tagName)) continue;
 
     const tag = node.tagName;
     if (HEADING_TAGS.has(tag)) {
       flush();
       const heading = truncateCodePoints(cleanText(textContent(node)), 300).value;
       pendingHeading = heading === "" ? undefined : heading;
-      return;
+      continue;
     }
     if (tag === "br") {
       addText(" ");
-      return;
-    }
-    if (tag === "tr") {
-      flush();
-      for (const child of node.childNodes) visit(child, true);
-      flush();
-      return;
+      continue;
     }
     if (tag === "td" || tag === "th") {
       if (buffer !== "" && !buffer.endsWith(" | ")) buffer += " | ";
-      for (const child of node.childNodes) visit(child, insideTableRow);
-      return;
+      for (let index = node.childNodes.length - 1; index >= 0; index -= 1) {
+        stack.push({ kind: "node", node: node.childNodes[index]!, insideTableRow });
+      }
+      continue;
     }
 
-    const isBlock = BLOCK_TAGS.has(tag);
-    if (isBlock && !insideTableRow) flush();
-    for (const child of node.childNodes) visit(child, insideTableRow);
-    if (isBlock && !insideTableRow) flush();
-  };
-
-  const root = parseFragment(input);
-  for (const child of root.childNodes) visit(child);
+    const tableRow = tag === "tr";
+    const flushAfter = tableRow || (BLOCK_TAGS.has(tag) && !insideTableRow);
+    if (flushAfter) {
+      flush();
+      stack.push({ kind: "flush" });
+    }
+    const childInsideTableRow = tableRow || insideTableRow;
+    for (let index = node.childNodes.length - 1; index >= 0; index -= 1) {
+      stack.push({ kind: "node", node: node.childNodes[index]!, insideTableRow: childInsideTableRow });
+    }
+  }
   flush(Boolean(pendingHeading));
 
   const joined = sections

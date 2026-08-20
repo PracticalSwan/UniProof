@@ -114,15 +114,21 @@ function independentSourceCount(items: readonly CandidateWithSource[], target: R
   const owners = new Set<string>();
   const origins = new Set<string>();
   for (const item of items) {
-    if (item.source === undefined || item.source.sourceType === "anecdotal" || item.source.sourceType === "ranking") continue;
+    if (
+      item.source === undefined ||
+      item.source.sourceType === "anecdotal" ||
+      item.source.sourceType === "ranking" ||
+      item.source.sourceType === "independent"
+    ) continue;
     if (item.source.sourceType === "university" && !isResolvedUniversitySource(item.source, target)) continue;
     const origin = evidenceOriginKey(item);
     if (origin === undefined) continue;
     owners.add(sourceOwnerKey(item.source, target));
     origins.add(origin);
   }
-  // An independent corroboration requires both a different owner and a
-  // different underlying evidence origin.  A single source cannot count twice.
+  // Corroboration requires application-owned reliable source classes plus a
+  // different owner and evidence origin. Arbitrary general-web results remain
+  // inferred until a reviewed reliability/ownership registry exists.
   if (owners.size < 2 || origins.size < 2) return 1;
   return Math.min(owners.size, origins.size);
 }

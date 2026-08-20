@@ -2,6 +2,8 @@
 
 Status: **Phase 6A/6B implemented; Phase 6C is submission-ready / pending final video** as of 2026-08-20. The public Vercel project, Preview acceptance, active Research WAF, hosted provider configuration, bounded three-call live smoke, exact-SHA GitHub CI, exact-SHA Production promotion, and deterministic Production security/privacy/log checks have been executed. Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` serves `https://uniproof-beta.vercel.app` from release SHA `21d645baaf9eca381a167246d22538c23bb29427`, whose GitHub Actions run `32367630411` succeeded. Hosted Supabase Auth/save is intentionally absent because production email delivery is not configured. Devpost final submission is the only deliberate publication hold and remains blocked until the final demo video is supplied, verified, and explicitly approved.
 
+Final-testing addendum (2026-08-21): `final_testing_plan.md` is the authoritative final closeout plan. It preserves the historical Phase 6C 3/3 accepted-call record while authorizing a separate maximum-five hypothesis-driven allowance. The local remediation pass bound Magic Links to the initiating browser, authenticated before private body reads, blocked blind ambiguous-save retry, recomputed version-1 Guide/Comparison derivations, validated deployment-stopped outcome prefixes, cleared Research restores on account change, removed arbitrary-web corroboration, made HTML normalization stack-safe, and closed Compare/Guide accessibility/error gaps. Fresh local evidence is 611/611 Vitest, TypeScript, ESLint, production build, dependency/release/workspace gates, Supabase reset/lint/advisors/pgTAP 40/40, Auth/Saved 12/12, and built Research/Compare/Guide 84/84. Final Git/CI/Production/Devpost facts are recorded only after their external gates complete.
+
 Detailed execution plans:
 
 - `docs/superpowers/plans/2026-08-19-phase-6a-identity-persistence.md`
@@ -58,6 +60,8 @@ The following remain true throughout Phase 6:
 Authentication is optional. Add a compact account entry point without moving Research/Compare/Guide behind an auth wall.
 
 Planned initial sign-in method: **Supabase passwordless email Magic Link using PKCE**, because the application does not need to own password storage/reset semantics. Use a generic post-request response so the UI does not disclose whether an email already has an account. Configure exact Site URL and redirect allowlists; reject caller-controlled redirect destinations.
+
+Final hardening binds the one-time link to the requesting browser with a high-entropy, short-lived `HttpOnly`, `SameSite=Lax` intent cookie. The email callback carries the matching state, and `/auth/confirm` consumes it before `verifyOtp`; a link opened in another browser fails without consuming the token. The UI tells users to open the newest link in the same browser.
 
 Local implementation must use Supabase CLI local Auth and Mailpit/Mailpit-equivalent local capture only. Production email/SMTP configuration is a Phase 6C external gate. If production email delivery is not demonstrably configured, authentication/save UI must not be presented as production-ready; anonymous core functionality remains deployable.
 
@@ -185,6 +189,8 @@ Every private response is `Cache-Control: private, no-store`. Mutations apply th
 Use one exact public error vocabulary so every caller and test maps the same cases: `unauthenticated`, `forbidden-origin`, `invalid-content-type`, `invalid-json`, `invalid-request`, `request-too-large`, `snapshot-too-large`, `snapshot-capacity-reached`, `snapshot-not-found`, `snapshot-invalid`, `snapshot-unsupported-version`, `snapshot-target-unavailable`, and `persistence-unavailable`. Do not expose SQLSTATE/PostgREST/Auth internals. A network disconnect after a non-idempotent Save/Delete can make completion ambiguous; Phase 6A does not add a generic automatic mutation retry. The client keeps one logical mutation single-flight, reports a neutral outcome-unknown state when transport completion is ambiguous, and refreshes the bounded Saved list before the user retries so duplicate saves or misleading delete-success claims are not manufactured.
 
 The browser never sends `owner_id` or a free-form saved title as an authorization/persistence input. If owner metadata appears in a database row, omit it from the public private-artifact DTO. Stored title is never authoritative; target/program identity is re-derived from the parsed payload and current catalog where applicable.
+
+Final hardening performs the Auth-server identity check before reading a POST body, reuses that authenticated context for insertion, treats all non-idempotent HTTP `5xx` outcomes as completion-ambiguous, and recomputes version-1 Comparison scores/trade-offs plus Guide assessments/plans from their bound dossiers. A structurally valid owner-tampered derivation is `snapshot-invalid`, not historical truth.
 
 ### 4.8 Save/load semantics by mode
 
@@ -604,7 +610,7 @@ For the anonymous hackathon release:
 - hosted Supabase Auth/save must be either fully configured and verified **or intentionally absent**; the current release chooses absence because production email delivery is not configured;
 - authorized Vercel Preview and exact-SHA Production deployment must be verified;
 - durable rate limiting must be active and observed;
-- the bounded live-smoke budget must be truthfully recorded. For this release, all **3/3** accepted calls are consumed; the final call returned a schema-valid but operationally incomplete dossier, so no successful live-evidence claim is made;
+- the bounded live-smoke budget must be truthfully recorded. The historical Phase 6C allowance consumed **3/3** accepted calls and produced no successful evidence-bearing smoke; `final_testing_plan.md` separately governs up to five new hypothesis-driven calls and requires `3 historical + N final-testing` accounting;
 - final Production security/secret/privacy/client-bundle checks must pass;
 - README/screenshots/demo materials must describe only verified behavior and clearly distinguish deterministic fixture screenshots from live provider output;
 - exact public repository/deployed commit must be traceable and its GitHub Actions run green;

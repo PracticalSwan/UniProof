@@ -109,7 +109,8 @@ test.describe("Phase 4 Compare accessibility", () => {
     await expect(page.locator('[aria-live="polite"]')).toHaveCount(1);
     first.release();
     await expect(page.getByRole("heading", { level: 2, name: "Comparison results" })).toBeVisible();
-    await expect(page.getByRole("status")).toHaveCount(0);
+    await expect(page.getByRole("status")).toHaveCount(1);
+    await expect(page.getByRole("status")).toHaveText("Comparison completed.");
   });
 
   test("keyboard can remove a target, cancel, retry incomplete research, and clear the result", async ({ page, research }) => {
@@ -146,6 +147,7 @@ test.describe("Phase 4 Compare accessibility", () => {
     await cancel.press("Enter");
     pending.release();
     await expect(page.getByText("Comparison cancelled.")).toBeVisible();
+    await expect(page.getByRole("status")).toHaveText("Comparison cancelled.");
 
     research.enqueueJson(stanfordResponse!);
     research.enqueueJson(georgiaTechResponse);
@@ -153,7 +155,7 @@ test.describe("Phase 4 Compare accessibility", () => {
     await compare.focus();
     await compare.press("Enter");
     await expect(page.getByRole("heading", { level: 2, name: "Comparison results" })).toBeVisible();
-    await expect(page.getByText(/Partial comparison/)).toBeVisible();
+    await expect(page.getByText(/Partial comparison:/)).toBeVisible();
 
     research.enqueueJson(mitResponse!);
     const retry = page.getByRole("button", { name: "Retry incomplete/failed research" });

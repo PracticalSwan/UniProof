@@ -4,12 +4,14 @@ import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import { categoryLabel } from "@/lib/research/mode/format";
 import type { PublicResearchClaim, ResearchDossier } from "@/lib/research/mode/public-contracts";
 import { comparisonPriorityOrder, type ComparisonSubmission } from "@/lib/comparison/contracts";
+import type { ComparisonResearchOutcome } from "@/lib/comparison/client-state";
 import type { ComparisonTargetScore } from "@/lib/comparison/scoring";
 import { ComparisonPriorityRow } from "./comparison-priority-row";
 
 interface ComparisonTargetCardProps {
   index: number;
   targetScore: ComparisonTargetScore;
+  outcome?: ComparisonResearchOutcome;
   submission: ComparisonSubmission;
   catalog: ResearchCatalog;
   onEvidence: (dossier: ResearchDossier, claimId: string, trigger: HTMLButtonElement) => void;
@@ -37,6 +39,7 @@ function contextualClaims(dossier: ResearchDossier, submission: ComparisonSubmis
 export function ComparisonTargetCard({
   index,
   targetScore,
+  outcome,
   submission,
   catalog,
   onEvidence,
@@ -83,7 +86,11 @@ export function ComparisonTargetCard({
       </dl>
 
       {dossier === null ? (
-        <p className="mt-5 rounded-md bg-destructive/10 p-3 text-sm font-semibold text-destructive">No usable Research dossier was available for this target.</p>
+        <p className="mt-5 rounded-md bg-destructive/10 p-3 text-sm font-semibold text-destructive">
+          {outcome?.state === "transport-error"
+            ? outcome.error.message
+            : "No usable Research dossier was available for this target."}
+        </p>
       ) : (
         <div className="mt-5 space-y-2" aria-label={`Evidence warnings for option ${index + 1}`}>
           {dossier.categories.map((row) => {

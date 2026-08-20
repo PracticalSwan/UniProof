@@ -2,9 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   authEmailSchema,
+  authMagicLinkIntentResponseSchema,
   safeInternalAuthRedirect,
   sanitizeAuthRequestError,
 } from "@/lib/auth/contracts";
+import {
+  createMagicLinkIntentState,
+  matchesMagicLinkIntent,
+} from "@/lib/auth/magic-link-intent.server";
 
 describe("auth email contract", () => {
   it("trims and accepts a bounded valid email", () => {
@@ -38,6 +43,18 @@ describe("auth redirects", () => {
     ]) {
       expect(safeInternalAuthRedirect(value)).toBeNull();
     }
+  });
+});
+
+describe("Magic Link browser intent binding", () => {
+  it("creates a bounded intent and matches only the exact initiating-browser value", () => {
+    const state = createMagicLinkIntentState();
+    const differentState = `${state.slice(0, -1)}${state.endsWith("0") ? "1" : "0"}`;
+    expect(authMagicLinkIntentResponseSchema.safeParse({ state }).success).toBe(true);
+    expect(matchesMagicLinkIntent(state, state)).toBe(true);
+    expect(matchesMagicLinkIntent(state, differentState)).toBe(false);
+    expect(matchesMagicLinkIntent(undefined, state)).toBe(false);
+    expect(matchesMagicLinkIntent(state, null)).toBe(false);
   });
 });
 

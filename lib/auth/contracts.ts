@@ -10,6 +10,10 @@ export const authEmailSchema = z.string()
   .email()
   .refine((value) => /^[\x21-\x7e]+$/u.test(value), "Email must use printable ASCII characters.");
 
+export const authMagicLinkIntentResponseSchema = z.object({
+  state: z.string().regex(/^[a-f0-9]{32}$/u),
+}).strict();
+
 export type AuthInternalDestination = (typeof AUTH_INTERNAL_DESTINATIONS)[number];
 
 export function safeInternalAuthRedirect(value: unknown): AuthInternalDestination | null {

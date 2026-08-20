@@ -360,11 +360,18 @@ describe("Phase 2E deterministic evidence policy", () => {
     expect(result.claims[0]?.verificationStatus).toBe("university-reported");
   });
 
-  it("requires independent owners and origins for corroboration", () => {
+  it("requires application-owned reliable source classes plus independent owners and origins for corroboration", () => {
     const left = candidate({ value: 100, supportingText: "Tuition fee: 100.", property: "tuition fee" });
     const right = candidate({ id: "candidate-2", value: 100, supportingText: "The tuition fee is 100.", sourceId: "source-2", documentId: "document-2", property: "tuition fee" });
-    const result = evaluateEvidenceGate({ candidates: [left, right], sources: [source("source-1", { publisher: "Independent One", sourceType: "independent" }), source("source-2", { publisher: "Independent Two", sourceType: "independent" })], documents: [document("document-1", "source-1", "e".repeat(64), left.supportingText), document("document-2", "source-2", "f".repeat(64), right.supportingText)], target: target(), decisionEligibleCategories: ["admissions"], relationships: [{ questionId: "question-1", leftCandidateId: "candidate-1", rightCandidateId: "candidate-2", category: "admissions", property: "tuition fee", relationship: "equivalent", resolution: "model" }] });
+    const result = evaluateEvidenceGate({ candidates: [left, right], sources: [source("source-1", { publisher: "Dataset One", sourceType: "dataset" }), source("source-2", { publisher: "Dataset Two", sourceType: "dataset" })], documents: [document("document-1", "source-1", "e".repeat(64), left.supportingText), document("document-2", "source-2", "f".repeat(64), right.supportingText)], target: target(), decisionEligibleCategories: ["admissions"], relationships: [{ questionId: "question-1", leftCandidateId: "candidate-1", rightCandidateId: "candidate-2", category: "admissions", property: "tuition fee", relationship: "equivalent", resolution: "model" }] });
     expect(result.claims[0]?.verificationStatus).toBe("corroborated");
+  });
+
+  it("keeps matching arbitrary web sources inferred even when two publishers and origins agree", () => {
+    const left = candidate({ value: 100, supportingText: "Tuition fee: 100.", property: "tuition fee" });
+    const right = candidate({ id: "candidate-2", value: 100, supportingText: "The tuition fee is 100.", sourceId: "source-2", documentId: "document-2", property: "tuition fee" });
+    const result = evaluateEvidenceGate({ candidates: [left, right], sources: [source("source-1", { publisher: "Attacker One", sourceType: "independent" }), source("source-2", { publisher: "Attacker Two", sourceType: "independent" })], documents: [document("document-1", "source-1", "8".repeat(64), left.supportingText), document("document-2", "source-2", "9".repeat(64), right.supportingText)], target: target(), decisionEligibleCategories: ["admissions"], relationships: [{ questionId: "question-arbitrary-web", leftCandidateId: left.id, rightCandidateId: right.id, category: "admissions", property: "tuition fee", relationship: "equivalent", resolution: "deterministic" }] });
+    expect(result.claims[0]?.verificationStatus).toBe("inferred");
   });
 
   it("keeps direct authoritative normative support verified even with independent corroboration", () => {

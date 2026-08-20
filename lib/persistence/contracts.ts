@@ -1,7 +1,10 @@
 import { z } from "zod";
 
-import { comparisonResultSchema } from "@/lib/comparison/client-state";
+import { comparisonResultSchema, finalizeComparisonOutcomes } from "@/lib/comparison/client-state";
 import { comparisonTargetKey, normalizeComparisonPriorityWeights } from "@/lib/comparison/contracts";
+import { scoreComparison } from "@/lib/comparison/scoring";
+import { buildComparisonTradeoffs } from "@/lib/comparison/tradeoffs";
+import { finalizeGuideResult } from "@/lib/guide/client-state";
 import { bindCatalogOwnedResearchTarget } from "@/lib/research/catalog/presentation";
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import {
@@ -244,12 +247,24 @@ function validateGuideArtifact(
     return { ok: false, code: "snapshot-invalid" };
   }
 
+  const reboundPayload = { ...payload, dossier: boundDossier };
+  const recomputed = finalizeGuideResult(
+    reboundPayload.submission,
+    reboundPayload.researchRequest,
+    boundDossier,
+    catalog,
+  );
+  if (!recomputed.ok) {
+    return { ok: false, code: "snapshot-invalid" };
+  }
+  const parsedRecomputed = guideResultSchema.safeParse(recomputed.result);
+  if (!parsedRecomputed.success || !sameJson(parsedRecomputed.data, reboundPayload)) {
+    return { ok: false, code: "snapshot-invalid" };
+  }
+
   return {
     ok: true,
-    payload: {
-      ...payload,
-      dossier: boundDossier,
-    },
+    payload: parsedRecomputed.data,
   };
 }
 
@@ -263,12 +278,22 @@ function validateComparisonArtifact(
 ): { ok: true; payload: z.infer<typeof comparisonResultSchema> } | ValidationFailure {
   const selectedKeys = payload.submission.targets.map(comparisonTargetKey);
   if (
-    payload.outcomes.length !== payload.submission.targets.length ||
+    payload.outcomes.length === 0 ||
+    payload.outcomes.length > payload.submission.targets.length ||
     payload.outcomes.some((outcome, index) =>
       !sameJson(outcome.target, payload.submission.targets[index])
     )
   ) {
     return { ok: false, code: "snapshot-invalid" };
+  }
+  if (payload.outcomes.length < payload.submission.targets.length) {
+    const terminal = payload.outcomes.at(-1);
+    if (
+      terminal?.state !== "transport-error" ||
+      (terminal.error.code !== "deployment-rate-limit" && terminal.error.code !== "deployment-timeout")
+    ) {
+      return { ok: false, code: "snapshot-invalid" };
+    }
   }
 
   const dossierByKey = new Map<string, z.infer<typeof researchDossierSchema>>();
@@ -355,15 +380,36 @@ function validateComparisonArtifact(
     return { ok: false, code: "snapshot-invalid" };
   }
 
+  const reboundOutcomes = boundOutcomes.map((outcome) => {
+    if ("unavailable" in outcome || "mismatch" in outcome) {
+      throw new Error("Unreachable bound comparison outcome.");
+    }
+    return outcome;
+  });
+  const finalized = finalizeComparisonOutcomes(payload.submission, reboundOutcomes);
+  if (!finalized.ok || finalized.status !== payload.status) {
+    return { ok: false, code: "snapshot-invalid" };
+  }
+  const recomputedScore = scoreComparison(payload.submission, finalized.dossiers);
+  const recomputedTradeoffs = buildComparisonTradeoffs(
+    recomputedScore,
+    finalized.dossiers,
+    payload.submission,
+  );
+  if (!sameJson(payload.score, recomputedScore) || !sameJson(payload.tradeoffs, recomputedTradeoffs)) {
+    return { ok: false, code: "snapshot-invalid" };
+  }
+  const parsedRecomputed = comparisonResultSchema.safeParse({
+    ...payload,
+    outcomes: reboundOutcomes,
+    score: recomputedScore,
+    tradeoffs: recomputedTradeoffs,
+  });
+  if (!parsedRecomputed.success) return { ok: false, code: "snapshot-invalid" };
+
   return {
     ok: true,
-    payload: {
-      ...payload,
-      outcomes: boundOutcomes.map((outcome) => {
-        if ("unavailable" in outcome || "mismatch" in outcome) throw new Error("Unreachable bound comparison outcome.");
-        return outcome;
-      }),
-    },
+    payload: parsedRecomputed.data,
   };
 }
 

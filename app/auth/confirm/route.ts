@@ -1,12 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import {
+  AUTH_MAGIC_LINK_INTENT_COOKIE,
+  magicLinkIntentCookieOptions,
+  matchesMagicLinkIntent,
+} from "@/lib/auth/magic-link-intent.server";
 import { createClient } from "@/lib/supabase/server";
 
 const HASH_PARAM = ["token", "hash"].join("_");
 const HASH_VALUE = /^[A-Za-z0-9._~-]{16,1024}$/u;
 
 function privateRedirect(pathname: "/auth" | "/auth/complete") {
-  return new NextResponse(null, {
+  const response = new NextResponse(null, {
     status: 303,
     headers: {
       Location: pathname,
@@ -15,12 +20,24 @@ function privateRedirect(pathname: "/auth" | "/auth/complete") {
       Expires: "0",
     },
   });
+  response.cookies.set(AUTH_MAGIC_LINK_INTENT_COOKIE, "", {
+    ...magicLinkIntentCookieOptions(),
+    maxAge: 0,
+  });
+  return response;
 }
 
 export async function GET(request: NextRequest) {
   const hash = request.nextUrl.searchParams.get(HASH_PARAM);
   const type = request.nextUrl.searchParams.get("type");
-  if (hash === null || !HASH_VALUE.test(hash) || type !== "email") {
+  const suppliedState = request.nextUrl.searchParams.get("state");
+  const expectedState = request.cookies.get(AUTH_MAGIC_LINK_INTENT_COOKIE)?.value;
+  if (
+    hash === null ||
+    !HASH_VALUE.test(hash) ||
+    type !== "email" ||
+    !matchesMagicLinkIntent(expectedState, suppliedState)
+  ) {
     return privateRedirect("/auth");
   }
 

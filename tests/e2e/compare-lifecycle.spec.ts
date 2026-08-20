@@ -120,7 +120,7 @@ test.describe("Phase 4 Compare lifecycle and ownership", () => {
     await submitComparison(page);
 
     await expect(page.getByRole("heading", { level: 2, name: "Comparison results" })).toBeVisible();
-    await expect(page.getByText(/Partial comparison/)).toBeVisible();
+    await expect(page.getByText(/Partial comparison:/)).toBeVisible();
     expect(research.requests).toHaveLength(3);
 
     await page.getByLabel("Academic year (public context only, optional)").fill("2030-31");
@@ -185,11 +185,30 @@ test.describe("Phase 4 Compare lifecycle and ownership", () => {
       await submitComparison(page);
 
       await expect(page.getByRole("heading", { name: "Comparison could not be calculated" })).toBeVisible();
+      const alert = page.getByRole("alert", { name: "Comparison could not be calculated" });
+      await expect(alert).toContainText(
+        status === 429 ? "temporarily limiting research requests" : "timed out before the research request completed",
+      );
+      await expect(alert).not.toContainText("platform details");
       await page.waitForTimeout(150);
       expect(research.requests).toHaveLength(1);
       await expect(page.getByRole("button", { name: "Retry incomplete/failed research" })).toHaveCount(1);
     });
   }
+
+  test("renders an undispatched fourth target after a deployment stop without crashing", async ({ page, research }) => {
+    research.enqueueJson(mitResponse!);
+    research.enqueueJson(stanfordResponse!);
+    research.enqueueRaw("platform details must not be parsed", { status: 429, contentType: "text/plain" });
+    await openCompare(page);
+    await selectFourComparisonTargets(page);
+    await submitComparison(page);
+
+    await expect(page.getByRole("heading", { level: 2, name: "Comparison results" })).toBeVisible();
+    expect(research.requests).toHaveLength(3);
+    await expect(page.locator("[data-comparison-card='3']")).toContainText("temporarily limiting research requests");
+    await expect(page.locator("[data-comparison-card='4']")).toContainText("No usable Research dossier was available for this target.");
+  });
 
   test("retry after a deployment stop replays the failed target and every target that was not dispatched", async ({ page, research }) => {
     research.enqueueRaw("platform details must not be parsed", { status: 429, contentType: "text/plain" });
@@ -359,7 +378,7 @@ test.describe("Phase 4 Compare lifecycle and ownership", () => {
     await submitComparison(page);
 
     await expect(page.getByRole("heading", { level: 2, name: "Comparison results" })).toBeVisible();
-    await expect(page.getByText(/Partial comparison/)).toBeVisible();
+    await expect(page.getByText(/Partial comparison:/)).toBeVisible();
     await expect(page.locator("[data-comparison-card='1']")).toContainText("Research: research incomplete.");
     await expect(page.locator("[data-comparison-card='1']")).toContainText("Research incomplete");
   });

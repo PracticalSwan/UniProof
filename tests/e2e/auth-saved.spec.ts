@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { signInWithLocalMagicLink } from "./helpers/auth-browser";
+import { requestLocalMagicLink, signInWithLocalMagicLink } from "./helpers/auth-browser";
 import { fillGuideProfile } from "./helpers/guide-browser";
 import { resolvePlaywrightOrigin } from "./helpers/playwright-harness";
+import { fixtureTarget, succeededAllReadyResponse } from "../fixtures/research-dossiers";
 
 const localOnly = process.env.UNIPROOF_E2E_LOCAL_SUPABASE === "1";
 const e2eOrigin = resolvePlaywrightOrigin(process.env.UNIPROOF_E2E_PORT);
@@ -41,6 +42,29 @@ async function createProfile(page: Page): Promise<string> {
   });
   expect(response.status()).toBe(201);
   expect(response.headers()["cache-control"]).toContain("no-store");
+  const body = await response.json() as { id?: unknown };
+  expect(typeof body.id).toBe("string");
+  return body.id as string;
+}
+
+async function createResearchSnapshot(page: Page): Promise<string> {
+  if (!succeededAllReadyResponse.ok) throw new Error("expected a successful Research fixture");
+  const response = await page.request.post("/api/saved-artifacts", {
+    headers: { "content-type": "application/json; charset=utf-8" },
+    data: {
+      kind: "research",
+      schemaVersion: 1,
+      payload: {
+        request: {
+          universityId: fixtureTarget.university.id,
+          programId: fixtureTarget.program.id,
+          categories: succeededAllReadyResponse.dossier.categories.map((row) => row.category),
+        },
+        dossier: succeededAllReadyResponse.dossier,
+      },
+    },
+  });
+  expect(response.status()).toBe(201);
   const body = await response.json() as { id?: unknown };
   expect(typeof body.id).toBe("string");
   return body.id as string;
@@ -84,6 +108,27 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
     expect(malformed.headers()["cache-control"]).toContain("no-store");
   });
 
+  test("rejects a Magic Link opened outside the browser that initiated sign-in", async ({ browser, request }) => {
+    const initiator = await browser.newContext({ baseURL: e2eOrigin });
+    const otherBrowser = await browser.newContext({ baseURL: e2eOrigin });
+    const initiatorPage = await initiator.newPage();
+    const otherPage = await otherBrowser.newPage();
+    try {
+      const link = await requestLocalMagicLink(initiatorPage, request, testEmail("intent-bound"));
+
+      await otherPage.goto(link);
+      await expect(otherPage).toHaveURL(/\/auth$/u);
+      expect((await otherBrowser.cookies()).some((cookie) => cookie.name.includes("auth-token"))).toBe(false);
+
+      await initiatorPage.goto(link);
+      await expect(initiatorPage).toHaveURL(/\/saved$/u, { timeout: 15_000 });
+      await expect(initiatorPage.getByRole("button", { name: "Sign out" })).toBeVisible();
+    } finally {
+      await initiator.close();
+      await otherBrowser.close();
+    }
+  });
+
   test("local-scope sign out leaves a second session for the same invented account signed in", async ({ browser, request }) => {
     const first = await browser.newContext({ baseURL: e2eOrigin });
     const second = await browser.newContext({ baseURL: e2eOrigin });
@@ -122,6 +167,7 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
 
     await page.goto("/guide");
     await page.getByRole("button", { name: "Save profile" }).click();
+    await expect(page.getByLabel("Citizenship")).toBeFocused();
     await expect(page.locator("#guide-qual-title")).toHaveAttribute("aria-invalid", "true");
     await expect(page.locator("#guide-qual-subject")).toHaveAttribute("aria-invalid", "true");
     expect(saveRequests).toBe(0);
@@ -161,6 +207,39 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
+  test("blocks blind retry after an ambiguous profile save until the profile changes", async ({ page, request }) => {
+    await signInWithLocalMagicLink(page, request, testEmail("ambiguous-save"));
+    let saveRequests = 0;
+    await page.route("**/api/saved-artifacts", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      saveRequests += 1;
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "persistence-unavailable",
+          message: "Private saved snapshots are temporarily unavailable.",
+        }),
+      });
+    });
+    await page.goto("/guide");
+    await fillGuideProfile(page, {
+      citizenship: "Exampleland",
+      currentCountry: "Testland",
+      qualificationTitle: "BSc Computer Science",
+      qualificationSubject: "Computer Science",
+    });
+    const save = page.getByRole("button", { name: "Save profile" });
+    await save.click();
+    await expect(page.getByText("The save outcome is unknown.")).toBeVisible();
+    await expect(save).toBeDisabled();
+    await save.click({ force: true });
+    expect(saveRequests).toBe(1);
+
+    await page.getByLabel("Citizenship").fill("Changed Exampleland");
+    await expect(save).toBeEnabled();
+  });
+
   test("saves, lists, restores, and deletes a private profile without a persistent browser restore channel", async ({ page, request }) => {
     await signInWithLocalMagicLink(page, request, testEmail("profile"));
     const id = await createProfile(page);
@@ -198,6 +277,61 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
     await expect(page.getByText("No saved snapshots yet.")).toBeVisible();
   });
 
+  test("does not publish a delayed restore after sign-out changes account ownership", async ({ page, request }) => {
+    await signInWithLocalMagicLink(page, request, testEmail("restore-race"));
+    const id = await createProfile(page);
+    let releaseRestore!: () => void;
+    let markRestoreEntered!: () => void;
+    const restoreEntered = new Promise<void>((resolve) => { markRestoreEntered = resolve; });
+    const restoreReleased = new Promise<void>((resolve) => { releaseRestore = resolve; });
+    await page.route(`**/api/saved-artifacts/${id}`, async (route) => {
+      const response = await route.fetch();
+      markRestoreEntered();
+      await restoreReleased;
+      await route.fulfill({ response });
+    });
+
+    await page.goto("/saved");
+    await page.getByRole("button", { name: "Restore" }).click();
+    await restoreEntered;
+    const signOutResponsePromise = page.waitForResponse((response) =>
+      response.url().endsWith("/api/auth/sign-out") && response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Sign out" }).click();
+    expect((await signOutResponsePromise).status()).toBe(200);
+    releaseRestore();
+
+    await expect(page.getByRole("banner").getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(page).toHaveURL(/\/saved$/u);
+    await expect(page.getByLabel("Citizenship")).toHaveCount(0);
+  });
+
+  test("enforces the 20-snapshot owner cap under concurrent final inserts", async ({ page, request }) => {
+    await signInWithLocalMagicLink(page, request, testEmail("owner-cap-race"));
+    const initial = await Promise.all(Array.from({ length: 19 }, () => page.request.post("/api/saved-artifacts", {
+      headers: { "content-type": "application/json; charset=utf-8" },
+      data: profileArtifact,
+    })));
+    expect(initial.every((response) => response.status() === 201)).toBe(true);
+
+    const finalPair = await Promise.all([
+      page.request.post("/api/saved-artifacts", {
+        headers: { "content-type": "application/json; charset=utf-8" },
+        data: profileArtifact,
+      }),
+      page.request.post("/api/saved-artifacts", {
+        headers: { "content-type": "application/json; charset=utf-8" },
+        data: profileArtifact,
+      }),
+    ]);
+    expect(finalPair.map((response) => response.status()).sort()).toEqual([201, 409]);
+
+    const list = await page.request.get("/api/saved-artifacts");
+    expect(list.status()).toBe(200);
+    const body = await list.json() as { artifacts?: unknown[] };
+    expect(body.artifacts).toHaveLength(20);
+  });
+
   test("sign out clears restored private profile state from the active Guide workspace", async ({ page, request }) => {
     await signInWithLocalMagicLink(page, request, testEmail("profile-signout"));
     await createProfile(page);
@@ -215,6 +349,24 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
     await expect(page.getByLabel("Citizenship")).toHaveValue("");
     await expect(page.getByLabel("Current country")).toHaveValue("");
     expect((await page.request.get("/api/saved-artifacts")).status()).toBe(401);
+  });
+
+  test("sign out clears a restored private Research snapshot from the active workspace", async ({ page, request }) => {
+    await signInWithLocalMagicLink(page, request, testEmail("research-signout"));
+    await createResearchSnapshot(page);
+    await page.goto("/saved");
+    await page.getByRole("button", { name: "Restore" }).click();
+    await expect(page).toHaveURL(/\/research$/u, { timeout: 15_000 });
+    await expect(page.getByRole("region", { name: "Research dossier" })).toBeVisible();
+
+    const signOutResponsePromise = page.waitForResponse((response) =>
+      response.url().endsWith("/api/auth/sign-out") && response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Sign out" }).click();
+    expect((await signOutResponsePromise).status()).toBe(200);
+    await expect(page.getByRole("banner").getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Research dossier" })).toHaveCount(0);
+    await expect(page.getByLabel("Search supported universities and programs")).toHaveValue("");
   });
 
   test("cross-user saved artifact IDs are non-disclosing and mutations reject cross-origin requests", async ({ browser, request }) => {

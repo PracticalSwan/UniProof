@@ -58,6 +58,10 @@ export function CompareForm({
   onReset,
 }: CompareFormProps) {
   const results = React.useMemo(() => searchComparisonCatalog(state, catalog), [state, catalog]);
+  const shownUniversityCount = Math.min(results.universities.length, 8);
+  const shownProgramCount = Math.min(results.programs.length, 12);
+  const totalMatches = results.universities.length + results.programs.length;
+  const shownMatches = shownUniversityCount + shownProgramCount;
 
   const update = (patch: Partial<ComparisonFormState>) => onStateChange((current) => ({ ...current, ...patch }));
 
@@ -83,6 +87,9 @@ export function CompareForm({
               id="compare-target-search"
               value={state.search}
               onChange={(event) => update({ search: event.target.value })}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.preventDefault();
+              }}
               disabled={disabled}
               aria-invalid={fieldErrors.targets === undefined ? undefined : true}
               aria-describedby={fieldErrors.targets === undefined ? undefined : "compare-targets-error"}
@@ -126,6 +133,13 @@ export function CompareForm({
         </div>
 
         <div className="mt-4 grid max-h-72 gap-2 overflow-y-auto rounded-md border border-border bg-panel p-2" aria-label="Catalog search results">
+          <p className="px-1 py-1 text-xs text-muted-foreground">
+            {totalMatches === 0
+              ? "No supported matches. Change the search or filters."
+              : shownMatches < totalMatches
+                ? `Showing ${shownMatches} of ${totalMatches} supported matches. Refine the search to see hidden matches.`
+                : `${totalMatches} supported ${totalMatches === 1 ? "match" : "matches"}.`}
+          </p>
           {results.universities.slice(0, 8).map((university) => (
             <button
               key={`u-${university.id}`}

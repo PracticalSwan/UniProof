@@ -3,6 +3,7 @@
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
 import type { ResearchDossier } from "@/lib/research/mode/public-contracts";
 import type { ComparisonResult } from "@/lib/comparison/client-state";
+import { comparisonTargetKey } from "@/lib/comparison/contracts";
 import { ComparisonTargetCard } from "./comparison-target-card";
 import { ComparisonTradeoffs } from "./comparison-tradeoffs";
 
@@ -13,6 +14,9 @@ interface ComparisonResultsProps {
 }
 
 export function ComparisonResults({ result, catalog, onEvidence }: ComparisonResultsProps) {
+  const outcomesByTarget = new Map(
+    result.outcomes.map((outcome) => [comparisonTargetKey(outcome.target), outcome]),
+  );
   const dossiers = result.outcomes
     .filter((outcome) => outcome.state === "dossier" && outcome.dossier.run.status !== "failed")
     .map((outcome) => outcome.state === "dossier" ? outcome.dossier : null)
@@ -36,6 +40,7 @@ export function ComparisonResults({ result, catalog, onEvidence }: ComparisonRes
             key={`${targetScore.target.universityId}:${targetScore.target.programId ?? ""}`}
             index={index}
             targetScore={targetScore}
+            outcome={outcomesByTarget.get(comparisonTargetKey(targetScore.target))}
             submission={result.submission}
             catalog={catalog}
             onEvidence={onEvidence}

@@ -54,7 +54,7 @@ UniProof does not duplicate Vercel's HSTS at the application layer.
 
 ## Release smoke evidence
 
-The owner-authorized live Research budget was capped at three accepted executions and is exhausted at **3/3**. Do not make another live Research call as part of this release.
+The historical Phase 6C live Research budget was capped at three accepted executions and is exhausted at **3/3**. That record remains immutable. The later `final_testing_plan.md` owns a separate maximum-five allowance and requires an explicit unresolved Production hypothesis before each accepted call.
 
 The third pass used University of Waterloo Bachelor of Computer Science admissions. The request returned HTTP 200 and a schema-valid public response, but the category remained operationally incomplete with zero claims. That pass exposed two deterministic resilience defects subsequently fixed without another live call:
 
@@ -72,7 +72,7 @@ Source-gap claims remain visible in Research but are non-definitive in Compare a
 5. Require GitHub Actions to complete successfully on that exact SHA.
 6. Deploy that exact committed source to Vercel Production.
 7. Confirm `https://uniproof-beta.vercel.app` serves the new deployment and verify the deployment metadata is tied to the expected Git SHA.
-8. Run only deterministic post-deploy checks: route/navigation availability, headers/CSP/cache, WAF configuration, browser/client-bundle privacy, and runtime logs. **Do not perform another live Research call.**
+8. Run deterministic post-deploy checks first: route/navigation availability, headers/CSP/cache, WAF configuration, browser/client-bundle privacy, and runtime logs. Any later live Research request is governed exclusively by the separate final-testing allowance and its written hypothesis/accounting rules.
 
 ## Rollback
 

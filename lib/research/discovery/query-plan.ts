@@ -52,6 +52,16 @@ export function containsSensitiveResearchData(value: string): boolean {
   }
 
   if (
+    /\b(?:my|i(?:'m| am| have| got| scored)?)\b[\s\S]{0,48}\b(?:ielts|toefl|pte|duolingo)\b[\s\S]{0,18}\d/iu.test(normalized) ||
+    /\b(?:my|i(?:'m| am| have| got| scored)?)\b[\s\S]{0,48}\d(?:\.\d+)?[\s\S]{0,18}\b(?:ielts|toefl|pte|duolingo)\b/iu.test(normalized) ||
+    /\b(?:my|i(?:'m| am| have)?)\b[\s\S]{0,48}\bbudget\b[\s\S]{0,24}\d/iu.test(normalized) ||
+    /\b[\p{L}][\p{L}\p{M}'’-]{1,30}\s+(?:citizen|national)\b/iu.test(normalized) ||
+    /\b(?:citizen|national)\s+of\s+[\p{L}][\p{L}\p{M}'’ -]{1,40}/iu.test(normalized)
+  ) {
+    return true;
+  }
+
+  if (
     /\b(?:my|i(?:'m| am)?|student)\b[\s\S]{0,48}\b(?:citizenship|nationality|passport|national\s+id|transcript|bank\s+statement|recommendation\s+letter|visa\s+document)\b/iu.test(normalized) ||
     /\b(?:citizenship|nationality|passport|national\s+id)\b\s*(?:is|:|=)\s*[^,.;!?]{2,}/iu.test(normalized) ||
     /\b(?:passport(?:\s+number)?|national\s+id(?:\s+number)?|student\s+id)\b[\s:#=-]*[A-Z0-9-]*\d[A-Z0-9-]*\b/iu.test(normalized) ||

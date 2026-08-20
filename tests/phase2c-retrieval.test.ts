@@ -159,6 +159,15 @@ describe("Phase 2C retrieval and normalization", () => {
     expect(normalized.text).not.toContain("Ignore");
   });
 
+  it("normalizes deeply nested bounded HTML without exhausting the JavaScript stack", () => {
+    const depth = 12_000;
+    const nestedBlock = `${"<div>".repeat(depth)}<p>Deep requirement</p>${"</div>".repeat(depth)}`;
+    const nestedHeading = `<h1>${"<span>".repeat(depth)}Admissions${"</span>".repeat(depth)}</h1>`;
+
+    expect(normalizeHtml(nestedBlock).text).toContain("Deep requirement");
+    expect(normalizeHtml(nestedHeading).text).toContain("Admissions");
+  });
+
   it("normalizes plain text deterministically and refuses PDF promotion", () => {
     const plain = normalizePlainText("  First line\r\n\r\n\r\nSecond\tline  ");
     expect(plain.text).toBe("First line\n\nSecond line");

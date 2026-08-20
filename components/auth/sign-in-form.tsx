@@ -3,7 +3,11 @@
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
-import { authEmailSchema, sanitizeAuthRequestError } from "@/lib/auth/contracts";
+import {
+  authEmailSchema,
+  authMagicLinkIntentResponseSchema,
+  sanitizeAuthRequestError,
+} from "@/lib/auth/contracts";
 import { getPublicEnv } from "@/lib/env/public";
 import { createClient } from "@/lib/supabase/client";
 
@@ -35,8 +39,16 @@ export function SignInForm() {
 
     setState({ kind: "submitting" });
     try {
+      const intentResponse = await fetch("/api/auth/magic-link-intent", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const intent = authMagicLinkIntentResponseSchema.safeParse(await intentResponse.json());
+      if (!intentResponse.ok || !intent.success) {
+        throw new Error("Magic Link intent could not be created.");
+      }
       const client = createClient();
-      const callback = `${window.location.origin}/auth/confirm`;
+      const callback = `${window.location.origin}/auth/confirm?state=${encodeURIComponent(intent.data.state)}`;
       const { error } = await client.auth.signInWithOtp({
         email: parsed.data,
         options: { emailRedirectTo: callback },
@@ -47,7 +59,7 @@ export function SignInForm() {
       }
       setState({
         kind: "sent",
-        message: "If this address can receive a UniProof sign-in link, check its inbox and use the newest link.",
+        message: "If this address can receive a UniProof sign-in link, open the newest link in this same browser.",
       });
     } catch (error) {
       setState({ kind: "error", message: sanitizeAuthRequestError(error).message });
@@ -84,7 +96,7 @@ export function SignInForm() {
           className="mt-2 min-h-11 w-full rounded-md border border-input bg-background px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
         />
         <p id="auth-email-help" className="mt-2 text-sm text-muted-foreground">
-          UniProof will send a one-time sign-in link. No password is required.
+          UniProof will send a one-time sign-in link. Open it in this same browser; no password is required.
         </p>
       </div>
       <Button type="submit" disabled={state.kind === "submitting"} className="min-h-11">

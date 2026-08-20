@@ -82,9 +82,11 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
   const { consume } = useSavedRestore();
   const [saveStatus, setSaveStatus] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  const [saveBlocked, setSaveBlocked] = React.useState(false);
   const saveSequenceRef = React.useRef(0);
   const authAccountId = authState.status === "signed-in" ? authState.userId : null;
   const authAccountRef = React.useRef<string | null>(authAccountId);
+  const restoredAccountRef = React.useRef<string | null>(null);
   const [formState, setFormState] = React.useState<ResearchFormState>(() =>
     createInitialResearchFormState(),
   );
@@ -108,7 +110,20 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
       authAccountRef.current = authAccountId;
       saveSequenceRef.current += 1;
       setSaving(false);
+      setSaveBlocked(false);
       setSaveStatus("");
+      if (restoredAccountRef.current !== null) {
+        restoredAccountRef.current = null;
+        const active = activeRequestRef.current;
+        activeRequestRef.current = null;
+        active?.controller.abort();
+        setSelectedClaimId(null);
+        setClaimTrigger(null);
+        setCancelRequested(false);
+        setFieldErrors({});
+        setFormState(createInitialResearchFormState());
+        dispatch({ type: "clear-result" });
+      }
     }
   }, [authAccountId]);
 
@@ -138,6 +153,8 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
       setSelectedClaimId(null);
       setClaimTrigger(null);
       setFieldErrors({});
+      setSaveBlocked(false);
+      restoredAccountRef.current = owner;
       setFormState({
         search: targetLabel,
         universityId: request.universityId,
@@ -237,6 +254,8 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
           }
           setSelectedClaimId(null);
           setClaimTrigger(null);
+          restoredAccountRef.current = null;
+          setSaveBlocked(false);
           dispatch({ type: "result", sequence, dossier: presentationDossier });
           return;
         }
@@ -329,7 +348,7 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
   }, []);
 
   const handleSave = React.useCallback(async () => {
-    if (runState.kind !== "result" || authAccountId === null || isLoading || saving) return;
+    if (runState.kind !== "result" || authAccountId === null || isLoading || saving || saveBlocked) return;
     const sequence = saveSequenceRef.current + 1;
     saveSequenceRef.current = sequence;
     const owner = authAccountId;
@@ -347,13 +366,15 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
     if (!mountedRef.current || sequence !== saveSequenceRef.current || authAccountRef.current !== owner) return;
     setSaving(false);
     if (!outcome.ok) {
+      if (outcome.ambiguousMutation) setSaveBlocked(true);
       setSaveStatus(outcome.ambiguousMutation
         ? "The save outcome is unknown. Open Saved snapshots and refresh the list before trying again."
         : outcome.error.message);
       return;
     }
+    setSaveBlocked(false);
     setSaveStatus("Research snapshot saved privately.");
-  }, [authAccountId, isLoading, runState, saving]);
+  }, [authAccountId, isLoading, runState, saveBlocked, saving]);
 
   const formMatchesSubmission = React.useMemo(() => {
     if (displayedResult === null) return true;
@@ -414,7 +435,7 @@ export function ResearchWorkspace({ catalog }: ResearchWorkspaceProps) {
           {restoredHistorical ? (
             <Button type="button" onClick={() => handleRetry(runState.submission)}>Refresh research</Button>
           ) : authState.status === "signed-in" ? (
-            <Button type="button" variant="outline" disabled={saving} onClick={() => void handleSave()}>
+            <Button type="button" variant="outline" disabled={saving || saveBlocked} onClick={() => void handleSave()}>
               {saving ? "Saving…" : "Save snapshot"}
             </Button>
           ) : authState.status === "signed-out" && authState.configured ? (

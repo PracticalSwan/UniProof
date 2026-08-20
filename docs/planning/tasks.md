@@ -18,7 +18,7 @@ Deadline snapshot: 2026-08-22 16:00 UTC / 23:00 ICT. Re-verify Devpost before fi
 - [x] Implement the approved Figma-derived responsive Home, Research, Compare, and Guide UI foundation with reusable evidence states.
 - [x] Extend domain contracts for ApplicantProfile, Comparison, and ApplicationPlan in their feature phases.
 - [x] Create database migrations with Row Level Security before enabling user-owned persistence.
-- [ ] Seed a small deterministic university/program dataset for development and fallback demo use.
+- [x] Supersede the early persistent seed-data idea with the checked-in application catalog plus invented deterministic test fixtures; `supabase/seed.sql` intentionally creates no persistent user/application data.
 
 ## Phase 2 — Evidence and Research Pipeline
 
@@ -295,13 +295,22 @@ Execution plan: `docs/superpowers/plans/2026-08-19-phase-6c-deployment-submissio
 - [x] Enable and inspect the single durable `POST /api/research` WAF rule: source-IP fixed window, 20 requests/60 seconds, 429 on excess. No second app-level limiter was added.
 - [x] Deploy verified Preview candidates and pass deterministic deployed acceptance. The final hardened executable Preview passed **104/104** Research/Compare/Guide browser cases; security/header/client-bundle checks were also observed without spending live provider quota.
 - [x] Promoted the final committed release candidate `21d645baaf9eca381a167246d22538c23bb29427` to Vercel Production after GitHub Actions run `32367630411` completed successfully. Deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` now serves the canonical `https://uniproof-beta.vercel.app`; deterministic Production route/TLS/HSTS/CSP/header/cache/WAF/client-bundle/log checks passed without another live Research call.
-- [x] Consume the authorized live-provider budget without exceeding it: **3/3 accepted Research executions used**. The last returned HTTP 200/schema-valid but operationally incomplete admissions with zero claims, exposing resilience defects that were fixed deterministically. No fourth live call is permitted and no successful-live-evidence smoke claim is made.
+- [x] Consume the historical Phase 6C live-provider budget without exceeding it: **3/3 accepted Research executions used**. The last returned HTTP 200/schema-valid but operationally incomplete admissions with zero claims, exposing resilience defects that were fixed deterministically. No fourth call was permitted under that Phase 6C allowance and no successful-live-evidence smoke claim is made; the later `final_testing_plan.md` owns a separate maximum-five final-testing allowance.
 - [x] Verify the hosted judge release intentionally has no Auth/save surface because hosted Supabase browser variables are absent; therefore no production auth test records/accounts were created or require cleanup.
 - [x] Bound Production to public Git SHA `21d645baaf9eca381a167246d22538c23bb29427`: GitHub Actions run `32367630411` succeeded on that exact SHA, and Vercel deployment metadata for `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` records both `githubCommitSha` and `releaseSha` as the same value. This later documentation closeout does not change the deployed executable source.
 - [x] Prepare release README/architecture/security/operations/traceability updates plus **8 reviewed screenshots** under `docs/assets/screenshots/phase-6/`; protected `ui-flow-screenshots/` remains untouched/untracked.
 - [x] Draft `docs/submission/devpost-draft.md`, `demo-script.md`, and `demo-checklist.md` from verified behavior with explicit live-smoke limitations and no hosted-Auth overclaim.
 - [ ] **Devpost final submission remains intentionally blocked** until the final approximately three-minute video is supplied, verified, reconciled with the draft, and explicitly authorized. Do not post before then.
 - [ ] After the video hold is released and Devpost is actually submitted, verify the submitted project/live links and append final submission evidence without overstating any skipped/unobserved check.
+
+### Final end-to-end testing and draft preparation
+
+Authoritative execution plan: `final_testing_plan.md`.
+
+- [x] Complete repository/tool/CI/Production inventory and independent architecture, requirements, test-gap, security, UI/UX, and performance audits.
+- [x] Remediate verified evidence-integrity, hostile-normalization, Auth, persistence, private-restore, Compare accessibility/error, Guide focus, and test-harness gaps with focused regressions.
+- [x] Pass the fresh local Supabase reset/lint/advisors/pgTAP/Auth-Saved matrix and the stable source/type/lint/unit/build/built-browser gates recorded in the final-testing closeout.
+- [ ] Publish the final reviewed change set, require exact-SHA CI, connect GitHub to Vercel, verify any automatic Production deployment, and save/reinspect the unsubmitted Devpost draft.
 
 ## Side Phase UCE — University Catalog Expansion
 

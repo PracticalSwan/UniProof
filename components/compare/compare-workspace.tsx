@@ -107,6 +107,7 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
   const mountedRef = React.useRef(true);
   const [saveStatus, setSaveStatus] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  const [saveBlocked, setSaveBlocked] = React.useState(false);
   const saveSequenceRef = React.useRef(0);
   const [formState, setFormState] = React.useState(createInitialComparisonFormState);
   const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<ComparisonFormField, string>>>({});
@@ -133,6 +134,7 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
     authAccountRef.current = authAccountId;
     saveSequenceRef.current += 1;
     setSaving(false);
+    setSaveBlocked(false);
     setSaveStatus("");
     if (restoredAccountRef.current !== null) {
       restoredAccountRef.current = null;
@@ -156,6 +158,7 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
       if (!mountedRef.current || authAccountRef.current !== owner || activeBatchRef.current !== null || sequence !== sequenceRef.current) return;
       setEvidence(null);
       setLastEvidenceTrigger(null);
+      setSaveBlocked(false);
       restoredAccountRef.current = owner;
       dispatch({ type: "restore", sequence, result: restored.payload });
       setSaveStatus("Saved comparison snapshot loaded. Re-run explicitly for current evidence.");
@@ -261,6 +264,7 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
         tradeoffs,
       };
       restoredAccountRef.current = null;
+      setSaveBlocked(false);
       dispatch({ type: "complete", sequence, result });
     } finally {
       if (activeBatchRef.current === active) activeBatchRef.current = null;
@@ -319,7 +323,7 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
   }, [catalog]);
 
   const handleSave = React.useCallback(async () => {
-    if (workspace.kind !== "result" || workspace.notice === "Saved snapshot loaded." || authAccountId === null || saving) return;
+    if (workspace.kind !== "result" || workspace.notice === "Saved snapshot loaded." || authAccountId === null || saving || saveBlocked) return;
     const sequence = saveSequenceRef.current + 1;
     saveSequenceRef.current = sequence;
     const owner = authAccountId;
@@ -334,15 +338,31 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
     if (!mountedRef.current || sequence !== saveSequenceRef.current || authAccountRef.current !== owner) return;
     setSaving(false);
     if (!result.ok) {
+      if (result.ambiguousMutation) setSaveBlocked(true);
       setSaveStatus(result.ambiguousMutation
         ? "The save outcome is unknown. Open Saved snapshots and refresh the list before trying again."
         : result.error.message);
       return;
     }
+    setSaveBlocked(false);
     setSaveStatus("Comparison snapshot saved privately.");
-  }, [authAccountId, saving, workspace]);
+  }, [authAccountId, saveBlocked, saving, workspace]);
 
   const restoredHistorical = workspace.kind === "result" && workspace.notice === "Saved snapshot loaded.";
+  const terminalNotice = workspace.kind === "idle"
+    ? workspace.notice
+    : workspace.kind === "result"
+      ? saveStatus !== ""
+        ? saveStatus
+        : workspace.notice ?? (workspace.result.status === "partial" ? "Partial comparison completed." : "Comparison completed.")
+      : undefined;
+  const terminalNoticeVisible =
+    (workspace.kind === "idle" || workspace.kind === "result") && workspace.notice !== undefined;
+  const workspaceFailureMessages = workspace.kind === "error"
+    ? [...new Set(workspace.completedTargets.flatMap((outcome) =>
+        outcome.state === "transport-error" ? [outcome.error.message] : [],
+      ))]
+    : [];
   const loadingTarget = workspace.kind === "loading"
     ? workspace.submission.targets[Math.min(workspace.currentTargetIndex, workspace.submission.targets.length - 1)]
     : undefined;
@@ -376,9 +396,12 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
       ) : null}
 
       {workspace.kind === "error" ? (
-        <section className="mt-8 rounded-lg border border-destructive/30 bg-destructive/5 p-4" aria-labelledby="compare-error-heading">
+        <section role="alert" className="mt-8 rounded-lg border border-destructive/30 bg-destructive/5 p-4" aria-labelledby="compare-error-heading">
           <h2 id="compare-error-heading" className="text-lg font-semibold text-destructive">Comparison could not be calculated</h2>
           <p className="mt-2 text-sm">{workspace.error.message}</p>
+          {workspaceFailureMessages.map((message) => (
+            <p key={message} className="mt-2 text-sm font-semibold text-destructive">{message}</p>
+          ))}
         </section>
       ) : null}
 
@@ -395,7 +418,7 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
           )}
           {workspace.kind === "result" && !restoredHistorical ? (
             authState.status === "signed-in" ? (
-              <Button type="button" variant="outline" className="min-h-10" disabled={saving} onClick={() => void handleSave()}>
+              <Button type="button" variant="outline" className="min-h-10" disabled={saving || saveBlocked} onClick={() => void handleSave()}>
                 {saving ? "Saving…" : "Save snapshot"}
               </Button>
             ) : authState.status === "signed-out" && authState.configured ? (
@@ -409,18 +432,22 @@ export function CompareWorkspace({ catalog }: CompareWorkspaceProps) {
             onClick={() => {
               restoredAccountRef.current = null;
               setEvidence(null);
+              setSaveBlocked(false);
               setSaveStatus("");
               dispatch({ type: "clear-result" });
             }}
           >
             Clear result
           </Button>
-          <p aria-live="polite" className="text-sm text-muted-foreground">{saveStatus}</p>
+          <p className="text-sm text-muted-foreground">{saveStatus}</p>
         </div>
       ) : null}
 
-      {workspace.kind === "idle" && workspace.notice !== undefined ? <p className="mt-5 text-sm font-semibold">{workspace.notice}</p> : null}
-      {workspace.kind === "result" && workspace.notice !== undefined ? <p className="mt-5 text-sm font-semibold">{workspace.notice}</p> : null}
+      {terminalNotice === undefined ? null : (
+        <p role="status" aria-live="polite" className={terminalNoticeVisible ? "mt-5 text-sm font-semibold" : "sr-only"}>
+          {terminalNotice}
+        </p>
+      )}
 
       {currentResult === undefined ? null : (
         <ComparisonResults result={currentResult} catalog={catalog} onEvidence={openEvidence} />

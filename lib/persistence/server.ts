@@ -19,6 +19,7 @@ import {
 import { researchCatalog } from "@/lib/research/catalog";
 import { isAllowedSameOriginMutation } from "@/lib/security/same-origin";
 import { createClient } from "@/lib/supabase/server";
+import { readSavedArtifactJson } from "./bounded-body";
 
 const artifactIdSchema = z.uuid();
 const dbMetadataSchema = z.object({
@@ -124,9 +125,12 @@ export async function listSavedArtifacts(request: Request): Promise<Response> {
   }
 }
 
-export async function saveArtifact(input: unknown): Promise<Response> {
-  const auth = await authenticatedClient();
-  if (!auth.ok) return persistenceErrorResponse(auth.code, auth.code === "unauthenticated" ? 401 : 503);
+type AuthenticatedPersistenceClient = Extract<Awaited<ReturnType<typeof authenticatedClient>>, { ok: true }>;
+
+async function saveArtifactForAuthenticatedUser(
+  input: unknown,
+  auth: AuthenticatedPersistenceClient,
+): Promise<Response> {
 
   const validated = validateSavedArtifact(input as { kind: unknown; schemaVersion: unknown; payload?: unknown }, researchCatalog);
   if (!validated.ok) return persistenceErrorResponse(validated.code, statusForValidation(validated.code));
@@ -158,6 +162,18 @@ export async function saveArtifact(input: unknown): Promise<Response> {
   } catch {
     return persistenceErrorResponse("persistence-unavailable", 503);
   }
+}
+
+export async function saveArtifactRequest(request: Request): Promise<Response> {
+  const auth = await authenticatedClient();
+  if (!auth.ok) return persistenceErrorResponse(auth.code, auth.code === "unauthenticated" ? 401 : 503);
+
+  const body = await readSavedArtifactJson(request);
+  if (!body.ok) {
+    const status = body.code === "request-too-large" ? 413 : body.code === "invalid-content-type" ? 415 : 400;
+    return persistenceErrorResponse(body.code, status);
+  }
+  return saveArtifactForAuthenticatedUser(body.value, auth);
 }
 
 export async function getSavedArtifact(id: string): Promise<Response> {

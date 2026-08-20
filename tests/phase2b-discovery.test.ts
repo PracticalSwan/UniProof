@@ -550,9 +550,17 @@ describe("Phase 2B discovery", () => {
   it("excludes personal values from provider queries while retaining public target context", async () => {
     expect(containsSensitiveResearchData("What is the GPA requirement?"))
       .toBe(false);
+    expect(containsSensitiveResearchData("International student IELTS 7.5 entry requirement"))
+      .toBe(false);
     expect(containsSensitiveResearchData("My GPA is 3.8; email me at student@example.com"))
       .toBe(true);
     expect(containsSensitiveResearchData("passport number AB123456"))
+      .toBe(true);
+    expect(containsSensitiveResearchData("IELTS 7.5, Thai citizen"))
+      .toBe(true);
+    expect(containsSensitiveResearchData("I scored 7.5 in IELTS"))
+      .toBe(true);
+    expect(containsSensitiveResearchData("My annual budget is USD 24000"))
       .toBe(true);
     const parsed = request({ categories: ["admissions"], question: "My GPA is 3.8; email me at student@example.com" });
     const resolution = await resolveResearchTarget(parsed);

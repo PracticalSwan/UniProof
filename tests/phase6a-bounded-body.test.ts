@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { POST as postSavedArtifact } from "@/app/api/saved-artifacts/route";
 import { readSavedArtifactJson } from "@/lib/persistence/bounded-body";
 import { SAVED_ARTIFACT_MAX_BODY_UTF8_BYTES } from "@/lib/persistence/contracts";
 
@@ -13,6 +14,30 @@ function requestFromBytes(bytes: Uint8Array, headers: Record<string, string> = {
 }
 
 describe("saved-artifact bounded request body", () => {
+  it("rejects unavailable private persistence before reading an unauthenticated request body", async () => {
+    let bodyRead = false;
+    const request = {
+      method: "POST",
+      url: "https://app.example/api/saved-artifacts",
+      headers: new Headers({ "content-type": "application/json; charset=utf-8" }),
+      signal: new AbortController().signal,
+      body: {
+        getReader() {
+          bodyRead = true;
+          return {
+            read: async () => ({ done: true, value: undefined }),
+            cancel: async () => undefined,
+          };
+        },
+      },
+    } as unknown as Request;
+
+    const response = await postSavedArtifact(request);
+
+    expect(response.status).toBe(503);
+    expect(bodyRead).toBe(false);
+  });
+
   it("accepts an exact maximum-size valid UTF-8 JSON body and rejects one byte over", async () => {
     const overhead = new TextEncoder().encode('{"x":""}').byteLength;
     const exactText = `{"x":"${"a".repeat(SAVED_ARTIFACT_MAX_BODY_UTF8_BYTES - overhead)}"}`;

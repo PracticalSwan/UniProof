@@ -1,15 +1,15 @@
 # Pixel Forge AI Hackathon Constraints
 
-Source of truth: Pixel Forge AI Hackathon Devpost overview/rules/schedule, re-verified on **2026-08-20**. Event metadata is mutable; re-check the live pages immediately before final submission.
+Source of truth: official Devpost Hackathons plugin overview/rules/dates/requirements/judging responses, re-verified on **2026-08-21**. Event metadata is mutable; re-check it immediately before final submission.
 
 ## Current Event State
 
-- Current Devpost title observed on 2026-08-20: `Pixel Forge AI Hackathon ($18,000+ in Prizes)`.
+- Current Devpost title: `Pixel Forge AI Hackathon ($18,000+ in Prizes)`.
 - Current phase: submissions open.
 - Submission deadline: **2026-08-22 16:00 UTC**.
 - Deadline in Bangkok time: **2026-08-22 23:00 ICT**.
 - Judging criteria shown by Devpost: Originality, Design, Potential Impact, Technological Implementation.
-- Latest observed organizer announcement (2026-08-19): final call for submissions.
+- Official submission form currently exposes no hackathon-specific custom questions or tracks; the global project form and required deliverables still apply.
 
 ## Eligibility and Build Rules That Affect This Repository
 
@@ -49,6 +49,8 @@ Current UniProof release assets:
 - Draft submission: `docs/submission/devpost-draft.md`
 - Recording script: `docs/submission/demo-script.md`
 - Final checklist: `docs/submission/demo-checklist.md`
+
+The official plugin reports `video_required: true`, `zip_file_required: false`, and no custom submission fields for this event. The public website is still required by the organizer's prose/rules even though the global structured `website_required` flag is false, so UniProof keeps the canonical live URL prominent.
 
 ## Submission hold
 

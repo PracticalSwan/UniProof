@@ -25,6 +25,7 @@ test.describe("Phase 4 Compare form", () => {
     await expect(priorities.getByRole("heading", { level: 2, name: "Comparison priorities" })).toBeVisible();
     await expect(page.getByText(/relative importance/i)).toBeVisible();
     await expect(page.getByText(/total exactly 100|Weight total 100 \/ 100/)).toHaveCount(0);
+    await expect(page.getByText("Showing 20 of 75 supported matches. Refine the search to see hidden matches.")).toBeVisible();
 
     const expected = {
       affordability: "30",
@@ -42,6 +43,18 @@ test.describe("Phase 4 Compare form", () => {
       await expect(slider).toHaveValue(value);
       await expect(page.getByTestId(`compare-weight-${priority}-value`)).toHaveText(value);
     }
+  });
+
+  test("keeps Enter inside catalog search and explains an empty result", async ({ page, research }) => {
+    await openCompare(page);
+    const search = page.getByLabel("Search supported universities and programs");
+    await search.fill("MIT");
+    await search.press("Enter");
+    await expect(page.getByText("Select exactly two to four unique supported targets.")).toHaveCount(0);
+    expect(research.requests).toHaveLength(0);
+
+    await search.fill("No Such UniProof Target");
+    await expect(page.getByText("No supported matches. Change the search or filters.")).toBeVisible();
   });
 
   test("finds expanded Canada and EU targets through the bounded result list", async ({ page }) => {

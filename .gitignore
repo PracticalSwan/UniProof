@@ -25,6 +25,7 @@ output/playwright/
 # Hosting / local service state
 .vercel/
 supabase/.temp/
+.devpost-hackathon-state.json
 
 # Logs and caches
 *.log

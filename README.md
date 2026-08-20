@@ -52,10 +52,12 @@ Important boundaries:
 
 - provider credentials stay server-side;
 - retrieved pages and model output are untrusted input;
+- arbitrary general-web sources remain `inferred` and cannot manufacture `corroborated` status; corroboration is reserved for application-owned reliable source classes with distinct owners and origins;
 - the browser validates the public Research response again before display;
 - Comparison and Guide working state remain memory-first and never become provider/model inputs;
 - Guide applicant profile values are not sent through the Research/provider chain; optional private persistence is explicit, signed-in, user-scoped, and RLS-protected;
 - saved profile/Research/Comparison/Guide results are historical snapshots restored through one account-bound memory-only handoff, never URL/Web Storage state;
+- saved Comparison/Guide derivations are recomputed with the version-1 deterministic algorithms on write/read, and restored private state is cleared when its account signs out or changes;
 - conflicting/missing/incompatible evidence fails closed rather than becoming a guessed fact or zero score;
 - production browser policy uses nonce-based CSP and restrictive security headers without third-party runtime analytics/scripts.
 
@@ -155,7 +157,7 @@ supabase db reset
 supabase test db
 ```
 
-Configure only the local public browser values `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the local Supabase stack in your ignored local environment, then start Next.js normally. Local Magic Links are delivered to the Supabase Mailpit development inbox. **Do not put a service-role key in browser variables or ordinary saved-artifact routes.** The public hackathon deployment intentionally leaves hosted Supabase browser/Auth variables absent because production email delivery is not configured; anonymous Research/Compare/Guide remains the judge-facing release.
+Configure only the local public browser values `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the local Supabase stack in your ignored local environment, then start Next.js normally. Local Magic Links are delivered to the Supabase Mailpit development inbox and must be opened in the same browser that requested them; a short-lived intent cookie rejects cross-browser account swapping. **Do not put a service-role key in browser variables or ordinary saved-artifact routes.** The public hackathon deployment intentionally leaves hosted Supabase browser/Auth variables absent because production email delivery is not configured; anonymous Research/Compare/Guide remains the judge-facing release.
 
 ### Verification commands
 
@@ -229,7 +231,7 @@ The anonymous Phase 0–6C application is live at **https://uniproof-beta.vercel
 
 The Phase 6 source-resilience review also changed evidence semantics for partial source failure: a category may preserve supported claims from usable sources while exposing a sanitized source-gap warning. Such claims remain visible in Research but are not definitive scoring/planning evidence in Compare or Guide. Program-scoped Research now always retains the catalog-owned official program page as a trusted direct source candidate even when web discovery succeeds.
 
-The bounded release smoke budget is exhausted at **3/3 accepted live Research executions**. The third call returned a schema-valid HTTP 200 dossier but admissions remained operationally incomplete with zero claims; it exposed the direct-program-source defect above, which was fixed and regression-tested without exceeding the quota. Do not reinterpret that smoke as a successful live evidence result.
+The historical Phase 6C smoke budget is exhausted at **3/3 accepted live Research executions**. The third call returned a schema-valid HTTP 200 dossier but admissions remained operationally incomplete with zero claims; it exposed the direct-program-source defect above, which was fixed and regression-tested without exceeding that allowance. `final_testing_plan.md` separately authorizes up to five additional hypothesis-driven accepted calls for final testing; unused calls remain unused, and no result is represented as successful live evidence unless it actually produces traceable evidence.
 
 The final hardened executable source passed **602/602 Vitest tests**, TypeScript, ESLint, production build, release/workspace verification, `npm audit --omit=dev` with zero vulnerabilities, and **104/104 deterministic hosted Preview Research/Compare/Guide browser acceptance** before the documentation-only release synchronization. Release screenshots under `docs/assets/screenshots/phase-6/` were captured from that verified hosted UI with deterministic intercepted Research fixtures; they demonstrate presentation behavior and are not represented as live-provider outputs.
 

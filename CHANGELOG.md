@@ -8,6 +8,8 @@ The project has not published a tagged release yet. Until the first release, com
 
 ### Added
 
+- Final release regression coverage for browser-bound Magic Links, delayed restore/account-change races, concurrent saved-artifact capacity, private Research restore clearing, deeply nested hostile HTML, saved-derived-result tampering, Compare terminal announcements/errors/search behavior, and Guide invalid-field focus.
+
 - Evidence-first Research Mode with a checked-in supported university/program catalog, structured browser-safe dossiers, exact source inspection, conflict/outdated/unknown/incomplete states, cancellation, retry, responsive browser acceptance, and hardened same-origin Research transport.
 - Tavily discovery with Brave fallback, bounded SSRF-resistant retrieval, and structured Gemini -> Groq -> OpenRouter provider fallback with deterministic evidence gates.
 - Comparison Mode for 2–4 compatible targets with immutable submissions, closed deterministic metric mappings, user-priority fit/coverage, score suppression for sparse evidence, explicit gaps, deterministic trade-offs, and target-scoped exact evidence references.
@@ -21,6 +23,9 @@ The project has not published a tagged release yet. Until the first release, com
 
 ### Changed
 
+- Final testing now keeps arbitrary general-web sources inferred unless an application-owned reliable source class can establish corroboration, strengthens common applicant-context rejection before provider queries, and replaces recursive HTML normalization with stack-safe iterative traversal.
+- Compare now announces completion/cancellation/errors, preserves sanitized deployment 429/504 causes, prevents Enter in catalog search from submitting, and explains capped or empty matches; Guide focuses the first invalid control.
+
 - Replaced Comparison's exact-total-100 numeric priority inputs with keyboard-accessible 0–100 relative sliders, deterministic positive-total normalization, all-zero fail-closed validation, and normalized evidence coverage while preserving version-1 saved snapshots. Also aligned Guide applicant-profile paired fields, title-cased qualification labels without changing canonical lowercase values, and documented the exact bounded 30-university/45-program catalog in README.
 - Reclassified the `shadcn` CLI from a production dependency to an exact development dependency because runtime application code does not import it.
 - Simplified Comparison result/provenance contracts by removing obsolete flat trade-off claim IDs and an impossible nullable result score state.
@@ -30,6 +35,9 @@ The project has not published a tagged release yet. Until the first release, com
 - Made isolated Playwright origins authoritative across the Auth/Saved harness, including Mailpit Magic Link parsing and secondary browser contexts, removing hidden dependence on port 3102 during concurrent verification.
 
 ### Security
+
+- Magic Link completion is bound to a short-lived same-browser intent cookie; unsolicited or cross-browser links are rejected before token verification.
+- Private save authentication now precedes request-body buffering, Save/Delete `5xx` outcomes are treated as ambiguous without automatic retry, saved Guide/Comparison derivations are deterministically recomputed, and account-derived Research restores clear on sign-out/account change.
 
 - Cross-dossier Comparison provenance is scoped by both target identity and dossier-local claim ID.
 - Guide profile values remain browser-local by default and are excluded from the Research/provider request boundary, persistent browser storage, public URLs, and logs. Phase 6A adds only an explicit signed-in private Save into user-scoped RLS rows; browser marker tests cover outbound traffic, storage, reload/navigation, XSS-shaped text, and built-client leakage.

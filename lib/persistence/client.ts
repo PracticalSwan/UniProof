@@ -73,7 +73,12 @@ export async function saveSavedArtifact(input: unknown): Promise<PersistenceClie
       headers: { "content-type": "application/json; charset=utf-8" },
       body: JSON.stringify(parsedArtifact.data),
     });
-    if (!response.ok) return { ok: false, error: await parseFailure(response) };
+    if (!response.ok) {
+      const error = await parseFailure(response);
+      return response.status >= 500
+        ? { ok: false, error, ambiguousMutation: true }
+        : { ok: false, error };
+    }
     const parsed = savedArtifactMetadataSchema.safeParse(await response.json());
     return parsed.success ? { ok: true, value: parsed.data } : { ok: false, error: unavailable, ambiguousMutation: true };
   } catch {
@@ -87,7 +92,12 @@ export async function deleteSavedArtifact(id: string): Promise<PersistenceClient
       method: "DELETE",
       credentials: "same-origin",
     });
-    if (!response.ok) return { ok: false, error: await parseFailure(response) };
+    if (!response.ok) {
+      const error = await parseFailure(response);
+      return response.status >= 500
+        ? { ok: false, error, ambiguousMutation: true }
+        : { ok: false, error };
+    }
     const body = await response.json() as unknown;
     if (typeof body !== "object" || body === null || (body as { deleted?: unknown }).deleted !== true) {
       return { ok: false, error: unavailable, ambiguousMutation: true };

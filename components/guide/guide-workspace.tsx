@@ -52,6 +52,52 @@ const GUIDE_RETRYABLE_CODES = new Set([
   "guide-assessment-error",
 ]);
 
+function focusFirstGuideError(errors: GuideFieldErrors): void {
+  const order = [
+    "target",
+    "intake",
+    "academicYear",
+    "citizenship",
+    "currentCountry",
+    "qualificationLevel",
+    "qualificationTitle",
+    "qualificationSubject",
+    "gpaValue",
+    "gpaScale",
+    "englishKind",
+    "englishOverall",
+    "englishComponents",
+    "otherEnglishName",
+    "otherEnglishScore",
+    "budgetAmount",
+    "budgetCurrency",
+    "budgetScope",
+  ];
+  const first = order.find((field) => errors[field] !== undefined);
+  const idByField: Record<string, string> = {
+    target: "guide-program-search",
+    intake: "guide-intake",
+    academicYear: "guide-year",
+    citizenship: "guide-citizenship",
+    currentCountry: "guide-current-country",
+    qualificationLevel: "guide-qual-level",
+    qualificationTitle: "guide-qual-title",
+    qualificationSubject: "guide-qual-subject",
+    gpaValue: "guide-gpa-value",
+    gpaScale: "guide-gpa-scale",
+    englishKind: "guide-english-kind",
+    englishOverall: "guide-english-overall",
+    englishComponents: "guide-english-listening",
+    otherEnglishName: "guide-other-english-name",
+    otherEnglishScore: "guide-other-english-score",
+    budgetAmount: "guide-budget-amount",
+    budgetCurrency: "guide-budget-currency",
+    budgetScope: "guide-budget-scope",
+  };
+  const target = first === undefined ? "guide-program-search" : idByField[first];
+  if (target !== undefined) requestAnimationFrame(() => document.getElementById(target)?.focus());
+}
+
 function draftWithProfile(current: GuideDraft, profile: GuideApplicantProfile): GuideDraft {
   const english = profile.englishTest;
   const components = "components" in english ? english.components : undefined;
@@ -98,6 +144,7 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
   const restoredProfileAccountRef = React.useRef<string | null>(null);
   const [saveStatus, setSaveStatus] = React.useState("");
   const [saving, setSaving] = React.useState(false);
+  const [blockedSaves, setBlockedSaves] = React.useState({ profile: false, guide: false });
   const saveSequenceRef = React.useRef(0);
   const [draft, setDraft] = React.useState<GuideDraft>(createDefaultGuideDraft);
   const [errors, setErrors] = React.useState<GuideFieldErrors>({});
@@ -126,6 +173,7 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
     authAccountRef.current = authAccountId;
     saveSequenceRef.current += 1;
     setSaving(false);
+    setBlockedSaves({ profile: false, guide: false });
     setSaveStatus("");
     if (restoredAccountRef.current !== null || restoredProfileAccountRef.current !== null) {
       sequenceRef.current += 1;
@@ -164,6 +212,10 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
   const handleDraftChange = React.useCallback((updates: Partial<GuideDraft>) => {
     setErrors({});
     setDraft((current) => ({ ...current, ...updates }));
+    const publicOnlyFields = new Set(["universityId", "programId", "intake", "academicYear"]);
+    if (Object.keys(updates).some((field) => !publicOnlyFields.has(field))) {
+      setBlockedSaves((current) => ({ ...current, profile: false }));
+    }
   }, []);
 
   const handleShowEvidence = React.useCallback((ref: GuideEvidenceRef, trigger: HTMLButtonElement) => {
@@ -185,6 +237,7 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
       queueMicrotask(() => {
         if (!mountedRef.current || authAccountRef.current !== owner || activeRunRef.current) return;
         restoredProfileAccountRef.current = owner;
+        setBlockedSaves((current) => ({ ...current, profile: false }));
         setDraft((current) => draftWithProfile(current, profile.payload));
         setErrors({});
         setSaveStatus("Saved applicant profile loaded. It was not submitted and no research was started.");
@@ -208,6 +261,7 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
       setReusableDossier(undefined);
       restoredAccountRef.current = owner;
       restoredProfileAccountRef.current = owner;
+      setBlockedSaves({ profile: false, guide: false });
       setDraft(draftFromGuideResult(restored.payload));
       setErrors({});
       dispatch({ type: "restore", sequence, result: restored.payload });
@@ -243,6 +297,7 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
             return;
           }
           restoredAccountRef.current = null;
+          setBlockedSaves((current) => ({ ...current, guide: false }));
           dispatch({ type: "complete", sequence, result: finalization.result, notice: "Previously researched requirements were reused." });
         } else {
           dispatch({ type: "fail", sequence, error: finalization.error });
@@ -303,6 +358,7 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
         const completedTargetKey = guideTargetKey(submission.target);
         setCorrectionRequiredTargetKey((current) => current === completedTargetKey ? null : current);
         restoredAccountRef.current = null;
+        setBlockedSaves((current) => ({ ...current, guide: false }));
         dispatch({ type: "complete", sequence, result: finalization.result });
       } else {
         dispatch({ type: "fail", sequence, error: finalization.error });
@@ -319,14 +375,18 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
     const validation = validateGuideDraft(draft, catalog);
     if (!validation.ok) {
       setErrors(validation.errors);
+      focusFirstGuideError(validation.errors);
       return;
     }
     const targetKey = guideTargetKey(validation.submission.target);
     if (correctionRequiredTargetKey === targetKey) {
-      setErrors({ target: "This program is correction-required. Select a different supported program." });
+      const errors = { target: "This program is correction-required. Select a different supported program." };
+      setErrors(errors);
+      focusFirstGuideError(errors);
       return;
     }
     setErrors({});
+    setBlockedSaves({ profile: false, guide: false });
     if (correctionRequiredTargetKey !== null && correctionRequiredTargetKey !== targetKey) {
       setCorrectionRequiredTargetKey(null);
     }
@@ -338,6 +398,7 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
     const validation = validateGuideDraft(draft, catalog);
     if (!validation.ok) {
       setErrors(validation.errors);
+      focusFirstGuideError(validation.errors);
       return;
     }
     setErrors({});
@@ -380,13 +441,14 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
   }, []);
 
   const saveGuideArtifact = React.useCallback(async (kind: "profile" | "guide") => {
-    if (authAccountId === null || saving || activeRunRef.current) return;
+    if (authAccountId === null || saving || activeRunRef.current || blockedSaves[kind]) return;
 
     const artifact = kind === "profile"
       ? (() => {
           const validation = validateGuideProfileDraft(draft);
           if (!validation.ok) {
             setErrors(validation.errors);
+            focusFirstGuideError(validation.errors);
             return null;
           }
           return {
@@ -413,13 +475,17 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
     if (!mountedRef.current || sequence !== saveSequenceRef.current || authAccountRef.current !== owner) return;
     setSaving(false);
     if (!result.ok) {
+      if (result.ambiguousMutation) {
+        setBlockedSaves((current) => ({ ...current, [kind]: true }));
+      }
       setSaveStatus(result.ambiguousMutation
         ? "The save outcome is unknown. Open Saved snapshots and refresh the list before trying again."
         : result.error.message);
       return;
     }
+    setBlockedSaves((current) => ({ ...current, [kind]: false }));
     setSaveStatus(kind === "profile" ? "Applicant profile saved privately." : "Guide snapshot saved privately.");
-  }, [authAccountId, draft, saving, state]);
+  }, [authAccountId, blockedSaves, draft, saving, state]);
 
   const isNetworkPending = state.kind === "loading";
   const restoredHistorical = state.kind === "result" && state.notice === "Saved snapshot loaded.";
@@ -451,9 +517,9 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
             <div className="mt-3 flex flex-wrap gap-2">
               {authState.status === "signed-in" ? (
                 <>
-                  <Button type="button" variant="outline" disabled={saving || isNetworkPending} onClick={() => void saveGuideArtifact("profile")}>Save profile</Button>
+                  <Button type="button" variant="outline" disabled={saving || isNetworkPending || blockedSaves.profile} onClick={() => void saveGuideArtifact("profile")}>Save profile</Button>
                   {state.kind === "result" && !restoredHistorical ? (
-                    <Button type="button" variant="outline" disabled={saving || isNetworkPending} onClick={() => void saveGuideArtifact("guide")}>Save Guide snapshot</Button>
+                    <Button type="button" variant="outline" disabled={saving || isNetworkPending || blockedSaves.guide} onClick={() => void saveGuideArtifact("guide")}>Save Guide snapshot</Button>
                   ) : null}
                 </>
               ) : (

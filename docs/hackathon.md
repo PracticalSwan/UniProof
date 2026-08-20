@@ -41,6 +41,9 @@ Before final submission, verify all of the following live:
 Current UniProof release assets:
 
 - Production origin: `https://uniproof-beta.vercel.app`
+- Executable release SHA: `21d645baaf9eca381a167246d22538c23bb29427`
+- Exact-SHA CI: GitHub Actions run `32367630411`, successful
+- Vercel Production deployment: `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN`
 - Source repository: `https://github.com/PracticalSwan/UniProof`
 - Release screenshots: `docs/assets/screenshots/phase-6/`
 - Draft submission: `docs/submission/devpost-draft.md`

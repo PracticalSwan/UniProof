@@ -414,9 +414,9 @@ Reference URLs:
 - `https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html`
 - `https://cheatsheetseries.owasp.org/cheatsheets/HTML5_Security_Cheat_Sheet.html`
 
-## 15. Security acceptance evidence through Phase 6A
+## 15. Security acceptance evidence through the Phase 6C release
 
-Phase 4/5 evidence remains part of the reviewed baseline. Phase 6A identity/ownership/persistence evidence was observed locally on 2026-08-19 using the real local Supabase/Auth/Mailpit stack plus deterministic Research fixtures. Hosted Supabase, production email/session behavior, live providers, durable deployment abuse controls, and public deployment remain deferred.
+Phase 4/5 evidence remains part of the reviewed baseline. Phase 6A identity/ownership/persistence evidence was observed locally on 2026-08-19 using the real local Supabase/Auth/Mailpit stack plus deterministic Research fixtures. The public Phase 6C release intentionally leaves hosted Supabase Auth/save and production email/session behavior disabled, so no hosted private-state claim is made. The anonymous judge surface is deployed to `https://uniproof-beta.vercel.app` from executable release SHA `21d645baaf9eca381a167246d22538c23bb29427`; GitHub Actions run `32367630411` succeeded on that SHA, Vercel deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` is bound to it, and the exact Research WAF rule is enforced at 20 requests/60 seconds/source IP. The authorized live Research budget is exhausted at 3/3 and did not produce a successful evidence-bearing smoke, so live-provider variability remains a residual limitation rather than a release-success claim.
 
 Required evidence includes:
 
@@ -451,3 +451,7 @@ Required evidence includes:
 - private API body/UTF-8/schema/error/no-store tests, including non-blocking cancellation after the body ceiling and PostgREST timestamp-offset parsing;
 - explicit pre-assessment profile save with zero Research requests, account-bound single-consume restore, signout private-state clearing, and no UniProof private state in Local/Session Storage, IndexedDB, Cache Storage, service workers, or URL state;
 - Phase 6A dev browser **67 Research + 55 Compare + 50 Guide + 7 Auth/Saved**, Guide lifecycle **55/55** five-repeat, Auth/Saved lifecycle **35/35** five-repeat, and built-production anonymous/core **67/55/50**; authenticated built-mode against local HTTP Supabase is not claimed because production CSP requires HTTPS.
+- final hardened hosted Preview Research/Compare/Guide acceptance **104/104** using intercepted deterministic Research responses, with no additional live-provider expenditure;
+- exact executable release SHA `21d645baaf9eca381a167246d22538c23bb29427` passed GitHub Actions run `32367630411` and is bound by Vercel metadata to Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN`;
+- final canonical Production checks observed HTTP 200 core routes, nonce CSP/private no-store/security headers, Vercel HSTS, one enforced exact Research WAF rule, same-origin browser bundles with zero configured-secret/provider-internal matches, and no error-level or HTTP 5xx entries in the inspected post-deploy log window;
+- hosted Supabase Auth/save remains intentionally unconfigured, and live Research remains a documented residual availability/evidence limitation after the three authorized accepted calls produced no successful evidence-bearing smoke.

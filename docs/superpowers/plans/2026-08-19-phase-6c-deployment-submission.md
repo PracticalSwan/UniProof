@@ -41,7 +41,7 @@
 - The live Research allowance is exhausted at 3/3. The third accepted call returned HTTP 200/schema-valid but an operationally incomplete admissions category with zero claims; it exposed source-resilience defects that were fixed with deterministic regressions without a fourth live call.
 - Eight release screenshots were captured from the verified hosted Preview with intercepted deterministic fixtures under `docs/assets/screenshots/phase-6/`; they are presentation evidence, not live-provider-output evidence.
 - Devpost draft/script/checklist are prepared under `docs/submission/`. Final Devpost posting remains blocked on the final video and exact submission authorization.
-- The remaining external release sequence is deliberately short: final source/secret gates -> exact staged diff -> commit/push -> exact-SHA GitHub Actions green -> exact-SHA Production deploy -> deterministic production route/header/WAF/log verification. No additional live Research call is permitted.
+- The release sequence through exact-SHA Production is complete: executable SHA `21d645baaf9eca381a167246d22538c23bb29427` passed GitHub Actions run `32367630411`, Vercel Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` serves the canonical origin, and deterministic route/header/WAF/client-bundle/log verification passed without another live Research call. The only remaining external gate is the final video review plus separately authorized Devpost submission; this later documentation closeout does not redeploy or change the executable release.
 
 ---
 
@@ -676,18 +676,18 @@ After successful authorized submission:
 
 After external state is actually verified, update:
 
-- [ ] `docs/planning/phase-6-hardening-submission-readiness.md` final status/evidence;
-- [ ] `docs/planning/tasks.md` Phase 6 checkboxes;
-- [ ] `docs/planning/phase-6-requirements-traceability.md` live statuses;
-- [ ] `docs/hackathon.md` final live verification snapshot;
-- [ ] `docs/requirements.md` implementation status;
-- [ ] `docs/design.md` deployed architecture;
-- [ ] `docs/security.md` deployed controls/residual risk;
-- [ ] `docs/security-threat-model.md` deployment/auth status;
-- [ ] `README.md` live URLs/assets;
-- [ ] `CHANGELOG.md`;
-- [ ] `AGENT_MEMORY.md` with exact deployment/commit/submission evidence;
-- [ ] `LESSONS.md` only for reusable release corrections.
+- [x] `docs/planning/phase-6-hardening-submission-readiness.md` final status/evidence;
+- [x] `docs/planning/tasks.md` Phase 6 checkboxes;
+- [x] `docs/planning/phase-6-requirements-traceability.md` live statuses;
+- [x] `docs/hackathon.md` final live verification snapshot;
+- [x] `docs/requirements.md` implementation status;
+- [x] `docs/design.md` deployed architecture;
+- [x] `docs/security.md` deployed controls/residual risk;
+- [x] `docs/security-threat-model.md` deployment/auth status;
+- [x] `README.md` live URLs/assets;
+- [x] `CHANGELOG.md`;
+- [x] `AGENT_MEMORY.md` with exact executable release/deployment evidence and explicit Devpost hold;
+- [x] `LESSONS.md` reviewed; no new reusable release correction was discovered, so no entry was added.
 
 Final report must separately state:
 

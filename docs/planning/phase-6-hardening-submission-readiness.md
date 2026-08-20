@@ -1,6 +1,6 @@
 # Phase 6 — Hardening and Submission Readiness
 
-Status: **Phase 6A/6B implemented and Phase 6C release execution substantially complete** as of 2026-08-20. The public Vercel project, Preview acceptance, active Research WAF, hosted provider configuration, security/header checks, release screenshots, and bounded three-call live smoke have been executed. Hosted Supabase Auth/save is intentionally absent from the public deployment because production email delivery is not configured; the anonymous core remains releaseable. Devpost final submission is the only deliberate publication hold and remains blocked until the final demo video is supplied, verified, and explicitly approved.
+Status: **Phase 6A/6B implemented; Phase 6C is submission-ready / pending final video** as of 2026-08-20. The public Vercel project, Preview acceptance, active Research WAF, hosted provider configuration, bounded three-call live smoke, exact-SHA GitHub CI, exact-SHA Production promotion, and deterministic Production security/privacy/log checks have been executed. Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` serves `https://uniproof-beta.vercel.app` from release SHA `21d645baaf9eca381a167246d22538c23bb29427`, whose GitHub Actions run `32367630411` succeeded. Hosted Supabase Auth/save is intentionally absent because production email delivery is not configured. Devpost final submission is the only deliberate publication hold and remains blocked until the final demo video is supplied, verified, and explicitly approved.
 
 Detailed execution plans:
 
@@ -29,7 +29,7 @@ The starting baseline for this plan was the reviewed Phase 0–5 working tree re
 - Guide still sends only public target/intake/year context to Research; applicant data remains provider-separated.
 - Production CSP still uses request nonces and no third-party runtime analytics/scripts.
 - Phase 6A now adds Supabase SSR Auth refresh, local migration/RLS, strict private saved-artifact APIs, and optional explicit profile/Research/Comparison/Guide snapshot persistence.
-- Public release now has durable Vercel WAF enforcement, verified Preview security/header behavior, bounded hosted provider configuration, and release screenshots. Hosted Auth/save is intentionally disabled rather than partially configured; the remaining final release gates are exact-SHA CI/Production promotion plus the separately held Devpost video/submission step.
+- Public release now has durable Vercel WAF enforcement, verified Preview and Production security/header behavior, bounded hosted provider configuration, exact-SHA GitHub CI/Production traceability, and release screenshots. Hosted Auth/save is intentionally disabled rather than partially configured. The only remaining release gate is the separately held Devpost video/submission step.
 
 Do not rewrite Phase 2–5 evidence semantics during Phase 6. Phase 6 is a hardening/release phase, not a new AI reasoning phase.
 
@@ -612,6 +612,8 @@ For the anonymous hackathon release:
 - Devpost submission remains outside the release-completion claim until the final video is supplied and the exact submission is explicitly authorized.
 
 The application may therefore be **production-released and submission-ready except for Devpost posting** while the final-video hold remains active. Do not label the Devpost entry submitted or complete before that hold is released.
+
+**Observed Phase 6C release-gate evidence (2026-08-20):** the anonymous release satisfies every pre-Devpost item above. Hardened Preview acceptance passed 104/104 deterministic Research/Compare/Guide browser cases; executable SHA `21d645baaf9eca381a167246d22538c23bb29427` passed GitHub Actions run `32367630411`; Vercel Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` is metadata-bound to that SHA and serves the canonical origin; the exact Research WAF rule remains enabled; and deterministic Production route/header/security/client-bundle/log checks passed without a fourth live Research call. Hosted Auth/save remains intentionally absent. The release state is therefore `submission-ready / pending final video`, not Devpost-submitted.
 
 ## 10. Explicit exclusions
 

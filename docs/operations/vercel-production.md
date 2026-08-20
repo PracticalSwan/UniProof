@@ -27,16 +27,28 @@ Exactly one durable custom rate-limit rule is enabled:
 
 Do not add a second in-process limiter merely to duplicate this protection. Application clients classify raw deployment/WAF 429 and platform 504 before body/schema parsing and do not automatically retry them.
 
+## Final Production release evidence
+
+- Release source SHA: `21d645baaf9eca381a167246d22538c23bb29427`.
+- GitHub Actions: run `32367630411`, conclusion `success`; both `application` and `local-supabase` jobs succeeded.
+- Vercel Production deployment: `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` / `https://uniproof-ba5rt3slh-practicalswans-projects.vercel.app`.
+- Canonical alias: `https://uniproof-beta.vercel.app`.
+- Vercel metadata records both `githubCommitSha` and release metadata `releaseSha` as the release source SHA above.
+- Runtime: Node `22.x`; deployment state `READY`, target `production`.
+
 ## Security / privacy observations
 
-Preview verification observed:
+Final Production verification observed:
 
+- HTTP 200 for `/`, `/research`, `/compare`, and `/guide` on the canonical origin;
 - private/no-cache/no-store application responses;
-- request-nonce CSP with `connect-src 'self'` and no production `unsafe-eval`/`unsafe-inline` script policy;
+- request-nonce CSP with `connect-src 'self'`, `strict-dynamic`, `script-src-attr 'none'`, and no production `unsafe-eval`/script `unsafe-inline` policy;
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, COOP/CORP, restrictive Permissions Policy;
 - Vercel HSTS: `max-age=63072000; includeSubDomains; preload`;
-- no provider key names or configured secret values in the browser bundle;
-- no browser source-map files or `sourceMappingURL` references.
+- all 15 browser script bundles on `/research` remained same-origin;
+- five configured local secret values were compared against the deployed browser bundles without printing them and produced zero matches;
+- no provider key names/provider identifiers, browser source-map references, Vercel toolbar, or Vercel runtime analytics markers were found in the deployed page/bundles;
+- recent exact-deployment log inspection showed the expected successful GET smoke traffic, no error-level entries, and no HTTP 5xx entries in the observed window.
 
 UniProof does not duplicate Vercel's HSTS at the application layer.
 

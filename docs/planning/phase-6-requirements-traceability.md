@@ -21,8 +21,8 @@ This matrix binds Phase 6 hardening/release requirements to implementation and o
 | Protected local screenshots stay private | `.vercelignore`, Git review | Git status + release verifier | `ui-flow-screenshots/` remains untracked/unpublished |
 | Release screenshots are separate and reviewable | `docs/assets/screenshots/phase-6/` | deterministic hosted capture + visual inspection | 8 reviewed PNGs retained |
 | Live provider smoke is bounded | Phase 6C runbook | accepted call accounting | **3/3 exhausted**; final call HTTP 200/schema-valid but operationally incomplete; no successful-live-evidence claim |
-| GitHub CI is least privilege and deterministic | `.github/workflows/ci.yml` | prior green exact-SHA CI plus final release exact-SHA run required after commit | Final release SHA pending commit |
-| Exact repository/deployment traceability | Git + Vercel | `origin/main`, GitHub Actions, Vercel deployment metadata | Final exact-SHA step pending commit/Production promotion |
+| GitHub CI is least privilege and deterministic | `.github/workflows/ci.yml` | GitHub Actions run `32367630411` | **Verified** on release SHA `21d645baaf9eca381a167246d22538c23bb29427`; application and local-Supabase jobs succeeded |
+| Exact repository/deployment traceability | Git + Vercel | public Git SHA + GitHub Actions + Vercel deployment metadata | **Verified**: Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` records `githubCommitSha` and `releaseSha` = `21d645baaf9eca381a167246d22538c23bb29427` |
 | Devpost rules/assets are current | `docs/hackathon.md`, `docs/submission/` | Devpost recheck 2026-08-20 | Draft-ready; final video/submission pending |
 
 ## Current executable verification
@@ -37,7 +37,7 @@ Before the documentation-only release synchronization, the hardened executable t
 - deterministic hosted Preview Research/Compare/Guide browser acceptance **104/104**;
 - exact-value secret/client-bundle scan with zero configured-secret matches and zero browser source maps.
 
-Release screenshots were then captured from the same verified hosted Preview with deterministic intercepted Research fixtures. Documentation edits do not change executable application behavior, but the final exact-SHA CI and Production promotion still run after the release commit.
+Release screenshots were captured from the verified hosted Preview with deterministic intercepted Research fixtures. The executable release was then published as `21d645baaf9eca381a167246d22538c23bb29427`; GitHub Actions run `32367630411` completed successfully on that exact SHA, and Vercel Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` was promoted to the canonical origin. Post-deploy route/header/WAF/client-bundle/log verification was deterministic and consumed no additional live Research quota. This documentation-only closeout records that already-observed external state and does not alter the deployed executable source.
 
 ## Live-smoke limitation
 

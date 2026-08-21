@@ -54,8 +54,8 @@ test.describe("Research evidence semantics", () => {
             ? {
                 ...row,
                 sourceGap: {
-                  code: "retrieval",
-                  message: "Available sources could not be retrieved completely.",
+                  code: "provider-budget",
+                  message: "The bounded AI work budget was exhausted before this category completed.",
                 },
               }
             : row,
@@ -64,7 +64,7 @@ test.describe("Research evidence semantics", () => {
     };
     await render(page, research, response);
 
-    await expect(page.getByText(/Some selected sources could not be retrieved or processed/i)).toBeVisible();
+    await expect(page.getByText(/The bounded AI work budget was exhausted before this category completed/i)).toBeVisible();
     await expect(page.getByText(/Compare and Guide will not treat this category as definitive/i)).toBeVisible();
     await expect(page.getByRole("button", { name: "View evidence for Published application code" })).toBeVisible();
   });

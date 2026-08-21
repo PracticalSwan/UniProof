@@ -674,7 +674,58 @@ describe("Phase 2F orchestration", () => {
     expect(result.candidates).toHaveLength(0);
     expect(result.run.unprocessedCategories).toEqual(["admissions"]);
     expect(result.failures).toHaveLength(1);
-    expect(result.failures[0]).toMatchObject({ category: "admissions", code: "provider-error" });
+    expect(result.run.failureCode).toBe("provider-budget");
+    expect(result.failures[0]).toMatchObject({ category: "admissions", code: "provider-budget" });
+  });
+
+  it("preserves claim-bearing extraction work when later segments exhaust the bounded AI budget", async () => {
+    const passage = "The application deadline is 2027-01-01.";
+    const text = `${passage}\n\n${"x".repeat(199_000)}`;
+    let calls = 0;
+    const result = await runPhase2Research(
+      { target: { university: { name: "Example University" } }, categories: ["admissions"] },
+      baseOptions({
+        retrieve: async (url: string) => retrieval(url, text),
+        extraction: {
+          runTask: async (task: ExtractionTask) => {
+            calls += 1;
+            const claims = task.segment.text.includes(passage)
+              ? [{
+                  category: "admissions" as const,
+                  property: "application deadline",
+                  value: "2027-01-01",
+                  unit: null,
+                  currency: null,
+                  academicYear: "2027",
+                  effectiveDate: null,
+                  intake: null,
+                  segmentId: task.segment.id,
+                  supportingText: passage,
+                }]
+              : [];
+            return {
+              payload: { claims },
+              provider: "gemini" as const,
+              model: "injected-model",
+              attempts: [researchProviderAttemptSchema.parse({
+                stage: "extraction", provider: "gemini", model: "injected-model",
+                outcome: "success", retryCount: 0, durationMs: 1,
+              })],
+            };
+          },
+        },
+      }),
+    );
+
+    expect(calls).toBe(RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN);
+    expect(result.run.status).toBe("succeeded");
+    expect(result.run.processedCategories).toEqual(["admissions"]);
+    expect(result.run.unprocessedCategories).toEqual([]);
+    expect(result.claims).toHaveLength(1);
+    expect(result.failures).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "admissions", code: "provider-budget" }),
+    ]));
+    expect(result.evidenceSummary.categoriesFailed).toEqual([]);
   });
 
   it("fails closed before DNS when pinned retrieval is pre-aborted", async () => {

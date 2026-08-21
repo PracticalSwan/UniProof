@@ -301,6 +301,28 @@ describe("Phase 2D deterministic segmentation", () => {
     expect(longId[0]?.id).toMatch(/^segment-[a-f0-9]{32}-section-0-chunk-0$/u);
   });
 
+  it("coalesces highly fragmented document sections into bounded extraction chunks", () => {
+    const blocks = Array.from({ length: 100 }, (_, index) =>
+      `Block ${index}: ${"x".repeat(220)}`
+    );
+    const normalizedText = blocks.join("\n\n");
+    const currentDocument = document({
+      id: "document-fragmented",
+      sourceId: "source-fragmented",
+      normalizedText,
+      sections: blocks.map((text, index) => ({ heading: `Heading ${index}`, text })),
+    });
+
+    const segments = segmentResearchDocument(currentDocument);
+
+    expect(segments.length).toBeLessThanOrEqual(6);
+    expect(segments.every((segment) =>
+      Array.from(segment.text).length <= RESEARCH_MAX_EXTRACTION_SEGMENT_CHARACTERS
+    )).toBe(true);
+    expect(segments[0]?.text).toContain("Block 0:");
+    expect(segments.at(-1)?.text).toContain("Block 99:");
+  });
+
   it("keeps generated IDs inside live UTF-16 schema bounds for astral document IDs", () => {
     const currentDocument = document({
       id: "😀".repeat(50),

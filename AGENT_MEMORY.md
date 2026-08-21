@@ -739,3 +739,14 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - GitHub: repository homepage metadata was set and read back as `https://uniproof-beta.vercel.app`.
 - Research quota accounting for this continuation: historical accepted executions 3, additional executions used 0, additional authorized limit 5, remaining 5.
 - Protected `ui-flow-screenshots/` remained untracked and untouched throughout; it was excluded from deployment input by `.vercelignore`.
+
+
+## 2026-08-22 â€” ChatGPT / GPT-5.6 Sol â€” Edinburgh Research extraction-budget remediation
+
+**Summary:** Reproduced the University of Edinburgh Artificial Intelligence MSc all-category Production failure, isolated the bounded extraction failure mode, repaired the segmentation/lifecycle semantics without increasing provider quotas, and prepared the reviewed fix for Git/CI/Vercel publication.
+
+- Root cause: the official Edinburgh program page normalized to a modest text body but highly fragmented HTML produced far too many section-based extraction segments. The 24-actual-attempt extraction ceiling could therefore be exhausted even though valid candidates had already been produced; affected categories were then removed before reconciliation and budget exhaustion was exposed as generic `provider-error`.
+- Changed: `segmentResearchDocument()` now detects pathologically fragmented section output and falls back to bounded canonical normalized-text chunks while preserving ordinary section-aware segmentation. AI total-budget exhaustion is represented as `provider-budget` through internal/public contracts and sanitized failure messages.
+- Changed: claim-bearing categories that encounter a later extraction-budget gap may continue through reconciliation and expose supported Research claims with a sanitized `provider-budget` `sourceGap`; Compare scoring and Guide assessment already treat any source-gap category as non-definitive. Categories with no usable claim remain incomplete, and cancellation semantics are unchanged.
+- Regression evidence: a 100-small-section document no longer expands into 100 extraction jobs; claim-bearing extraction work survives later budget exhaustion; public dossier projection sanitizes the budget gap; Comparison rejects source-gap evidence for definitive scoring. Full Vitest passed **614/614**, TypeScript passed, ESLint passed, Next.js 16.3.1 production build passed, workspace verification passed, and release-config verification passed before publication.
+- Protected boundary: `ui-flow-screenshots/` remains untracked and untouched. No dependency or provider-budget increase was introduced; the temporary reconciliation-budget experiment used during diagnosis was reverted before final verification.

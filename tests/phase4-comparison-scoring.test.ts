@@ -297,8 +297,8 @@ describe("Phase 4 deterministic scoring", () => {
         ? {
             ...row,
             sourceGap: {
-              code: "retrieval",
-              message: "Available sources could not be retrieved completely.",
+              code: "provider-budget",
+              message: "The bounded AI work budget was exhausted before this category completed.",
             },
           }
         : row),

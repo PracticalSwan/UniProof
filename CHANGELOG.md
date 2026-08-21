@@ -23,6 +23,7 @@ The project has not published a tagged release yet. Until the first release, com
 
 ### Changed
 
+- Research now collapses pathologically fragmented HTML into bounded normalized-text extraction chunks, reports AI work-budget exhaustion explicitly as `provider-budget`, and preserves already-supported claims behind a non-definitive source-gap marker when later extraction work hits that bound; zero-claim budget gaps still fail closed.
 - Final testing now keeps arbitrary general-web sources inferred unless an application-owned reliable source class can establish corroboration, strengthens common applicant-context rejection before provider queries, and replaces recursive HTML normalization with stack-safe iterative traversal.
 - Compare now announces completion/cancellation/errors, preserves sanitized deployment 429/504 causes, prevents Enter in catalog search from submitting, and explains capped or empty matches; Guide focuses the first invalid control.
 

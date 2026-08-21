@@ -46,6 +46,7 @@ const failurePrecedence: readonly ResearchFailure["code"][] = [
   "normalization",
   "source-limit",
   "provider-rate-limit",
+  "provider-budget",
   "provider-error",
   "unknown",
 ];

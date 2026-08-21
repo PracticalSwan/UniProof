@@ -127,6 +127,7 @@ export const publicResearchFailureSchema = z.object({
     "normalization",
     "source-limit",
     "provider-rate-limit",
+    "provider-budget",
     "provider-error",
     "unknown",
   ]),
@@ -135,8 +136,8 @@ export const publicResearchFailureSchema = z.object({
 export type PublicResearchFailure = z.infer<typeof publicResearchFailureSchema>;
 
 const publicSourceGapFailureSchema = publicResearchFailureSchema.refine(
-  (failure) => failure.code === "retrieval" || failure.code === "normalization",
-  { message: "source gaps must describe retrieval or normalization failures" },
+  (failure) => failure.code === "retrieval" || failure.code === "normalization" || failure.code === "provider-budget",
+  { message: "source gaps must describe bounded retrieval, normalization, or extraction-budget gaps" },
 );
 
 const researchDossierTargetSchema = z.object({

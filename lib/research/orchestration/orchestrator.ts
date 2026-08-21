@@ -83,6 +83,7 @@ function normalizeProviderAttempts(attempts: readonly ResearchProviderAttempt[])
 
 function extractionFailureCode(failures: readonly ExtractionFailure[], aborted: boolean): ResearchFailure["code"] {
   if (aborted) return "cancelled";
+  if (failures.some((failure) => failure.kind === "budget")) return "provider-budget";
   if (failures.length > 0 && failures.every((failure) => failure.kind === "rate-limit")) return "provider-rate-limit";
   if (failures.length > 0 && failures.every((failure) => failure.kind === "timeout")) return "timeout";
   return "provider-error";
@@ -90,6 +91,7 @@ function extractionFailureCode(failures: readonly ExtractionFailure[], aborted: 
 
 function reconciliationFailureCode(failures: readonly ReconciliationFailure[], aborted: boolean): ResearchFailure["code"] {
   if (aborted) return "cancelled";
+  if (failures.some((failure) => failure.kind === "budget")) return "provider-budget";
   if (failures.length > 0 && failures.every((failure) => failure.kind === "rate-limit")) return "provider-rate-limit";
   if (failures.length > 0 && failures.every((failure) => failure.kind === "timeout")) return "timeout";
   return "provider-error";
@@ -105,6 +107,7 @@ function failureMessage(code: ResearchFailure["code"]): string {
     case "normalization": return "source normalization did not complete for this category";
     case "source-limit": return "bounded source selection left this category incomplete";
     case "provider-rate-limit": return "AI provider rate limits prevented this category from completing";
+    case "provider-budget": return "bounded AI work reached its attempt budget before this category completed";
     case "provider-error": return "bounded AI provider work did not complete for this category";
     default: return "research work did not complete for this category";
   }
@@ -260,7 +263,15 @@ export async function runPhase2Research(
   const extractionCompleted = extraction === undefined
     ? []
     : extraction.completedCategories.filter((category) => extractionCategories.includes(category));
-  const decisionEligibleCategories = canonicalizeResearchCategories([...cleanEmptyCategories, ...extractionCompleted]);
+  const extractionClaimBearingCategories = new Set((extraction?.candidates ?? []).map((candidate) => candidate.category));
+  const extractionGapCategories = extraction === undefined
+    ? []
+    : extraction.incompleteCategories.filter((category) => extractionClaimBearingCategories.has(category));
+  const decisionEligibleCategories = canonicalizeResearchCategories([
+    ...cleanEmptyCategories,
+    ...extractionCompleted,
+    ...extractionGapCategories,
+  ]);
 
   let reconciliation: ReconciliationStageResult | undefined;
   if (decisionEligibleCategories.length > 0 && !options.signal?.aborted) {
@@ -309,7 +320,7 @@ export async function runPhase2Research(
   const terminalFailures = buildFailures(requestedCategories, processedCategories, reasonByCategory);
   const sourceGapFailures: ResearchFailure[] = processedCategories.flatMap((category) => {
     const code = reasonByCategory.get(category);
-    return code === "retrieval" || code === "normalization"
+    return code === "retrieval" || code === "normalization" || code === "provider-budget"
       ? [{ category, code, message: failureMessage(code) }]
       : [];
   });

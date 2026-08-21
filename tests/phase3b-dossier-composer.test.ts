@@ -280,6 +280,31 @@ describe("Phase 3B dossier composer", () => {
     expect(row.claims).toHaveLength(1);
   });
 
+  it("projects a sanitized provider-budget source gap alongside supported claims", () => {
+    const base = buildResult([
+      { id: "claim-budget-gap", category: "admissions", property: "Application deadline", value: "2027-01-15", status: "verified" },
+    ]);
+    const result = researchResultSchema.parse({
+      ...base,
+      failures: [{
+        category: "admissions",
+        code: "provider-budget",
+        message: "raw internal provider budget detail that must not reach the browser",
+      }],
+    });
+
+    const dossier = composeResearchDossier(result, selectedTarget);
+    const row = dossier.categories[0]!;
+    expect(row.state).toBe("ready");
+    if (row.state !== "ready") throw new Error("expected ready provider-budget source-gap row");
+    expect(row.sourceGap).toEqual({
+      code: "provider-budget",
+      message: "The bounded AI work budget was exhausted before this category completed.",
+    });
+    expect(row.sourceGap?.message).not.toContain("raw internal");
+    expect(row.claims).toHaveLength(1);
+  });
+
   it("composes all seven ready categories in canonical order", () => {
     const categories = ["support", "research", "outcomes", "program-structure", "scholarships", "tuition", "admissions"] as ResearchCategory[];
     const result = buildResult(categories.map((category, index) => ({

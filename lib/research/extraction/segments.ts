@@ -107,16 +107,32 @@ export function segmentResearchDocument(
     throw new Error("extraction segment overlap must be between zero and the maximum segment size");
   }
 
-  const sections: readonly ResearchDocumentSection[] = document.sections.length > 0
-    ? document.sections
-    : [{ text: document.normalizedText }];
-  return sections.flatMap((section, sectionOrdinal) => sectionSegments(
+  const normalizedSegments = sectionSegments(
+    { text: document.normalizedText },
+    document,
+    0,
+    maximumCharacters,
+    overlapCharacters,
+  );
+  if (document.sections.length === 0) return normalizedSegments;
+
+  const sectionSegmentsList = document.sections.flatMap((section, sectionOrdinal) => sectionSegments(
     section,
     document,
     sectionOrdinal,
     maximumCharacters,
     overlapCharacters,
   ));
+
+  // HTML block structure can produce hundreds of tiny sections from a modest
+  // amount of useful text. In that case, section-by-section extraction wastes
+  // the bounded AI attempt budget without adding evidence. Fall back to the
+  // canonical normalized text stream while preserving ordinary section-aware
+  // segmentation for documents whose structure is not pathologically fragmented.
+  const fragmentationThreshold = Math.max(8, normalizedSegments.length * 2);
+  return sectionSegmentsList.length > fragmentationThreshold
+    ? normalizedSegments
+    : sectionSegmentsList;
 }
 
 export const segmentDocument = segmentResearchDocument;

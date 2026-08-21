@@ -40,6 +40,7 @@ const failurePrecedence: readonly ResearchFailure["code"][] = [
   "cancelled",
   "timeout",
   "provider-rate-limit",
+  "provider-budget",
   "source-limit",
   "normalization",
   "retrieval",
@@ -56,6 +57,7 @@ const failureMessages: Record<PublicResearchFailure["code"], string> = {
   normalization: "Available sources could not be processed completely.",
   "source-limit": "Bounded source selection left this category incomplete.",
   "provider-rate-limit": "Research provider limits prevented completion.",
+  "provider-budget": "The bounded AI work budget was exhausted before this category completed.",
   "provider-error": "Research could not complete this category.",
   unknown: "Research could not complete this category.",
 };
@@ -164,7 +166,7 @@ function publicSourceGapFor(
   const code = failures
     .filter((failure) => failure.category === category)
     .map((failure) => failure.code)
-    .filter((failureCode) => failureCode === "retrieval" || failureCode === "normalization")
+    .filter((failureCode) => failureCode === "retrieval" || failureCode === "normalization" || failureCode === "provider-budget")
     .sort((left, right) => failurePrecedence.indexOf(left) - failurePrecedence.indexOf(right))[0];
   return code === undefined ? undefined : { code, message: failureMessages[code] };
 }

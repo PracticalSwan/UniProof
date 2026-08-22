@@ -22,6 +22,7 @@ import {
   type StructuredProviderResult,
 } from "@/lib/research/ai/types";
 import { researchCategoryIntentTerms } from "@/lib/research/discovery/query-plan";
+import { extractDeterministicClosedMetrics } from "./deterministic-closed-metrics";
 import { buildExtractionPrompt, portableExtractionJsonSchema } from "./schema";
 import { segmentResearchDocument } from "./segments";
 import { dedupePromotedCandidates, promoteExtractedClaims } from "./promote";
@@ -494,30 +495,57 @@ export async function extractResearchDocuments(
     if (scoped.length === 0) continue;
     routedEntries.push(...routeDocumentSegments(segmentResearchDocument(document), scoped));
   }
-  const segmentEntries = scheduleCategoryFairly(routedEntries, categories);
+  const scheduledEntries = scheduleCategoryFairly(routedEntries, categories);
   const categorySegmentIds = new Map<ResearchCategory, Set<string>>(categories.map((category) => [category, new Set<string>()]));
-  for (const entry of segmentEntries) {
+  for (const entry of scheduledEntries) {
     for (const category of entry.categories) categorySegmentIds.get(category)?.add(entry.segment.id);
   }
+  const categorySegmentKey = (category: ResearchCategory, segmentId: string) => `${category}\u0000${segmentId}`;
+  const completedCategorySegments = new Set<string>();
+  const deterministicCandidates: import("@/lib/research/contracts").ClaimCandidate[] = [];
+  const documentsById = new Map(documents.map((document) => [document.id, document]));
+  const segmentEntries = scheduledEntries.flatMap((entry) => {
+    if (effectiveOptions.runTask !== undefined) return [entry];
+    const document = documentsById.get(entry.segment.documentId);
+    if (document === undefined) return [entry];
+    const deterministic = extractDeterministicClosedMetrics({
+      segment: entry.segment,
+      categories: entry.categories,
+      document,
+      target: targetForTask(effectiveOptions.target),
+    });
+    deterministicCandidates.push(...deterministic.candidates);
+    const resolved = new Set<ResearchCategory>(deterministic.completedCategories);
+    for (const category of resolved) {
+      completedCategorySegments.add(categorySegmentKey(category, entry.segment.id));
+    }
+    const remainingCategories = entry.categories.filter((category) => !resolved.has(category));
+    return remainingCategories.length === 0 ? [] : [{ ...entry, categories: remainingCategories }];
+  });
+  const unresolvedCategoriesBySegmentId = new Map(
+    segmentEntries.map((entry) => [entry.segment.id, entry.categories] as const),
+  );
   const executionUnits = buildExecutionUnits(
     segmentEntries,
     documents,
     targetForTask(effectiveOptions.target),
     effectiveOptions.runTask === undefined,
   );
-  const candidates: import("@/lib/research/contracts").ClaimCandidate[] = [];
+  const candidates: import("@/lib/research/contracts").ClaimCandidate[] = [...deterministicCandidates];
   const providerAttempts: ResearchProviderAttempt[] = [];
   const recordedConfigurationProviders = new Set<ResearchExtractionProvider>();
   const failures: ExtractionFailure[] = [];
   const warnings: string[] = [];
-  const processedSegmentIds: string[] = [];
+  const processedSegmentIds: string[] = scheduledEntries
+    .filter((entry) => !unresolvedCategoriesBySegmentId.has(entry.segment.id))
+    .map((entry) => entry.segment.id);
   const unprocessedSegmentIds: string[] = [];
   let aborted = false;
 
   const categoryCompletion = () => {
-    const unprocessed = new Set(unprocessedSegmentIds);
     const incompleteCategories = categories.filter((category) =>
-      [...(categorySegmentIds.get(category) ?? [])].some((segmentId) => unprocessed.has(segmentId)),
+      [...(categorySegmentIds.get(category) ?? [])]
+        .some((segmentId) => !completedCategorySegments.has(categorySegmentKey(category, segmentId))),
     );
     return {
       completedCategories: categories.filter((category) => !incompleteCategories.includes(category)),
@@ -544,7 +572,7 @@ export async function extractResearchDocuments(
       warnings.push("no extraction provider is configured; no segments were dispatched");
       const completion = categoryCompletion();
       return {
-        candidates: [],
+        candidates: dedupePromotedCandidates(candidates),
         providerAttempts,
         failures,
         warnings,
@@ -569,6 +597,11 @@ export async function extractResearchDocuments(
     candidates.push(...outcome.candidates);
     if (outcome.succeeded) {
       processedSegmentIds.push(...unit.segmentIds);
+      for (const segmentId of unit.segmentIds) {
+        for (const category of unresolvedCategoriesBySegmentId.get(segmentId) ?? []) {
+          completedCategorySegments.add(categorySegmentKey(category, segmentId));
+        }
+      }
     } else {
       unprocessedSegmentIds.push(...unit.segmentIds);
       if (outcome.failureKind !== undefined) failures.push({ kind: outcome.failureKind, segmentId: unit.task.segment.id });

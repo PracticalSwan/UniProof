@@ -489,6 +489,34 @@ describe("Phase 2D provider adapters and transport", () => {
     expect(result.attempts).toHaveLength(1);
   });
 
+  it("does not quarantine a transient upstream failure for the rest of the bounded Research run", async () => {
+    const health = createStructuredProviderHealth();
+    let calls = 0;
+    const first = await runGroqStructuredTask({
+      apiKey: "synthetic-groq-secret",
+      prompt: "public segment one",
+      schema: portableExtractionJsonSchema,
+      providerHealth: health,
+      fetchImpl: async () => { calls += 1; return new Response("", { status: 503 }); },
+    });
+    expect(first).toMatchObject({ ok: false, failureKind: "upstream" });
+    expect(calls).toBe(1);
+    expect(health.unavailable.groq).toBeUndefined();
+
+    const second = await runGroqStructuredTask({
+      apiKey: "synthetic-groq-secret",
+      prompt: "public reconciliation task",
+      schema: portableExtractionJsonSchema,
+      providerHealth: health,
+      stage: "reconciliation",
+      fetchImpl: async () => { calls += 1; throw new Error("quarantined provider must not dispatch again"); },
+    });
+    expect(second).toMatchObject({ ok: false, failureKind: "upstream" });
+    expect(second.attempts).toHaveLength(1);
+    expect(second.attempts[0]).toMatchObject({ stage: "reconciliation", outcome: "failed", failureKind: "upstream" });
+    expect(calls).toBe(2);
+  });
+
   it("falls through after a non-recoverable in-run rate limit and remembers provider health", async () => {
     const health = createStructuredProviderHealth();
     let calls = 0;

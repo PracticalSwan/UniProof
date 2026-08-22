@@ -775,3 +775,10 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - Production diagnosis: the reproduced Chulalongkorn four-category call returned HTTP 200 after about 115 seconds with zero claims and timeout/provider/rate-limit failures; a discovery-only diagnostic showed only three routed extraction tasks, proving the remaining bottleneck was structured-provider request behavior rather than browser dispatch or huge discovery fan-out.
 - Protected boundary: `ui-flow-screenshots/` remains 10 untracked owner-owned PNGs and was not modified, staged, or included in release inputs.
 - Deferred: Exact-SHA GitHub Actions, Vercel Production verification, and the two reserved live Edinburgh/Chulalongkorn Research validations follow publication. Devpost remains untouched pending the final video and explicit submission authorization.
+
+## 2026-08-23 — Deterministic closed-metric fallback follow-up
+
+- Added a narrow official-source deterministic fallback for annual tuition, affirmative scholarship availability, affirmative research-opportunity availability, and dated employment rates. Exact source substrings and normal source/document provenance are required; ambiguous values and absence-by-silence fail closed.
+- Resolved segment/category pairs bypass structured-provider dispatch, while unresolved work continues through the existing bounded provider/reconciliation path. Boolean availability direct-evidence handling was corrected so explicit official statements can become score-eligible without relaxing Compare thresholds.
+- Final local verification before publication: focused 99/99, full Vitest 641/641, TypeScript, ESLint, Next.js 16.3.1 production build, workspace/release verifiers, dependency audit 0 vulnerabilities, diff check, secret/client-boundary scan, and Compare 63/63. Remaining long browser/CI reruns were explicitly skipped by user instruction in favor of immediate deployment; no additional live Research execution was authorized or made.
+- `ui-flow-screenshots/` remains protected, untracked, and excluded from publication. Devpost remains unsubmitted.

@@ -20,6 +20,8 @@ export type ExtractionSegment = {
 export type ExtractionTargetIdentity = StructuredTaskTargetContext & {
   universityId?: string;
   programId?: string;
+  /** Resolved official university host used only for fail-closed deterministic source checks. */
+  officialHost?: string;
 };
 
 export type ExtractionTask = {

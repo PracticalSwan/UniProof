@@ -144,6 +144,7 @@ function extractionTarget(request: ResearchRequest, target: ResolvedResearchTarg
     subjectArea: target.subjectArea ?? request.target?.subjectArea,
     countryCode: target.countryCode,
     degreeLevel: target.degreeLevel,
+    officialHost: target.officialHost,
   };
 }
 

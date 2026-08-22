@@ -144,6 +144,21 @@ function renderedValue(candidate: ClaimCandidate): string[] {
 
 function directSupport(candidate: ClaimCandidate): boolean {
   const passage = normalizeProperty(candidate.supportingText);
+  if (typeof candidate.value === "boolean") {
+    const property = normalizeProperty(candidate.property);
+    const availabilityProperty = /\b(?:available|availability)\b/u.test(property);
+    if (availabilityProperty) {
+      const explicitlyUnavailable =
+        /\b(?:not|never) available\b/u.test(passage) ||
+        /\bunavailable\b/u.test(passage) ||
+        /\bno\b(?: \p{L}+){0,12} \bavailable\b/u.test(passage);
+      if (candidate.value) return !explicitlyUnavailable && /\bavailable\b/u.test(passage);
+      return explicitlyUnavailable;
+    }
+    return candidate.value
+      ? /\b(?:true|yes)\b/u.test(passage)
+      : /\b(?:false|no)\b/u.test(passage);
+  }
   return renderedValue(candidate).some((value) => {
     const normalizedValue = normalizeProperty(value);
     return normalizedValue !== "" && passage.includes(normalizedValue);

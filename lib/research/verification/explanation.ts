@@ -199,6 +199,7 @@ export type ExplanationOptions = {
   requireOpenRouterZdr?: boolean;
   signal?: AbortSignal;
   budget?: StructuredAiBudget;
+  deterministicOnly?: boolean;
   providerOptions?: Omit<StructuredAdapterInput, "prompt" | "schema" | "apiKey" | "signal" | "budget" | "stage" | "kind">;
   runTask?: (input: { claims: readonly VerifiedClaim[]; categories: readonly ResearchCategory[] }) => Promise<{
     payload?: unknown;
@@ -236,6 +237,15 @@ export async function generateEvidenceExplanations(options: ExplanationOptions):
   const failures: ReconciliationFailure[] = [];
   const accepted = new Map<ResearchCategory, EvidenceExplanation>();
   const fallbackAll = () => categories.map((category) => deterministicFallback(category, claimsByCategory.get(category) ?? []));
+
+  if (options.deterministicOnly === true) {
+    return {
+      explanations: fallbackAll(),
+      providerAttempts,
+      failures,
+      budget: { limit: budget.limit, used: budget.used, providerUsed: budget.providerUsed },
+    };
+  }
 
   // A category-level unknown has no gated claim IDs to reference. Do not spend
   // provider budget asking a model to explain an empty evidence set.

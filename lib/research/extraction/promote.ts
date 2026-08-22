@@ -85,6 +85,11 @@ function promoteOne(
     addReason(reasons, "supporting-text-not-exact");
     return undefined;
   }
+  const provenanceSegments = task.provenanceSegments ?? [segment];
+  if (!provenanceSegments.some((sourceSegment) => sourceSegment.text.includes(claim.supportingText))) {
+    addReason(reasons, "supporting-text-not-exact");
+    return undefined;
+  }
 
   const extractionProvider = researchExtractionProviderSchema.safeParse(provider);
   if (!extractionProvider.success) {

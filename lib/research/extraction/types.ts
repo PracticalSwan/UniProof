@@ -24,6 +24,8 @@ export type ExtractionTargetIdentity = StructuredTaskTargetContext & {
 
 export type ExtractionTask = {
   segment: ExtractionSegment;
+  /** Original source segments represented by a synthetic production batch. */
+  provenanceSegments?: readonly ExtractionSegment[];
   categories: readonly ResearchCategory[];
   target: ExtractionTargetIdentity;
   document: ResearchDocument;

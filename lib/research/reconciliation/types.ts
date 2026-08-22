@@ -130,6 +130,8 @@ export type ReconciliationOptions = {
   runTask?: (task: ReconciliationTask) => Promise<ReconciliationRunTaskResult>;
   /** Set false to skip optional explanations; true enables the bounded explanation stage. */
   explain?: boolean;
+  /** Use the evidence-bound deterministic fallback instead of another provider request. */
+  deterministicExplanations?: boolean;
   enableExplanations?: boolean;
   explanation?: boolean;
   explanationBudget?: StructuredAiBudget;

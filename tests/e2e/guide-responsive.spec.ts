@@ -137,7 +137,10 @@ test("Guide evidence sheet handles 12 sources and 2,000-character evidence on mo
   const sourcesRegion = dialog.getByRole("region", { name: "Evidence sources" });
   await expect(sourcesRegion.getByRole("listitem")).toHaveCount(12);
   await expect(sourcesRegion.getByText("Source 12")).toBeVisible();
-  const box = await dialog.boundingBox();
-  expect(box).not.toBeNull();
-  expect(box!.width).toBeLessThanOrEqual(390);
+  const viewport = page.viewportSize();
+  expect(viewport).not.toBeNull();
+  await expect.poll(async () => {
+    const box = await dialog.boundingBox();
+    return box === null ? Number.POSITIVE_INFINITY : box.x + box.width;
+  }).toBeLessThanOrEqual(viewport!.width + 1);
 });

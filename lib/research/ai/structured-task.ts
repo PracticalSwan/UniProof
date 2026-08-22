@@ -114,10 +114,6 @@ function classifyStatus(status: number): ResearchProviderAttemptFailureKind {
   return "upstream";
 }
 
-function canRetry(failureKind: ResearchProviderAttemptFailureKind): boolean {
-  return failureKind === "rate-limit" || failureKind === "timeout" || failureKind === "upstream";
-}
-
 function providerUnavailableReason(
   failureKind: ResearchProviderAttemptFailureKind,
 ): "rate-limit" | "authentication" | "policy" | "capability" | undefined {
@@ -424,9 +420,7 @@ export async function runProviderTransport(
     }
 
     const failureKind = dispatched.outcome.failureKind;
-    const retryable = failureKind === "rate-limit"
-      ? dispatched.outcome.retryAfterMs !== undefined
-      : canRetry(failureKind);
+    const retryable = failureKind === "rate-limit" && dispatched.outcome.retryAfterMs !== undefined;
     if (!retryable || retryCount >= maxRetries) {
       const healthReason = providerUnavailableReason(failureKind);
       if (healthReason !== undefined && options.providerHealth !== undefined) {

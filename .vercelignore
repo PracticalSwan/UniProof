@@ -2,6 +2,7 @@
 ui-flow-screenshots/
 
 # Disposable local verification output.
+.next/
 output/
 test-results/
 playwright-report/

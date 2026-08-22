@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -134,6 +136,11 @@ describe("release configuration verifier", () => {
 });
 
 describe("repository release contract", () => {
+  it("excludes local Next build output from Vercel upload input", () => {
+    const vercelignore = readFileSync(".vercelignore", "utf8");
+    expect(vercelignore).toMatch(/(?:^|\n)\.next\/(?:\n|$)/u);
+  });
+
   it("rejects synthetic staged or tracked secret-bearing release paths without reading file contents", () => {
     const result = evaluateReleaseFileMetadata({
       trackedFiles: [".env.example", "src/safe.ts", "output/playwright/phase3d-dev-app-123/page.js"],

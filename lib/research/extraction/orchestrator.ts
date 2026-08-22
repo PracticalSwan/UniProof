@@ -1,5 +1,7 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import {
   GEMINI_PRIMARY_MODEL,
   runGeminiStructuredTask,
@@ -38,6 +40,7 @@ import {
   type ResearchExtractionProvider,
   type ResearchProviderAttempt,
 } from "@/lib/research/contracts";
+import { RESEARCH_MAX_EXTRACTION_BATCH_CHARACTERS } from "@/lib/security/research-limits";
 
 type TaskOutcome = {
   candidates: readonly import("@/lib/research/contracts").ClaimCandidate[];
@@ -374,6 +377,100 @@ function scheduleCategoryFairly(
   return scheduled;
 }
 
+type RoutedSegmentEntry = { segment: ExtractionSegment; categories: readonly ResearchCategory[] };
+
+type ExtractionExecutionUnit = {
+  task: ExtractionTask;
+  segmentIds: readonly string[];
+};
+
+function codePointLength(value: string): number {
+  return Array.from(value).length;
+}
+
+function batchSegmentId(documentId: string, segmentIds: readonly string[], batchOrdinal: number): string {
+  const digest = createHash("sha256")
+    .update(`${documentId}\u0000${batchOrdinal}\u0000${segmentIds.join("\u0000")}`, "utf8")
+    .digest("hex")
+    .slice(0, 32);
+  return `segment-batch-${digest}`;
+}
+
+function buildExecutionUnits(
+  entries: readonly RoutedSegmentEntry[],
+  documents: readonly import("@/lib/research/contracts").ResearchDocument[],
+  target: ExtractionTargetIdentity,
+  batchProductionWork: boolean,
+): ExtractionExecutionUnit[] {
+  const documentsById = new Map(documents.map((document) => [document.id, document]));
+  if (!batchProductionWork) {
+    return entries.flatMap((entry) => {
+      const document = documentsById.get(entry.segment.documentId);
+      return document === undefined ? [] : [{
+        task: { segment: entry.segment, categories: entry.categories, target, document },
+        segmentIds: [entry.segment.id],
+      }];
+    });
+  }
+
+  const byDocument = new Map<string, RoutedSegmentEntry[]>();
+  for (const entry of entries) {
+    const current = byDocument.get(entry.segment.documentId) ?? [];
+    current.push(entry);
+    byDocument.set(entry.segment.documentId, current);
+  }
+
+  const unitsByDocument: ExtractionExecutionUnit[][] = [];
+  for (const [documentId, documentEntries] of byDocument) {
+    const document = documentsById.get(documentId);
+    if (document === undefined) continue;
+    const documentUnits: ExtractionExecutionUnit[] = [];
+    let batch: RoutedSegmentEntry[] = [];
+    let batchCharacters = 0;
+    let batchOrdinal = 0;
+
+    const flush = () => {
+      if (batch.length === 0) return;
+      const categories = canonicalizeResearchCategories(batch.flatMap((entry) => entry.categories));
+      const segmentIds = batch.map((entry) => entry.segment.id);
+      const segment = batch.length === 1
+        ? batch[0]!.segment
+        : {
+            id: batchSegmentId(document.id, segmentIds, batchOrdinal),
+            sourceId: document.sourceId,
+            documentId: document.id,
+            sectionOrdinal: batch[0]!.segment.sectionOrdinal,
+            chunkOrdinal: batchOrdinal,
+            text: batch.map((entry) => entry.segment.text).join("\n\n"),
+          };
+      documentUnits.push({ task: { segment, ...(batch.length > 1 ? { provenanceSegments: batch.map((entry) => entry.segment) } : {}), categories, target, document }, segmentIds });
+      batch = [];
+      batchCharacters = 0;
+      batchOrdinal += 1;
+    };
+
+    for (const entry of documentEntries) {
+      const separatorCharacters = batch.length === 0 ? 0 : 2;
+      const nextCharacters = codePointLength(entry.segment.text) + separatorCharacters;
+      if (batch.length > 0 && batchCharacters + nextCharacters > RESEARCH_MAX_EXTRACTION_BATCH_CHARACTERS) flush();
+      batch.push(entry);
+      batchCharacters += codePointLength(entry.segment.text) + (batch.length === 1 ? 0 : 2);
+    }
+    flush();
+    if (documentUnits.length > 0) unitsByDocument.push(documentUnits);
+  }
+
+  const units: ExtractionExecutionUnit[] = [];
+  const maximumBatches = Math.max(0, ...unitsByDocument.map((documentUnits) => documentUnits.length));
+  for (let batchIndex = 0; batchIndex < maximumBatches; batchIndex += 1) {
+    for (const documentUnits of unitsByDocument) {
+      const unit = documentUnits[batchIndex];
+      if (unit !== undefined) units.push(unit);
+    }
+  }
+  return units;
+}
+
 function targetForTask(target: ExtractionTargetIdentity | undefined): ExtractionTargetIdentity {
   return target ?? {};
 }
@@ -402,7 +499,12 @@ export async function extractResearchDocuments(
   for (const entry of segmentEntries) {
     for (const category of entry.categories) categorySegmentIds.get(category)?.add(entry.segment.id);
   }
-  const segments = segmentEntries.map((entry) => entry.segment);
+  const executionUnits = buildExecutionUnits(
+    segmentEntries,
+    documents,
+    targetForTask(effectiveOptions.target),
+    effectiveOptions.runTask === undefined,
+  );
   const candidates: import("@/lib/research/contracts").ClaimCandidate[] = [];
   const providerAttempts: ResearchProviderAttempt[] = [];
   const recordedConfigurationProviders = new Set<ResearchExtractionProvider>();
@@ -430,15 +532,15 @@ export async function extractResearchDocuments(
       { provider: "openrouter" as const, key: effectiveOptions.openrouterApiKey, model: OPENROUTER_FREE_MODEL },
     ];
     const unavailable = providerConfigurations.filter((entry) => !hasConfiguredKey(entry.key));
-    if (unavailable.length > 0 && segments.length > 0) {
+    if (unavailable.length > 0 && executionUnits.length > 0) {
       warnings.push("unconfigured extraction providers: " + unavailable.map((entry) => entry.provider).join(", "));
     }
-    if (unavailable.length === providerConfigurations.length && segments.length > 0) {
+    if (unavailable.length === providerConfigurations.length && executionUnits.length > 0) {
       for (const entry of unavailable) {
         appendConfigurationSkip(providerAttempts, recordedConfigurationProviders, entry.provider, entry.model);
         failures.push({ kind: "configuration", provider: entry.provider });
       }
-      unprocessedSegmentIds.push(...segments.map((segment) => segment.id));
+      unprocessedSegmentIds.push(...executionUnits.flatMap((unit) => unit.segmentIds));
       warnings.push("no extraction provider is configured; no segments were dispatched");
       const completion = categoryCompletion();
       return {
@@ -455,37 +557,25 @@ export async function extractResearchDocuments(
     }
   }
 
-  for (let index = 0; index < segmentEntries.length; index += 1) {
-    const { segment, categories: taskCategories } = segmentEntries[index]!;
+  for (let index = 0; index < executionUnits.length; index += 1) {
+    const unit = executionUnits[index]!;
     if (effectiveOptions.signal?.aborted || budget.used >= budget.limit) {
-      unprocessedSegmentIds.push(...segmentEntries.slice(index).map((entry) => entry.segment.id));
+      unprocessedSegmentIds.push(...executionUnits.slice(index).flatMap((entry) => entry.segmentIds));
       aborted ||= effectiveOptions.signal?.aborted === true;
       break;
     }
-    const document = documents.find((item) => item.id === segment.documentId);
-    if (document === undefined) {
-      unprocessedSegmentIds.push(segment.id);
-      failures.push({ kind: "invalid-response", segmentId: segment.id });
-      continue;
-    }
-    const task: ExtractionTask = {
-      segment,
-      categories: taskCategories,
-      target: targetForTask(effectiveOptions.target),
-      document,
-    };
-    const outcome = await runSegmentTask(task, effectiveOptions, recordedConfigurationProviders);
+    const outcome = await runSegmentTask(unit.task, effectiveOptions, recordedConfigurationProviders);
     appendAttempts(providerAttempts, outcome.attempts);
     candidates.push(...outcome.candidates);
     if (outcome.succeeded) {
-      processedSegmentIds.push(segment.id);
+      processedSegmentIds.push(...unit.segmentIds);
     } else {
-      unprocessedSegmentIds.push(segment.id);
-      if (outcome.failureKind !== undefined) failures.push({ kind: outcome.failureKind, segmentId: segment.id });
+      unprocessedSegmentIds.push(...unit.segmentIds);
+      if (outcome.failureKind !== undefined) failures.push({ kind: outcome.failureKind, segmentId: unit.task.segment.id });
     }
     if (outcome.aborted) {
       aborted = true;
-      unprocessedSegmentIds.push(...segmentEntries.slice(index + 1).map((entry) => entry.segment.id));
+      unprocessedSegmentIds.push(...executionUnits.slice(index + 1).flatMap((entry) => entry.segmentIds));
       break;
     }
   }

@@ -298,6 +298,7 @@ export async function runPhase2Research(
       decisionEligibleCategories,
       signal: options.signal,
       explain: true,
+      deterministicExplanations: true,
       geminiApiKey: options.reconciliation?.geminiApiKey ?? options.extraction?.geminiApiKey ?? process.env.GEMINI_API_KEY,
       groqApiKey: options.reconciliation?.groqApiKey ?? options.extraction?.groqApiKey ?? process.env.GROQ_API_KEY,
       openrouterApiKey: options.reconciliation?.openrouterApiKey ?? options.extraction?.openrouterApiKey ?? process.env.OPENROUTER_API_KEY,

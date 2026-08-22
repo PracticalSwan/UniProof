@@ -254,7 +254,7 @@ describe("structured AI provider contract", () => {
       },
       fetchImpl: async () => {
         calls += 1;
-        return new Response("", { status: 503 });
+        return new Response("", { status: 429, headers: { "retry-after": "1" } });
       },
     });
     expect(result).toMatchObject({ ok: false, aborted: true });

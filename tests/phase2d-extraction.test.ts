@@ -470,6 +470,25 @@ describe("Phase 2D provider adapters and transport", () => {
     expect(result.attempts.map((attempt) => attempt.retryCount)).toEqual([0, 1]);
   });
 
+  it("fails over instead of retrying the same provider after an upstream failure", async () => {
+    let calls = 0;
+    let sleeps = 0;
+    const result = await runGroqStructuredTask({
+      apiKey: "synthetic-groq-secret",
+      prompt: "public segment",
+      schema: portableExtractionJsonSchema,
+      sleep: async () => { sleeps += 1; },
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response("", { status: 503 });
+      },
+    });
+    expect(calls).toBe(1);
+    expect(sleeps).toBe(0);
+    expect(result).toMatchObject({ ok: false, failureKind: "upstream" });
+    expect(result.attempts).toHaveLength(1);
+  });
+
   it("falls through after a non-recoverable in-run rate limit and remembers provider health", async () => {
     const health = createStructuredProviderHealth();
     let calls = 0;
@@ -534,7 +553,7 @@ describe("Phase 2D provider adapters and transport", () => {
     });
     expect(calls).toBe(1);
     expect(lowerBudget.used).toBe(1);
-    expect(result).toMatchObject({ ok: false, failureKind: "budget" });
+    expect(result).toMatchObject({ ok: false, failureKind: "upstream" });
   });
 
   it("checks a provider-specific attempt ceiling in addition to the total ceiling", async () => {
@@ -554,7 +573,7 @@ describe("Phase 2D provider adapters and transport", () => {
     expect(calls).toBe(1);
     expect(providerBudget.used).toBe(1);
     expect(providerBudget.providerUsed.groq).toBe(1);
-    expect(result).toMatchObject({ ok: false, failureKind: "budget" });
+    expect(result).toMatchObject({ ok: false, failureKind: "upstream" });
   });
 
   it("fails over after provider-local budget exhaustion but stops on total budget exhaustion", async () => {
@@ -688,7 +707,7 @@ describe("Phase 2D provider adapters and transport", () => {
       },
     });
     expect(nonOk).toMatchObject({ ok: false, failureKind: "upstream" });
-    expect(errorCalls).toBe(2);
+    expect(errorCalls).toBe(1);
     expect(errorBodyCancelled).toBe(true);
 
     const streamedOversize = await runGroqStructuredTask({
@@ -835,7 +854,7 @@ describe("Phase 2D provider adapters and transport", () => {
       await vi.advanceTimersByTimeAsync(RESEARCH_AI_HTTP_ATTEMPT_TIMEOUT_MS);
       const timeoutResult = await timeoutPending;
       expect(timeoutResult).toMatchObject({ ok: false, failureKind: "timeout" });
-      expect(timeoutResult.attempts.map((attempt) => attempt.failureKind)).toEqual(["timeout", "timeout"]);
+      expect(timeoutResult.attempts.map((attempt) => attempt.failureKind)).toEqual(["timeout"]);
     } finally {
       vi.useRealTimers();
     }
@@ -946,12 +965,12 @@ describe("Phase 2D sequential fallback, budget, and setup", () => {
     expect(result.candidates[0]?.extractionModel).toBe("provider/free-model");
     expect(result.candidates[0]?.extractionProvider).toBe("openrouter");
     expect(providers).toEqual([
-      GEMINI_INTERACTIONS_ENDPOINT, GEMINI_INTERACTIONS_ENDPOINT,
-      GROQ_STRUCTURED_ENDPOINT, GROQ_STRUCTURED_ENDPOINT,
+      GEMINI_INTERACTIONS_ENDPOINT,
+      GROQ_STRUCTURED_ENDPOINT,
       OPENROUTER_STRUCTURED_ENDPOINT,
     ]);
     expect(result.providerAttempts.map((attempt) => attempt.provider)).toEqual([
-      "gemini", "gemini", "groq", "groq", "openrouter",
+      "gemini", "groq", "openrouter",
     ]);
     expect(result.providerAttempts.some((attempt) => attempt.model === GEMINI_QUALITY_MODEL)).toBe(false);
   });
@@ -1022,6 +1041,69 @@ describe("Phase 2D sequential fallback, budget, and setup", () => {
     expect(result.completedCategories).toEqual(["tuition", "research"]);
   });
 
+  it("batches routed segments from one document into one production provider request", async () => {
+    const currentDocument = document({
+      id: "document-batched",
+      sourceId: "source-batched",
+      normalizedText: "Annual tuition fees are USD 10000.\n\nResearch groups and faculty work on AI.",
+      sections: [
+        { heading: "Tuition fees", text: "Annual tuition fees are USD 10000." },
+        { heading: "Research", text: "Research groups and faculty work on AI." },
+      ],
+    });
+    let calls = 0;
+    let requestBody = "";
+    const result = await extractResearchDocuments([currentDocument], {
+      categories: ["tuition", "research"],
+      categoriesByDocumentId: { [currentDocument.id]: ["tuition", "research"] },
+      target: { universityName: "Example University" },
+      groqApiKey: "synthetic-groq-secret",
+      providerOptions: {
+        fetchImpl: async (_input, init) => {
+          calls += 1;
+          requestBody = String(init?.body ?? "");
+          const body = JSON.parse(requestBody) as { messages?: Array<{ content?: unknown }> };
+          const prompt = typeof body.messages?.[0]?.content === "string" ? body.messages[0].content : "";
+          const segmentId = /Segment ID: ([^\n]+)/.exec(prompt)?.[1] ?? "missing";
+          return responseBody({ model: GROQ_STRUCTURED_MODEL, choices: [{ message: { content: JSON.stringify({ claims: [{ category: "tuition", property: "annual tuition", value: 10000, unit: null, currency: "USD", academicYear: null, effectiveDate: null, intake: null, segmentId, supportingText: "Annual tuition fees are USD 10000." }] }) } }] });
+        },
+      },
+    });
+    expect(calls).toBe(1);
+    expect(requestBody).toContain("Annual tuition fees are USD 10000.");
+    expect(requestBody).toContain("Research groups and faculty work on AI.");
+    expect(result.candidates).toHaveLength(1);
+    expect(result.processedSegmentIds).toHaveLength(2);
+    expect(result.completedCategories).toEqual(["tuition", "research"]);
+  });
+
+  it("rejects supporting text that spans an artificial production batch boundary", async () => {
+    const currentDocument = document({
+      id: "document-batch-provenance",
+      sourceId: "source-batch-provenance",
+      normalizedText: "Annual tuition fees are USD 10000.\nResearch groups and faculty work on AI.",
+      sections: [
+        { heading: "Tuition fees", text: "Annual tuition fees are USD 10000." },
+        { heading: "Research", text: "Research groups and faculty work on AI." },
+      ],
+    });
+    const result = await extractResearchDocuments([currentDocument], {
+      categories: ["tuition", "research"],
+      categoriesByDocumentId: { [currentDocument.id]: ["tuition", "research"] },
+      target: { universityName: "Example University" },
+      groqApiKey: "synthetic-groq-secret",
+      providerOptions: {
+        fetchImpl: async (_input, init) => {
+          const body = JSON.parse(String(init?.body ?? "{}")) as { messages?: Array<{ content?: unknown }> };
+          const prompt = typeof body.messages?.[0]?.content === "string" ? body.messages[0].content : "";
+          const segmentId = /Segment ID: ([^\n]+)/.exec(prompt)?.[1] ?? "missing";
+          return responseBody({ model: GROQ_STRUCTURED_MODEL, choices: [{ message: { content: JSON.stringify({ claims: [{ category: "tuition", property: "annual tuition", value: 10000, unit: null, currency: "USD", academicYear: null, effectiveDate: null, intake: null, segmentId, supportingText: "USD 10000.\n\nResearch groups" }] }) } }] });
+        },
+      },
+    });
+    expect(result.candidates).toHaveLength(0);
+    expect(result.failures.some((failure) => failure.kind === "invalid-response")).toBe(true);
+  });
   it("schedules extraction fairly so one document cannot starve a later category", async () => {
     const tuitionDocument = document({
       id: "document-tuition-heavy",
@@ -1065,6 +1147,43 @@ describe("Phase 2D sequential fallback, budget, and setup", () => {
     expect(result.incompleteCategories).toContain("tuition");
   });
 
+  it("interleaves production batches so one large document cannot starve a later category", async () => {
+    const tuitionDocument = document({
+      id: "document-batched-tuition-heavy",
+      sourceId: "source-batched-tuition-heavy",
+      contentHash: "d".repeat(64),
+      normalizedText: `Tuition fees ${"x".repeat(30_000)}`,
+      sections: [],
+    });
+    const researchDocument = document({
+      id: "document-batched-research",
+      sourceId: "source-batched-research",
+      contentHash: "e".repeat(64),
+      normalizedText: "Research groups and faculty work on artificial intelligence.",
+      sections: [],
+    });
+    const prompts: string[] = [];
+    const result = await extractResearchDocuments([tuitionDocument, researchDocument], {
+      categories: ["tuition", "research"],
+      categoriesByDocumentId: {
+        [tuitionDocument.id]: ["tuition"],
+        [researchDocument.id]: ["research"],
+      },
+      target: { universityName: "Example University" },
+      groqApiKey: "synthetic-groq-secret",
+      providerOptions: {
+        fetchImpl: async (_input, init) => {
+          prompts.push(String(init?.body ?? ""));
+          return responseBody({ model: GROQ_STRUCTURED_MODEL, choices: [{ message: { content: JSON.stringify({ claims: [] }) } }] });
+        },
+      },
+    });
+    expect(prompts.length).toBeGreaterThanOrEqual(3);
+    expect(prompts[0]).toContain("Tuition fees");
+    expect(prompts[1]).toContain("Research groups and faculty work on artificial intelligence.");
+    expect(result.completedCategories).toEqual(["tuition", "research"]);
+  });
+
   it("honors providerOptions ZDR when the extraction-level setting is omitted", async () => {
     const currentDocument = document();
     const currentSegment = segmentResearchDocument(currentDocument)[0];
@@ -1090,7 +1209,7 @@ describe("Phase 2D sequential fallback, budget, and setup", () => {
     expect(observedProvider).toEqual({ require_parameters: true, data_collection: "deny", zdr: true });
   });
 
-  it("enforces the 24 actual-attempt budget before dispatch and does not replace the 100-call schema ceiling", async () => {
+  it("keeps the 24-attempt safety ceiling while batching production extraction work", async () => {
     const long = "x".repeat(20_000);
     const currentDocument = document({ id: "document-budget", sourceId: "source-budget", normalizedText: long, sections: [] });
     let calls = 0;
@@ -1103,10 +1222,10 @@ describe("Phase 2D sequential fallback, budget, and setup", () => {
       providerOptions: { fetchImpl: async () => { calls += 1; return new Response("", { status: 503 }); }, sleep: async () => {} },
     });
     expect(RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN).toBe(24);
-    expect(calls).toBe(24);
-    expect(result.budget.used).toBe(24);
+    expect(calls).toBe(6);
+    expect(result.budget.used).toBe(6);
     expect(result.unfinished).toBe(true);
-    expect(result.failures.some((failure) => failure.kind === "budget")).toBe(true);
+    expect(result.failures.some((failure) => failure.kind === "budget")).toBe(false);
   });
 
   it("records a missing provider once without multiplying configuration skips across segments", async () => {

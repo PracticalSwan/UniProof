@@ -889,7 +889,7 @@ describe("Phase 2F orchestration", () => {
     expect(result.failures[0]).toMatchObject({ category: "tuition", code: "provider-error" });
   });
 
-  it("sends only claim-bearing categories to explanation AI and falls back locally for unknown", async () => {
+  it("uses deterministic explanations for both claim-bearing and unknown categories", async () => {
     const explanationCategories: string[][] = [];
     const result = await runPhase2Research(
       { target: { university: { name: "Example University" } }, categories: ["admissions", "tuition"] },
@@ -916,7 +916,7 @@ describe("Phase 2F orchestration", () => {
     expect(result.run.status).toBe("succeeded");
     expect(result.run.processedCategories).toEqual(["admissions", "tuition"]);
     expect(result.evidenceSummary.categoriesUnknown).toEqual(["tuition"]);
-    expect(explanationCategories).toEqual([["admissions"]]);
+    expect(explanationCategories).toEqual([]);
     expect(result.explanations).toHaveLength(2);
     expect(result.explanations.find((item) => item.category === "tuition")).toMatchObject({
       referencedClaimIds: [],

@@ -289,6 +289,7 @@ export function verifyRepositoryReleaseContracts(
     const vercelignore = readText(root, ".vercelignore");
     for (const requiredPattern of [
       "ui-flow-screenshots/\n",
+      ".next/\n",
       "output/\n",
       "test-results/\n",
       "supabase/.temp/\n",

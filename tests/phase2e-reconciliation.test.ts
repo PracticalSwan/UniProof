@@ -678,6 +678,22 @@ describe("Phase 2E stage budgets, aborts, and explanations", () => {
     expect(result.explanations[0]).toMatchObject({ fallback: true });
   });
 
+  it("uses deterministic explanations without dispatching a provider when requested", async () => {
+    const claim = verifiedClaimSchema.parse({ id: "claim-deterministic", universityName: "Example University", category: "admissions", property: "deadline", value: "2027-01-01", sourceIds: ["source-1"], documentIds: ["document-1"], candidateIds: ["candidate-1"], supportingText: "Applications close on 2027-01-01.", verificationStatus: "verified" });
+    let calls = 0;
+    const result = await generateEvidenceExplanations({
+      claims: [claim],
+      categories: ["admissions"],
+      deterministicOnly: true,
+      groqApiKey: "synthetic-groq-secret",
+      providerOptions: { fetchImpl: async () => { calls += 1; throw new Error("must not dispatch"); } },
+    });
+    expect(calls).toBe(0);
+    expect(result.providerAttempts).toHaveLength(0);
+    expect(result.budget.used).toBe(0);
+    expect(result.explanations[0]).toMatchObject({ category: "admissions", fallback: true });
+  });
+
   it("keeps deterministic explanation truncation well-formed at the UTF-16 bound", async () => {
     const claim = verifiedClaimSchema.parse({ id: "claim-utf16", universityName: "Example University", category: "admissions", property: "p".repeat(88), value: `${"a".repeat(498)}😀`, sourceIds: ["source-1"], documentIds: ["document-1"], candidateIds: ["candidate-1"], supportingText: "Bounded fallback evidence.", verificationStatus: "verified" });
     const result = await generateEvidenceExplanations({ claims: [claim], categories: ["admissions"] });

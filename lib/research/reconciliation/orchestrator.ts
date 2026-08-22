@@ -315,6 +315,7 @@ export async function reconcileResearchClaims(options: ReconciliationOptions): P
       requireOpenRouterZdr: options.requireOpenRouterZdr,
       signal: options.signal,
       budget: options.explanationBudget,
+      deterministicOnly: options.deterministicExplanations === true,
       providerOptions: options.providerOptions,
       runTask: options.explanationRunTask === undefined ? undefined : async ({ claims, categories }) => options.explanationRunTask?.({ claims, categories }) ?? { attempts: [] },
     });

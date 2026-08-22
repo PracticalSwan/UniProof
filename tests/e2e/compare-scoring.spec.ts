@@ -12,18 +12,21 @@ import {
 import { makeComparisonDossier, type ComparisonFixtureClaim } from "@/tests/fixtures/comparison-dossiers";
 import { researchModeResponseSchema, type ResearchModeCategory } from "@/lib/research/mode/public-contracts";
 
+const supportScoringCategories = [...comparisonBrowserCategories, "support"] as const satisfies readonly ResearchModeCategory[];
+
 function responseFromClaims(
   target: typeof comparisonBrowserTargets.mit | typeof comparisonBrowserTargets.stanford,
   claims: readonly ComparisonFixtureClaim[],
+  categories: readonly ResearchModeCategory[] = comparisonBrowserCategories,
 ) {
   const states = Object.fromEntries(
-    comparisonBrowserCategories
+    categories
       .filter((category) => !claims.some((claim) => claim.category === category))
       .map((category) => [category, "unknown"]),
   ) as Partial<Record<ResearchModeCategory, "unknown">>;
   return researchModeResponseSchema.parse({
     ok: true,
-    dossier: makeComparisonDossier({ ...target, categories: comparisonBrowserCategories, claims, states }),
+    dossier: makeComparisonDossier({ ...target, categories, claims, states }),
   });
 }
 
@@ -142,13 +145,13 @@ test.describe("Phase 4 Compare scoring presentation", () => {
       { id: "mit-scholarship-false", category: "scholarships", property: "scholarship available", value: false },
       { id: "mit-scholarship-name", category: "scholarships", property: "scholarship name", value: "Named award still must not override explicit false" },
       { id: "mit-support-false", category: "support", property: "international office available", value: false },
-    ]);
+    ], supportScoringCategories);
     const stanford = responseFromClaims(comparisonBrowserTargets.stanford, [
       { id: "stanford-tuition-tie", category: "tuition", property: "annual tuition", value: 10_000, currency: "USD", academicYear: "2027-28" },
       { id: "stanford-research-false", category: "research", property: "research opportunity available", value: false },
       { id: "stanford-scholarship-presence", category: "scholarships", property: "funding opportunity", value: "Published funding opportunity" },
       { id: "stanford-support-true", category: "support", property: "international student services available", value: true },
-    ]);
+    ], supportScoringCategories);
     research.enqueueJson(mit);
     research.enqueueJson(stanford);
     await openCompare(page);

@@ -136,8 +136,14 @@ export const publicResearchFailureSchema = z.object({
 export type PublicResearchFailure = z.infer<typeof publicResearchFailureSchema>;
 
 const publicSourceGapFailureSchema = publicResearchFailureSchema.refine(
-  (failure) => failure.code === "retrieval" || failure.code === "normalization" || failure.code === "provider-budget",
-  { message: "source gaps must describe bounded retrieval, normalization, or extraction-budget gaps" },
+  (failure) =>
+    failure.code === "retrieval" ||
+    failure.code === "normalization" ||
+    failure.code === "provider-rate-limit" ||
+    failure.code === "provider-budget" ||
+    failure.code === "provider-error" ||
+    failure.code === "timeout",
+  { message: "source gaps must describe bounded retrieval, normalization, or provider-work gaps" },
 );
 
 const researchDossierTargetSchema = z.object({

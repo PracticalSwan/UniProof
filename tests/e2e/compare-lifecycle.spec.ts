@@ -382,4 +382,30 @@ test.describe("Phase 4 Compare lifecycle and ownership", () => {
     await expect(page.locator("[data-comparison-card='1']")).toContainText("Research: research incomplete.");
     await expect(page.locator("[data-comparison-card='1']")).toContainText("Research incomplete");
   });
+
+  test("distinguishes supported source-gap evidence from zero-claim incomplete research", async ({ page, research }) => {
+    const sourceGapMit = makeComparisonBrowserResponse({
+      target: comparisonBrowserTargets.mit,
+      tuition: 10_000,
+      employment: 82,
+      research: true,
+      scholarship: true,
+      sourceGaps: {
+        research: {
+          code: "provider-budget",
+          message: "The bounded AI work budget was exhausted before this category completed.",
+        },
+      },
+    });
+    research.enqueueJson(sourceGapMit);
+    research.enqueueJson(stanfordResponse!);
+    await openCompare(page);
+    await selectDefaultComparisonTargets(page);
+    await submitComparison(page);
+
+    const firstCard = page.locator("[data-comparison-card='1']");
+    await expect(firstCard).toContainText("Research: partial evidence — unscored.");
+    await expect(firstCard).toContainText("The bounded AI work budget was exhausted before this category completed.");
+    await expect(firstCard).not.toContainText("Research: research incomplete.");
+  });
 });

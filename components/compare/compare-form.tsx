@@ -15,6 +15,7 @@ import {
   createInitialComparisonFormState,
   removeComparisonTarget,
   searchComparisonCatalog,
+  setComparisonPriorityWeight,
   toggleComparisonCategory,
   type ComparisonFormField,
   type ComparisonFormState,
@@ -245,10 +246,7 @@ export function CompareForm({
                       value={state.weights[priority]}
                       onChange={(event) => {
                         const value = event.target.value;
-                        onStateChange((current) => ({
-                          ...current,
-                          weights: { ...current.weights, [priority]: value },
-                        }));
+                        onStateChange((current) => setComparisonPriorityWeight(current, priority, value));
                       }}
                       disabled={disabled}
                       aria-invalid={fieldError === undefined ? undefined : true}

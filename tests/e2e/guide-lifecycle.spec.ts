@@ -3,6 +3,7 @@ import { guideFixtureTarget, openGuide, selectGuideProgram, fillGuideProfile, su
 import { buildGuideDossier } from "@/tests/fixtures/guide-dossiers";
 import { publicErrorStatuses, publicTransportErrors } from "@/tests/fixtures/research-dossiers";
 import { researchCatalog } from "@/lib/research/catalog/data";
+import { researchDossierSchema } from "@/lib/research/mode/public-contracts";
 
 const target = guideFixtureTarget;
 const secondProgram = researchCatalog.programs.find((program) => program.id !== target.program.id)!;
@@ -33,6 +34,44 @@ test.describe("Guide lifecycle", () => {
     await submitGuide(page);
     await expect(page.getByText("Assessment complete", { exact: false })).toBeVisible({ timeout: 15_000 });
     expect(research.requests).toHaveLength(1);
+  });
+
+  test("shows the sanitized reason when supported evidence is partial and non-definitive", async ({ page, research }) => {
+    await prepareGuide(page);
+    const base = buildGuideDossier({
+      universityId: target.university.id,
+      programId: target.program.id,
+      admissionsClaims: [{
+        id: "gpa-source-gap-ui",
+        category: "admissions",
+        property: "Minimum GPA",
+        value: 3,
+        unit: "4.0",
+        verificationStatus: "verified",
+        representativeSourceId: "source-1",
+        sourceIds: ["source-1"],
+        supportingText: "Applicants must have a minimum GPA of 3.0 on a 4.0 scale.",
+      }],
+    });
+    const dossier = researchDossierSchema.parse({
+      ...base,
+      categories: base.categories.map((row) => row.category === "admissions" && row.state === "ready"
+        ? {
+            ...row,
+            sourceGap: {
+              code: "provider-rate-limit",
+              message: "Research provider limits prevented completion.",
+            },
+          }
+        : row),
+    });
+    research.enqueueJson({ ok: true, dossier });
+    await submitGuide(page);
+
+    await expect(page.getByText("Partial result ready", { exact: false })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("Admissions: partial evidence — non-definitive. Research provider limits prevented completion.")).toBeVisible();
+    await expect(page.getByText("Minimum GPA", { exact: true })).toBeVisible();
+    await expect(page.getByText("Unclear requirement", { exact: true })).toBeVisible();
   });
 
   test("same-tick duplicate submission dispatches at most one Research request", async ({ page, research }) => {

@@ -11,6 +11,7 @@ import {
   type ResearchRequest,
   type ResearchResult,
 } from "@/lib/research/contracts";
+import { createStructuredProviderHealth } from "@/lib/research/ai/types";
 import type { ResolvedResearchTarget } from "@/lib/research/discovery/types";
 import { extractResearchDocuments } from "@/lib/research/extraction/orchestrator";
 import type { ExtractionFailure, ExtractionStageResult, ExtractionTargetIdentity } from "@/lib/research/extraction/types";
@@ -60,8 +61,15 @@ function normalizeProviderAttempts(attempts: readonly ResearchProviderAttempt[])
       result.push(attempt);
       continue;
     }
-    if (attempt.failureKind === "configuration" || (attempt.failureKind === "budget" && attempt.budgetScope !== "total")) {
-      const key = attempt.stage + ":" + attempt.provider;
+    if (
+      attempt.failureKind === "configuration" ||
+      attempt.failureKind === "rate-limit" ||
+      attempt.failureKind === "authentication" ||
+      attempt.failureKind === "policy" ||
+      attempt.failureKind === "capability" ||
+      (attempt.failureKind === "budget" && attempt.budgetScope !== "total")
+    ) {
+      const key = attempt.stage + ":" + attempt.provider + ":" + attempt.failureKind;
       if (providerScopedSkips.has(key)) continue;
       providerScopedSkips.add(key);
       result.push(attempt);
@@ -173,6 +181,9 @@ export async function runPhase2Research(
 
   const request: ResearchRequest = { ...parsed.data, categories: canonicalizeResearchCategories(parsed.data.categories) };
   const requestedCategories = request.categories;
+  const providerHealth = options.extraction?.providerOptions?.providerHealth ??
+    options.reconciliation?.providerOptions?.providerHealth ??
+    createStructuredProviderHealth();
   const initialAbortCode = options.signal?.aborted
     ? researchAbortFailureCode(options.signal)
     : undefined;
@@ -246,6 +257,7 @@ export async function runPhase2Research(
   if (extractionCategories.length > 0 && !options.signal?.aborted) {
     extraction = await extractResearchDocuments(stage.documents, {
       ...options.extraction,
+      providerOptions: { ...options.extraction?.providerOptions, providerHealth },
       categories: extractionCategories,
       categoriesByDocumentId: stage.documentCategories,
       target: extractionTarget(request, stage.resolution.target),
@@ -277,6 +289,7 @@ export async function runPhase2Research(
   if (decisionEligibleCategories.length > 0 && !options.signal?.aborted) {
     reconciliation = await reconcileResearchClaims({
       ...options.reconciliation,
+      providerOptions: { ...options.reconciliation?.providerOptions, providerHealth },
       candidates: extraction?.candidates ?? [],
       sources: stage.sources,
       documents: stage.documents,
@@ -320,7 +333,12 @@ export async function runPhase2Research(
   const terminalFailures = buildFailures(requestedCategories, processedCategories, reasonByCategory);
   const sourceGapFailures: ResearchFailure[] = processedCategories.flatMap((category) => {
     const code = reasonByCategory.get(category);
-    return code === "retrieval" || code === "normalization" || code === "provider-budget"
+    return code === "retrieval" ||
+        code === "normalization" ||
+        code === "provider-rate-limit" ||
+        code === "provider-budget" ||
+        code === "provider-error" ||
+        code === "timeout"
       ? [{ category, code, message: failureMessage(code) }]
       : [];
   });

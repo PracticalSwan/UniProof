@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { assessGuideRequirements } from "@/lib/guide/assessment";
 import { buildGuidePlan, daysBetweenDateOnly, parseStrictIsoDate } from "@/lib/guide/planning";
 import type { GuideApplicantProfile, GuideSubmission } from "@/lib/guide/contracts";
+import { researchDossierSchema } from "@/lib/research/mode/public-contracts";
 import { buildGuideDossier, makeClaim } from "./fixtures/guide-dossiers";
 
 const profile: GuideApplicantProfile = {
@@ -241,6 +242,31 @@ describe("buildGuidePlan application fee semantics", () => {
 
     expect(task?.evidenceRefs.map((ref) => ref.claimId)).toEqual(["fee-contextless"]);
     expect(task?.action).toBe("Confirm the current application fee for the selected intake/academic year; published period metadata is missing or does not match.");
+    expect(task?.action).not.toContain("100");
+  });
+
+  it("keeps source-gap application-fee evidence reachable as a neutral manual review", () => {
+    const feeClaim = makeClaim({ id: "fee-source-gap", property: "Application fee", value: 100, currency: "USD" });
+    const base = buildGuideDossier({ admissionsClaims: [feeClaim] });
+    const dossier = researchDossierSchema.parse({
+      ...base,
+      categories: base.categories.map((row) => row.category === "admissions" && row.state === "ready"
+        ? {
+            ...row,
+            sourceGap: {
+              code: "provider-rate-limit",
+              message: "Research provider limits prevented completion.",
+            },
+          }
+        : row),
+    });
+    const submission = makeSubmission("2026-08-18");
+    const assessment = assessGuideRequirements(submission, dossier);
+    const plan = buildGuidePlan(submission, dossier, assessment);
+    const task = plan.checklist.find((item) => item.kind === "application-fee-review");
+
+    expect(task?.evidenceRefs.map((ref) => ref.claimId)).toEqual(["fee-source-gap"]);
+    expect(task?.action).toBe("Confirm the current application fee manually; available evidence is not definitive.");
     expect(task?.action).not.toContain("100");
   });
 });

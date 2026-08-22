@@ -3,6 +3,7 @@
 import { EvidenceBadge } from "@/components/evidence/evidence-badge";
 import { Button } from "@/components/ui/button";
 import type { ResearchCatalog } from "@/lib/research/catalog/schema";
+import { categoryLabel } from "@/lib/research/mode/format";
 import type { GuideEvidenceRef, GuideResult } from "@/lib/guide/contracts";
 import { GuideChecklist } from "./guide-checklist";
 import { GuideRequirementRow } from "./guide-requirement-row";
@@ -37,6 +38,31 @@ export function GuideResults({ result, catalog, onShowEvidence, disabled, onClea
           Assessment date: {result.submission.assessmentDate}. This checks published requirements; it does not predict admission.
         </p>
       </div>
+
+      {result.status === "partial" ? (
+        <section aria-label="Guide research completeness" className="rounded-md border border-border bg-panel p-4 text-sm">
+          <p className="font-semibold">Research completeness</p>
+          <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+            {result.dossier.categories.flatMap((row) => {
+              if (row.state === "incomplete") {
+                return [
+                  <p key={row.category}>
+                    {categoryLabel(row.category)}: research incomplete. {row.failure.message}
+                  </p>,
+                ];
+              }
+              if (row.state === "ready" && row.sourceGap !== undefined) {
+                return [
+                  <p key={row.category}>
+                    {categoryLabel(row.category)}: partial evidence — non-definitive. {row.sourceGap.message}
+                  </p>,
+                ];
+              }
+              return [];
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <div className="overflow-hidden rounded-lg border border-border bg-white">
         {result.assessments.length === 0 ? (

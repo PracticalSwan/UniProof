@@ -4,6 +4,7 @@ import {
   researchDossierSchema,
   researchModeCategoryOrder,
   type PublicEvidenceStatus,
+  type PublicResearchFailure,
   type ResearchDossier,
   type ResearchModeCategory,
 } from "@/lib/research/mode/public-contracts";
@@ -32,6 +33,7 @@ export function makeComparisonDossier(options: {
   categories: readonly ResearchModeCategory[];
   claims?: readonly ComparisonFixtureClaim[];
   states?: Partial<Record<ResearchModeCategory, ComparisonFixtureCategoryState>>;
+  sourceGaps?: Partial<Record<ResearchModeCategory, PublicResearchFailure>>;
   runId?: string;
   canonicalUniversityName?: string;
   canonicalProgramName?: string;
@@ -112,6 +114,7 @@ export function makeComparisonDossier(options: {
         };
       }
       if (categoryClaims.length === 0) throw new Error(`ready fixture category ${category} needs claims`);
+      const sourceGap = options.sourceGaps?.[category];
       return {
         category,
         state: "ready" as const,
@@ -121,6 +124,7 @@ export function makeComparisonDossier(options: {
           referencedClaimIds: categoryClaims.map((claim) => claim.id),
           summary: `Fixture evidence summary for ${category}.`,
         },
+        ...(sourceGap === undefined ? {} : { sourceGap }),
         hasConflict: categoryClaims.some((claim) => claim.verificationStatus === "conflicting"),
         hasOutdated: categoryClaims.some((claim) => claim.verificationStatus === "outdated"),
       };

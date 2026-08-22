@@ -11,6 +11,8 @@ import { runPhase2Research, type Phase2ResearchOptions } from "@/lib/research/or
 import { fetchPublicUrl } from "@/lib/research/retrieval/fetch-public";
 import type { ExtractionTask } from "@/lib/research/extraction/types";
 import { accountInjectedStructuredAttempts, createExplanationBudget } from "@/lib/research/ai/types";
+import { GEMINI_INTERACTIONS_ENDPOINT } from "@/lib/integrations/gemini/structured";
+import { GROQ_STRUCTURED_ENDPOINT, GROQ_STRUCTURED_MODEL } from "@/lib/integrations/groq/structured";
 import {
   RESEARCH_MAX_DISCOVERY_PROVIDER_ATTEMPTS_PER_RUN,
   RESEARCH_MAX_DISCOVERY_RUN_TIMEOUT_MS,
@@ -208,6 +210,109 @@ describe("Phase 2F contracts and attempt ceilings", () => {
 });
 
 describe("Phase 2F orchestration", () => {
+  it("shares a rate-limit circuit across extraction and reconciliation while failing over to Groq", async () => {
+    let geminiCalls = 0;
+    let groqExtractionCalls = 0;
+    let groqReconciliationCalls = 0;
+    const fetchImpl: typeof fetch = async (input, init) => {
+      const endpoint = String(input);
+      if (endpoint === GEMINI_INTERACTIONS_ENDPOINT) {
+        geminiCalls += 1;
+        return new Response("", { status: 429, headers: { "Retry-After": "60" } });
+      }
+      if (endpoint !== GROQ_STRUCTURED_ENDPOINT) throw new Error(`unexpected provider endpoint ${endpoint}`);
+
+      const body = JSON.parse(String(init?.body)) as { messages?: Array<{ content?: string }> };
+      const prompt = body.messages?.[0]?.content ?? "";
+      if (prompt.includes("Segment ID:")) {
+        groqExtractionCalls += 1;
+        const segmentId = /Segment ID: ([^\n]+)/u.exec(prompt)?.[1];
+        if (segmentId === undefined) throw new Error("segment ID missing from extraction prompt");
+        const value = prompt.includes("3.5") ? 3.5 : 3.0;
+        const supportingText = value === 3.5 ? "The minimum GPA is 3.5." : "The minimum GPA is 3.0.";
+        return new Response(JSON.stringify({
+          model: GROQ_STRUCTURED_MODEL,
+          choices: [{ message: { content: JSON.stringify({
+            claims: [{
+              category: "admissions",
+              property: "minimum gpa",
+              value,
+              unit: "4.0",
+              currency: null,
+              academicYear: null,
+              effectiveDate: null,
+              intake: null,
+              segmentId,
+              supportingText,
+            }],
+          }) } }],
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+
+      groqReconciliationCalls += 1;
+      const questionsText = /BEGIN PAIR QUESTIONS\n([\s\S]+?)\nEND PAIR QUESTIONS/u.exec(prompt)?.[1];
+      if (questionsText === undefined) throw new Error("pair questions missing from reconciliation prompt");
+      const questions = JSON.parse(questionsText) as Array<{
+        questionId: string;
+        leftCandidateId: string;
+        rightCandidateId: string;
+      }>;
+      return new Response(JSON.stringify({
+        model: GROQ_STRUCTURED_MODEL,
+        choices: [{ message: { content: JSON.stringify({
+          relationships: questions.map((question) => ({ ...question, relationship: "contradictory" })),
+        }) } }],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    const options = baseOptions({
+      discovery: {
+        enableRor: false,
+        tavilySearch: async (query: { category?: TestCategory }) => ({
+          outcome: "success" as const,
+          candidates: query.category === "admissions"
+            ? [
+                candidate("https://example.edu/admissions-a", "admissions"),
+                candidate("https://example.edu/admissions-b", "admissions"),
+              ]
+            : [],
+          retryCount: 0,
+        }),
+        braveSearch: async () => ({ outcome: "empty" as const, candidates: [], retryCount: 0 }),
+      },
+      retrieve: async (url) => retrieval(
+        url,
+        url.endsWith("admissions-b") ? "The minimum GPA is 3.5." : "The minimum GPA is 3.0.",
+      ),
+      extraction: {
+        runTask: undefined,
+        geminiApiKey: "synthetic-gemini-key",
+        groqApiKey: "synthetic-groq-key",
+        providerOptions: { fetchImpl, sleep: async () => {} },
+      },
+      reconciliation: {
+        runTask: undefined,
+        geminiApiKey: "synthetic-gemini-key",
+        groqApiKey: "synthetic-groq-key",
+        providerOptions: { fetchImpl, sleep: async () => {} },
+      },
+    });
+
+    const result = await runPhase2Research({
+      target: { university: { name: "Example University" } },
+      categories: ["admissions"],
+    }, options);
+
+    expect(geminiCalls).toBe(1);
+    expect(groqExtractionCalls).toBe(2);
+    expect(groqReconciliationCalls).toBeGreaterThan(0);
+    expect(result.run.providerAttempts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ stage: "extraction", provider: "gemini", outcome: "failed", failureKind: "rate-limit" }),
+      expect.objectContaining({ stage: "reconciliation", provider: "gemini", outcome: "skipped", failureKind: "rate-limit" }),
+      expect.objectContaining({ stage: "reconciliation", provider: "groq", outcome: "success" }),
+    ]));
+  });
+
   it("returns a sanitized failed result for an invalid request without provider work", async () => {
     const result = await runPhase2Research({ categories: ["not-a-category"] }, baseOptions());
     expect(result).toMatchObject({

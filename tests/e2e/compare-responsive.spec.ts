@@ -11,13 +11,14 @@ import {
   makeComparisonBrowserResponse,
 } from "@/tests/fixtures/comparison-browser";
 import { makeComparisonDossier } from "@/tests/fixtures/comparison-dossiers";
-import { researchModeResponseSchema } from "@/lib/research/mode/public-contracts";
+import { researchModeResponseSchema, type ResearchModeCategory } from "@/lib/research/mode/public-contracts";
 
 const longProgramName = `International Computer Science and Artificial Intelligence ${"研究・ปัญญาประดิษฐ์・မြန်မာ".repeat(5)}`.slice(0, 190);
 const longUniversityName = `Global Technical University ${"มหาวิทยาลัย・大学・တက္ကသိုလ်".repeat(5)}`.slice(0, 190);
 const longContextProperty = `Published contextual ranking label ${"รายละเอียด・context・အချက်အလက်".repeat(6)}`.slice(0, 190);
 const longContextValue = `Context value ${"0123456789 abcdefghijklmnopqrstuvwxyz ".repeat(20)}`.slice(0, 500);
 const longEvidence = `<script>alert(1)</script>${" long published evidence 研究 ภาษาไทย မြန်မာ ".repeat(80)}`.slice(0, 2000);
+const stressCategories = [...comparisonBrowserCategories, "support"] as const satisfies readonly ResearchModeCategory[];
 
 function makeHighClaimMitResponse() {
   const tuitionSourceTypes = [
@@ -26,7 +27,7 @@ function makeHighClaimMitResponse() {
   ];
   const base = makeComparisonDossier({
     ...comparisonBrowserTargets.mit,
-    categories: comparisonBrowserCategories,
+    categories: stressCategories,
     claims: [
       {
         id: "mit-stress-tuition",
@@ -40,9 +41,7 @@ function makeHighClaimMitResponse() {
       },
     ],
     states: {
-      admissions: "unknown",
       scholarships: "unknown",
-      "program-structure": "unknown",
       research: "unknown",
       outcomes: "unknown",
       support: "unknown",
@@ -99,6 +98,7 @@ const stressResponses = [
     employment: 91,
     research: true,
     scholarship: false,
+    categories: stressCategories,
     canonicalProgramName: `${longProgramName} B`.slice(0, 198),
     canonicalUniversityName: `${longUniversityName} B`.slice(0, 198),
   }),
@@ -108,6 +108,7 @@ const stressResponses = [
     employment: 86,
     research: true,
     scholarship: true,
+    categories: stressCategories,
     canonicalProgramName: `${longProgramName} C`.slice(0, 198),
     canonicalUniversityName: `${longUniversityName} C`.slice(0, 198),
   }),
@@ -117,6 +118,7 @@ const stressResponses = [
     employment: 88,
     research: false,
     scholarship: true,
+    categories: stressCategories,
     canonicalProgramName: `${longProgramName} D`.slice(0, 198),
     canonicalUniversityName: `${longUniversityName} D`.slice(0, 198),
   }),

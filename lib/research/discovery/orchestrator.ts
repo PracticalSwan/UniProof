@@ -135,6 +135,20 @@ function completedGeneralWeb(result: ProviderSearchResult): boolean {
   return result.outcome === "success" || result.outcome === "empty";
 }
 
+function persistentDiscoveryFailure(
+  result: ProviderSearchResult,
+): NonNullable<ProviderSearchResult["failureKind"]> | undefined {
+  if (result.outcome !== "failed" && result.outcome !== "skipped") return undefined;
+  const kind = result.failureKind;
+  return kind === "configuration" ||
+      kind === "authentication" ||
+      kind === "rate-limit" ||
+      kind === "capability" ||
+      kind === "policy"
+    ? kind
+    : undefined;
+}
+
 function safeWarnings(warnings: readonly string[]): string[] {
   return [...new Set(warnings)].slice(0, RESEARCH_MAX_WARNINGS_PER_RUN);
 }
@@ -286,6 +300,7 @@ export async function discoverResearch(input: unknown, options: DiscoveryOptions
     const queries = planDiscoveryQueries(request, resolution);
     const tavilySearch = options.tavilySearch ?? searchTavily;
     const braveSearch = options.braveSearch ?? searchBrave;
+    const unavailableSearchProviders = new Map<"tavily" | "brave", NonNullable<ProviderSearchResult["failureKind"]>>();
 
     for (const query of queries) {
       if (runController.signal.aborted || attemptBudgetReached) break;
@@ -293,22 +308,36 @@ export async function discoverResearch(input: unknown, options: DiscoveryOptions
       const categoryProgress = query.category === undefined ? undefined : progress.get(query.category);
       let candidateFound = false;
 
-      if (!runBudgetAvailable(providerAttempts, deadline)) {
-        attemptBudgetReached = true;
-        budgetWarning(warnings);
-        break;
+      const tavilyUnavailable = unavailableSearchProviders.get("tavily");
+      let tavily: ProviderSearchResult;
+      if (tavilyUnavailable !== undefined) {
+        tavily = {
+          outcome: "skipped",
+          candidates: [],
+          retryCount: 0,
+          failureKind: tavilyUnavailable,
+        };
+      } else {
+        if (!runBudgetAvailable(providerAttempts, deadline)) {
+          attemptBudgetReached = true;
+          budgetWarning(warnings);
+          break;
+        }
+        const dispatched = await executeProvider(
+          () => tavilySearch(query, { apiKey: options.tavilyApiKey, signal: runController.signal }),
+          deadline,
+          { outcome: "failed", candidates: [], retryCount: 0, failureKind: "upstream", warning: "Tavily request failed" },
+        );
+        if (runController.signal.aborted) break;
+        if (dispatched === undefined) {
+          timedOut = true;
+          break;
+        }
+        tavily = dispatched;
+        recordAttempt(providerAttempts, "tavily", query.id, query.category, tavily);
+        const persistent = persistentDiscoveryFailure(tavily);
+        if (persistent !== undefined) unavailableSearchProviders.set("tavily", persistent);
       }
-      const tavily = await executeProvider(
-        () => tavilySearch(query, { apiKey: options.tavilyApiKey, signal: runController.signal }),
-        deadline,
-        { outcome: "failed", candidates: [], retryCount: 0, failureKind: "upstream", warning: "Tavily request failed" },
-      );
-      if (runController.signal.aborted) break;
-      if (tavily === undefined) {
-        timedOut = true;
-        break;
-      }
-      recordAttempt(providerAttempts, "tavily", query.id, query.category, tavily);
       if (categoryProgress !== undefined) {
         categoryProgress.generalWebCompleted ||= completedGeneralWeb(tavily);
         categoryProgress.providerFailed ||= tavily.outcome === "failed" || tavily.outcome === "skipped";
@@ -322,22 +351,36 @@ export async function discoverResearch(input: unknown, options: DiscoveryOptions
       }
 
       if (!candidateFound) {
-        if (!runBudgetAvailable(providerAttempts, deadline)) {
-          attemptBudgetReached = true;
-          budgetWarning(warnings);
-          break;
+        const braveUnavailable = unavailableSearchProviders.get("brave");
+        let brave: ProviderSearchResult;
+        if (braveUnavailable !== undefined) {
+          brave = {
+            outcome: "skipped",
+            candidates: [],
+            retryCount: 0,
+            failureKind: braveUnavailable,
+          };
+        } else {
+          if (!runBudgetAvailable(providerAttempts, deadline)) {
+            attemptBudgetReached = true;
+            budgetWarning(warnings);
+            break;
+          }
+          const dispatched = await executeProvider(
+            () => braveSearch(query, { apiKey: options.braveApiKey, signal: runController.signal }),
+            deadline,
+            { outcome: "failed", candidates: [], retryCount: 0, failureKind: "upstream", warning: "Brave request failed" },
+          );
+          if (runController.signal.aborted) break;
+          if (dispatched === undefined) {
+            timedOut = true;
+            break;
+          }
+          brave = dispatched;
+          recordAttempt(providerAttempts, "brave", query.id, query.category, brave);
+          const persistent = persistentDiscoveryFailure(brave);
+          if (persistent !== undefined) unavailableSearchProviders.set("brave", persistent);
         }
-        const brave = await executeProvider(
-          () => braveSearch(query, { apiKey: options.braveApiKey, signal: runController.signal }),
-          deadline,
-          { outcome: "failed", candidates: [], retryCount: 0, failureKind: "upstream", warning: "Brave request failed" },
-        );
-        if (runController.signal.aborted) break;
-        if (brave === undefined) {
-          timedOut = true;
-          break;
-        }
-        recordAttempt(providerAttempts, "brave", query.id, query.category, brave);
         if (categoryProgress !== undefined) {
           categoryProgress.generalWebCompleted ||= completedGeneralWeb(brave);
           categoryProgress.providerFailed ||= brave.outcome === "failed" || brave.outcome === "skipped";
@@ -351,7 +394,8 @@ export async function discoverResearch(input: unknown, options: DiscoveryOptions
         }
       }
 
-      if (query.kind === "category") {
+      const keepExactProgramPage = resolution.target.programId !== undefined || resolution.target.programName !== undefined;
+      if (query.kind === "category" && (keepExactProgramPage || !candidateFound)) {
         const direct = directDiscovery(resolution.target, query);
         const directResult: ProviderSearchResult = {
           outcome: direct.outcome,

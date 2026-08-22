@@ -160,6 +160,51 @@ describe("Phase 2B discovery", () => {
     ]));
   });
 
+  it("does not add a generic university homepage when category discovery already found official evidence", async () => {
+    const parsed = request({
+      target: { university: { id: "u-1" } },
+      categories: ["tuition", "research"],
+    });
+    const result = await discoverResearch(parsed, {
+      enableRor: false,
+      targetResolver: {
+        resolveUniversity: () => ({
+          id: "u-1",
+          name: "Example University",
+          countryCode: "US",
+          websiteUrl: "https://example.edu/",
+        }),
+      },
+      tavilySearch: async (query) => {
+        const candidate = normalizeCandidateSource(
+          {
+            url: query.category === "tuition"
+              ? "https://example.edu/fees"
+              : "https://example.edu/research",
+            sourceType: "university",
+          },
+          {
+            discoveryProvider: "tavily",
+            requestedCategory: query.category,
+            discoveryQueryId: query.id,
+          },
+        );
+        return { outcome: "success", candidates: candidate === null ? [] : [candidate], retryCount: 0 };
+      },
+      braveSearch: async () => ({ outcome: "empty", candidates: [], retryCount: 0 }),
+    });
+
+    expect(result.candidateSources.map((candidate) => candidate.url)).toEqual([
+      "https://example.edu/fees",
+      "https://example.edu/research",
+    ]);
+    expect(result.providerAttempts.some((attempt) => attempt.provider === "direct")).toBe(false);
+    expect(result.categoryAssociations).toEqual([
+      { url: "https://example.edu/fees", categories: ["tuition"] },
+      { url: "https://example.edu/research", categories: ["research"] },
+    ]);
+  });
+
   it("rejects a supplied university name that conflicts with a resolved program university", async () => {
     const conflict = await resolveResearchTarget(
       request({
@@ -291,6 +336,20 @@ describe("Phase 2B discovery", () => {
     expect(retried).toMatchObject({ outcome: "success", retryCount: 1 });
     expect(calls).toBe(2);
     expect(sleeps).toEqual([500]);
+
+    const longSleeps: number[] = [];
+    let longCalls = 0;
+    const longWindow = await searchTavily(query, {
+      apiKey: "secret-tavily-key",
+      sleep: async (milliseconds) => { longSleeps.push(milliseconds); },
+      fetchImpl: async () => {
+        longCalls += 1;
+        return new Response("", { status: 429, headers: { "Retry-After": "60" } });
+      },
+    });
+    expect(longWindow).toMatchObject({ outcome: "failed", failureKind: "rate-limit", retryCount: 0 });
+    expect(longCalls).toBe(1);
+    expect(longSleeps).toEqual([]);
   });
 
   it("classifies missing configuration, timeout, and 5xx handling without retrying policy failures", async () => {
@@ -345,6 +404,51 @@ describe("Phase 2B discovery", () => {
     });
     expect(result).toMatchObject({ outcome: "failed", failureKind: "invalid-response", retryCount: 0 });
     expect(JSON.stringify(result)).not.toContain("secret-brave-key");
+
+    const sleeps: number[] = [];
+    let calls = 0;
+    const longWindow = await searchBrave(query, {
+      apiKey: "secret-brave-key",
+      sleep: async (milliseconds) => { sleeps.push(milliseconds); },
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response("", { status: 429, headers: { "Retry-After": "60" } });
+      },
+    });
+    expect(longWindow).toMatchObject({ outcome: "failed", failureKind: "rate-limit", retryCount: 0 });
+    expect(calls).toBe(1);
+    expect(sleeps).toEqual([]);
+  });
+
+  it("circuits a persistently rate-limited discovery provider across later queries in the same run", async () => {
+    let tavilyCalls = 0;
+    let braveCalls = 0;
+    const result = await discoverResearch(request({ categories: ["admissions", "tuition"] }), {
+      enableRor: false,
+      tavilySearch: async () => {
+        tavilyCalls += 1;
+        return { outcome: "failed", candidates: [], retryCount: 0, failureKind: "rate-limit" as const };
+      },
+      braveSearch: async (query) => {
+        braveCalls += 1;
+        const discovered = query.category === undefined
+          ? null
+          : normalizeCandidateSource(
+              { url: `https://example.edu/${query.category}`, sourceType: "university" },
+              { discoveryProvider: "brave", requestedCategory: query.category, discoveryQueryId: query.id },
+            );
+        return {
+          outcome: discovered === null ? "empty" as const : "success" as const,
+          candidates: discovered === null ? [] : [discovered],
+          retryCount: 0,
+        };
+      },
+    });
+
+    expect(tavilyCalls).toBe(1);
+    expect(braveCalls).toBe(3);
+    expect(result.coveredCategories).toEqual(["admissions", "tuition"]);
+    expect(result.providerAttempts.filter((attempt) => attempt.provider === "tavily")).toHaveLength(1);
   });
 
   it("falls through from a failed Tavily query to Brave and preserves a trusted direct candidate", async () => {
@@ -400,7 +504,7 @@ describe("Phase 2B discovery", () => {
     });
     expect(braveCalls).toBe(0);
     expect(result.coveredCategories).toEqual(["admissions"]);
-    expect(result.providerAttempts.map((attempt) => attempt.provider)).toEqual(["tavily", "direct", "tavily"]);
+    expect(result.providerAttempts.map((attempt) => attempt.provider)).toEqual(["tavily", "tavily"]);
   });
 
   it("falls through to Brave and canonicalizes fragments with domain/run budgets", () => {

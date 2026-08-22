@@ -21,6 +21,10 @@ const CATEGORY_INTENTS: Record<ResearchCategory, readonly string[]> = {
   support: ["international student support", "academic services", "student services"],
 };
 
+export function researchCategoryIntentTerms(category: ResearchCategory): readonly string[] {
+  return CATEGORY_INTENTS[category];
+}
+
 function words(value: string): string[] {
   return value.trim().split(/\s+/u).filter(Boolean);
 }

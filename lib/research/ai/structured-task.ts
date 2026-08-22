@@ -118,6 +118,17 @@ function canRetry(failureKind: ResearchProviderAttemptFailureKind): boolean {
   return failureKind === "rate-limit" || failureKind === "timeout" || failureKind === "upstream";
 }
 
+function providerUnavailableReason(
+  failureKind: ResearchProviderAttemptFailureKind,
+): "rate-limit" | "authentication" | "policy" | "capability" | undefined {
+  return failureKind === "rate-limit" ||
+      failureKind === "authentication" ||
+      failureKind === "policy" ||
+      failureKind === "capability"
+    ? failureKind
+    : undefined;
+}
+
 function cancelResponseBody(response: Response, reason: string): void {
   try {
     const cancellation = response.body?.cancel(reason);
@@ -129,8 +140,9 @@ function cancelResponseBody(response: Response, reason: string): void {
 }
 
 /**
- * Parse only a bounded Retry-After value. Invalid values intentionally return
- * undefined so the caller can use an injected deterministic backoff.
+ * Parse only Retry-After values that can recover inside the deliberately
+ * short in-run retry window. Longer/invalid delays return undefined so a 429
+ * can fall through to the next provider instead of being clamped and retried.
  */
 export function parseRetryAfterMs(
   value: string | null,
@@ -142,7 +154,8 @@ export function parseRetryAfterMs(
   if (/^\d+(?:\.\d+)?$/u.test(normalized)) {
     const seconds = Number(normalized);
     if (!Number.isFinite(seconds) || seconds < 0) return undefined;
-    return Math.min(RESEARCH_MAX_RETRY_AFTER_MS, Math.round(seconds * 1_000));
+    const delay = Math.round(seconds * 1_000);
+    return delay <= RESEARCH_MAX_RETRY_AFTER_MS ? delay : undefined;
   }
   // A negative numeric value must not fall through to Date.parse (which
   // accepts a few surprising legacy date spellings such as "-1").
@@ -150,8 +163,8 @@ export function parseRetryAfterMs(
   const date = Date.parse(normalized);
   if (!Number.isFinite(date)) return undefined;
   const delay = date - now();
-  if (delay < 0) return undefined;
-  return Math.min(RESEARCH_MAX_RETRY_AFTER_MS, delay);
+  if (delay < 0 || delay > RESEARCH_MAX_RETRY_AFTER_MS) return undefined;
+  return delay;
 }
 
 function defaultBackoffMs(retryCount: number): number {
@@ -352,6 +365,20 @@ export async function runProviderTransport(
     return { ok: false, provider: spec.provider, failureKind: "configuration", attempts };
   }
 
+  const unavailableReason = options.providerHealth?.unavailable[spec.provider];
+  if (unavailableReason !== undefined) {
+    attempts.push(researchProviderAttemptSchema.parse({
+      stage,
+      provider: spec.provider,
+      model: spec.requestedModel,
+      outcome: "skipped",
+      retryCount: 0,
+      durationMs: 0,
+      failureKind: unavailableReason,
+    }));
+    return { ok: false, provider: spec.provider, failureKind: unavailableReason, attempts };
+  }
+
   const maxRetries = 1;
   for (let retryCount = 0; retryCount <= maxRetries; retryCount += 1) {
     if (options.signal?.aborted) {
@@ -397,10 +424,19 @@ export async function runProviderTransport(
     }
 
     const failureKind = dispatched.outcome.failureKind;
-    if (!canRetry(failureKind) || retryCount >= maxRetries) {
+    const retryable = failureKind === "rate-limit"
+      ? dispatched.outcome.retryAfterMs !== undefined
+      : canRetry(failureKind);
+    if (!retryable || retryCount >= maxRetries) {
+      const healthReason = providerUnavailableReason(failureKind);
+      if (healthReason !== undefined && options.providerHealth !== undefined) {
+        options.providerHealth.unavailable[spec.provider] = healthReason;
+      }
       return { ok: false, provider: spec.provider, failureKind, attempts };
     }
-    const delay = dispatched.outcome.retryAfterMs ?? defaultBackoffMs(retryCount);
+    const delay = failureKind === "rate-limit"
+      ? dispatched.outcome.retryAfterMs!
+      : defaultBackoffMs(retryCount);
     let mayRetry = false;
     try {
       mayRetry = await waitForRetryDelay(delay, options.signal, options.sleep);

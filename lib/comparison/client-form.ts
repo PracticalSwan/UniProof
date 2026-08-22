@@ -43,11 +43,17 @@ export type ComparisonFormValidation = {
 
 const MAX_SHORT_TEXT_UTF16 = 40;
 
+const comparisonDefaultCategories = researchModeCategoryOrder.filter((category) =>
+  comparisonPriorityOrder.some((priority) =>
+    comparisonDefaultWeights[priority] > 0 && comparisonPriorityCategory[priority] === category
+  )
+);
+
 export function createInitialComparisonFormState(): ComparisonFormState {
   return {
     search: "",
     targets: [],
-    categories: [...researchModeCategoryOrder],
+    categories: [...comparisonDefaultCategories],
     weights: Object.fromEntries(
       comparisonPriorityOrder.map((priority) => [priority, String(comparisonDefaultWeights[priority])]),
     ) as Record<ComparisonPriority, string>,
@@ -55,6 +61,25 @@ export function createInitialComparisonFormState(): ComparisonFormState {
     showAnecdotalEvidence: false,
     intake: "",
     academicYear: "",
+  };
+}
+
+export function setComparisonPriorityWeight(
+  state: ComparisonFormState,
+  priority: ComparisonPriority,
+  value: string,
+): ComparisonFormState {
+  const nextWeights = { ...state.weights, [priority]: value };
+  if (!/^(?:0|[1-9]\d{0,2})$/.test(value) || Number(value) <= 0 || Number(value) > 100) {
+    return { ...state, weights: nextWeights };
+  }
+  const backingCategory = comparisonPriorityCategory[priority];
+  if (state.categories.includes(backingCategory)) return { ...state, weights: nextWeights };
+  const selected = new Set([...state.categories, backingCategory]);
+  return {
+    ...state,
+    categories: researchModeCategoryOrder.filter((category) => selected.has(category)),
+    weights: nextWeights,
   };
 }
 

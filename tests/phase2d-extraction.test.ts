@@ -20,7 +20,7 @@ import {
 } from "@/lib/integrations/openrouter/structured";
 import { readBoundedText } from "@/lib/integrations/read-bounded-response";
 import { parseRetryAfterMs } from "@/lib/research/ai/structured-task";
-import { createExtractionBudget } from "@/lib/research/ai/types";
+import { createExtractionBudget, createStructuredProviderHealth } from "@/lib/research/ai/types";
 import {
   buildExtractionPrompt,
   portableExtractionJsonSchema,
@@ -447,7 +447,7 @@ describe("Phase 2D provider adapters and transport", () => {
     expect(parseRetryAfterMs("0.5", () => 0)).toBe(500);
     expect(parseRetryAfterMs("-1", () => 0)).toBeUndefined();
     expect(parseRetryAfterMs("not-a-delay", () => 0)).toBeUndefined();
-    expect(parseRetryAfterMs("999", () => 0)).toBe(2_000);
+    expect(parseRetryAfterMs("999", () => 0)).toBeUndefined();
     expect(parseRetryAfterMs(new Date(1_500).toUTCString(), () => 0)).toBe(1_000);
     expect(parseRetryAfterMs(new Date(-1_500).toUTCString(), () => 0)).toBeUndefined();
     const sleeps: number[] = [];
@@ -468,6 +468,41 @@ describe("Phase 2D provider adapters and transport", () => {
     expect(calls).toBe(2);
     expect(sleeps).toEqual([500]);
     expect(result.attempts.map((attempt) => attempt.retryCount)).toEqual([0, 1]);
+  });
+
+  it("falls through after a non-recoverable in-run rate limit and remembers provider health", async () => {
+    const health = createStructuredProviderHealth();
+    let calls = 0;
+    const first = await runGroqStructuredTask({
+      apiKey: "synthetic-groq-secret",
+      prompt: "public segment",
+      schema: portableExtractionJsonSchema,
+      providerHealth: health,
+      sleep: async () => { throw new Error("long Retry-After must not sleep"); },
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response("", { status: 429, headers: { "Retry-After": "60" } });
+      },
+    });
+    expect(first).toMatchObject({ ok: false, failureKind: "rate-limit" });
+    expect(calls).toBe(1);
+    expect(health.unavailable.groq).toBe("rate-limit");
+
+    const second = await runGroqStructuredTask({
+      apiKey: "synthetic-groq-secret",
+      prompt: "another public segment",
+      schema: portableExtractionJsonSchema,
+      providerHealth: health,
+      fetchImpl: async () => {
+        calls += 1;
+        return responseBody({});
+      },
+    });
+    expect(second).toMatchObject({ ok: false, failureKind: "rate-limit" });
+    expect(second.attempts).toEqual([
+      expect.objectContaining({ provider: "groq", outcome: "skipped", failureKind: "rate-limit" }),
+    ]);
+    expect(calls).toBe(1);
   });
 
   it("keeps the server-owned 24-attempt ceiling while allowing lower deterministic budgets", async () => {
@@ -951,6 +986,83 @@ describe("Phase 2D sequential fallback, budget, and setup", () => {
     expect(result.processedSegmentIds).toHaveLength(1);
     expect(result.unprocessedSegmentIds).toHaveLength(1);
     expect(result.unfinished).toBe(true);
+  });
+
+  it("routes shared-document segments to relevant categories instead of coupling every segment", async () => {
+    const currentDocument = document({
+      id: "document-routed",
+      sourceId: "source-routed",
+      normalizedText: "Annual tuition fees are USD 10000.\n\nResearch groups and faculty work on AI.\n\nWelcome to campus.",
+      sections: [
+        { heading: "Tuition fees", text: "Annual tuition fees are USD 10000." },
+        { heading: "Research", text: "Research groups and faculty work on AI." },
+        { heading: "Welcome", text: "Welcome to campus." },
+      ],
+    });
+    const dispatched: Array<{ heading?: string; categories: readonly string[] }> = [];
+    const result = await extractResearchDocuments([currentDocument], {
+      categories: ["tuition", "research"],
+      categoriesByDocumentId: { [currentDocument.id]: ["tuition", "research"] },
+      target: { universityName: "Example University" },
+      runTask: async (currentTask) => {
+        dispatched.push({ heading: currentTask.segment.heading, categories: currentTask.categories });
+        return {
+          payload: { claims: [] },
+          provider: "groq",
+          model: GROQ_STRUCTURED_MODEL,
+          attempts: [researchProviderAttemptSchema.parse({ stage: "extraction", provider: "groq", model: GROQ_STRUCTURED_MODEL, outcome: "success", retryCount: 0, durationMs: 1 })],
+        };
+      },
+    });
+    expect(dispatched).toEqual(expect.arrayContaining([
+      { heading: "Tuition fees", categories: ["tuition"] },
+      { heading: "Research", categories: ["research"] },
+    ]));
+    expect(dispatched.some((entry) => entry.heading === "Welcome")).toBe(false);
+    expect(result.completedCategories).toEqual(["tuition", "research"]);
+  });
+
+  it("schedules extraction fairly so one document cannot starve a later category", async () => {
+    const tuitionDocument = document({
+      id: "document-tuition-heavy",
+      sourceId: "source-tuition-heavy",
+      contentHash: "b".repeat(64),
+      normalizedText: ["Tuition fees one.", "Tuition fees two.", "Tuition fees three."].join("\n\n"),
+      sections: [
+        { heading: "Fees one", text: "Tuition fees one." },
+        { heading: "Fees two", text: "Tuition fees two." },
+        { heading: "Fees three", text: "Tuition fees three." },
+      ],
+    });
+    const researchDocument = document({
+      id: "document-research-later",
+      sourceId: "source-research-later",
+      contentHash: "c".repeat(64),
+      normalizedText: "Research groups and faculty work on AI.",
+      sections: [{ heading: "Research", text: "Research groups and faculty work on AI." }],
+    });
+    const dispatched: string[] = [];
+    const result = await extractResearchDocuments([tuitionDocument, researchDocument], {
+      categories: ["tuition", "research"],
+      categoriesByDocumentId: {
+        [tuitionDocument.id]: ["tuition"],
+        [researchDocument.id]: ["research"],
+      },
+      budget: createExtractionBudget(2),
+      target: { universityName: "Example University" },
+      runTask: async (currentTask) => {
+        dispatched.push(currentTask.categories[0] ?? "missing");
+        return {
+          payload: { claims: [] },
+          provider: "groq",
+          model: GROQ_STRUCTURED_MODEL,
+          attempts: [researchProviderAttemptSchema.parse({ stage: "extraction", provider: "groq", model: GROQ_STRUCTURED_MODEL, outcome: "success", retryCount: 0, durationMs: 1 })],
+        };
+      },
+    });
+    expect(dispatched).toEqual(["tuition", "research"]);
+    expect(result.completedCategories).toContain("research");
+    expect(result.incompleteCategories).toContain("tuition");
   });
 
   it("honors providerOptions ZDR when the extraction-level setting is omitted", async () => {

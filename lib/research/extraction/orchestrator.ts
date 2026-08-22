@@ -19,6 +19,7 @@ import {
   type StructuredAdapterInput,
   type StructuredProviderResult,
 } from "@/lib/research/ai/types";
+import { researchCategoryIntentTerms } from "@/lib/research/discovery/query-plan";
 import { buildExtractionPrompt, portableExtractionJsonSchema } from "./schema";
 import { segmentResearchDocument } from "./segments";
 import { dedupePromotedCandidates, promoteExtractedClaims } from "./promote";
@@ -279,6 +280,100 @@ async function runSegmentTask(
   };
 }
 
+function normalizedIntentText(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/gu, " ");
+}
+
+function segmentCategoryScore(segment: ExtractionSegment, category: ResearchCategory): number {
+  const text = normalizedIntentText([segment.heading, segment.text].filter(Boolean).join(" "));
+  if (text === "") return 0;
+  let score = 0;
+  for (const rawTerm of researchCategoryIntentTerms(category)) {
+    const term = normalizedIntentText(rawTerm);
+    if (term !== "" && text.includes(term)) score += 4;
+    const tokens = term.split(" ").filter((token) => token.length >= 4);
+    for (const token of tokens) {
+      if (text.includes(token)) score += 1;
+    }
+  }
+  return score;
+}
+
+function routeDocumentSegments(
+  segments: readonly ExtractionSegment[],
+  scopedCategories: readonly ResearchCategory[],
+): Array<{ segment: ExtractionSegment; categories: readonly ResearchCategory[] }> {
+  if (scopedCategories.length <= 1) {
+    return segments.map((segment) => ({ segment, categories: scopedCategories }));
+  }
+
+  const scores = segments.map((segment) => new Map(
+    scopedCategories.map((category) => [category, segmentCategoryScore(segment, category)]),
+  ));
+  const assigned = segments.map((segment, index) => ({
+    segment,
+    categories: scopedCategories.filter((category) => (scores[index]?.get(category) ?? 0) > 0),
+  }));
+
+  for (const category of scopedCategories) {
+    if (assigned.some((entry) => entry.categories.includes(category)) || segments.length === 0) continue;
+    let bestIndex = 0;
+    let bestScore = -1;
+    for (let index = 0; index < segments.length; index += 1) {
+      const score = scores[index]?.get(category) ?? 0;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIndex = index;
+      }
+    }
+    assigned[bestIndex] = {
+      ...assigned[bestIndex]!,
+      categories: canonicalizeResearchCategories([...assigned[bestIndex]!.categories, category]),
+    };
+  }
+
+  return assigned.filter((entry) => entry.categories.length > 0);
+}
+
+function scheduleCategoryFairly(
+  entries: ReadonlyArray<{ segment: ExtractionSegment; categories: readonly ResearchCategory[] }>,
+  categories: readonly ResearchCategory[],
+): Array<{ segment: ExtractionSegment; categories: readonly ResearchCategory[] }> {
+  const remaining = entries.map((entry, index) => ({ entry, index }));
+  const counts = new Map<ResearchCategory, number>(categories.map((category) => [category, 0]));
+  const scheduled: Array<{ segment: ExtractionSegment; categories: readonly ResearchCategory[] }> = [];
+
+  while (remaining.length > 0) {
+    let bestPosition = 0;
+    let bestLoad = Number.POSITIVE_INFINITY;
+    let bestIndex = Number.POSITIVE_INFINITY;
+    for (let position = 0; position < remaining.length; position += 1) {
+      const candidate = remaining[position]!;
+      const load = candidate.entry.categories.reduce(
+        (total, category) => total + (counts.get(category) ?? 0),
+        0,
+      ) / candidate.entry.categories.length;
+      if (load < bestLoad || (load === bestLoad && candidate.index < bestIndex)) {
+        bestPosition = position;
+        bestLoad = load;
+        bestIndex = candidate.index;
+      }
+    }
+    const [{ entry }] = remaining.splice(bestPosition, 1);
+    scheduled.push(entry);
+    for (const category of entry.categories) {
+      counts.set(category, (counts.get(category) ?? 0) + 1);
+    }
+  }
+
+  return scheduled;
+}
+
 function targetForTask(target: ExtractionTargetIdentity | undefined): ExtractionTargetIdentity {
   return target ?? {};
 }
@@ -293,18 +388,19 @@ export async function extractResearchDocuments(
   assertValidExtractionBudget(budget);
   const effectiveOptions: ExtractionOptions = { ...options, categories, budget };
 
-  const segmentEntries: Array<{ segment: ExtractionSegment; categories: readonly ResearchCategory[] }> = [];
-  const categorySegmentIds = new Map<ResearchCategory, Set<string>>(categories.map((category) => [category, new Set<string>()]));
+  const routedEntries: Array<{ segment: ExtractionSegment; categories: readonly ResearchCategory[] }> = [];
   for (const document of documents) {
     const requested = options.categoriesByDocumentId === undefined
       ? categories
       : options.categoriesByDocumentId[document.id] ?? [];
     const scoped = canonicalizeResearchCategories(requested.filter((category) => categories.includes(category)));
     if (scoped.length === 0) continue;
-    for (const segment of segmentResearchDocument(document)) {
-      segmentEntries.push({ segment, categories: scoped });
-      for (const category of scoped) categorySegmentIds.get(category)?.add(segment.id);
-    }
+    routedEntries.push(...routeDocumentSegments(segmentResearchDocument(document), scoped));
+  }
+  const segmentEntries = scheduleCategoryFairly(routedEntries, categories);
+  const categorySegmentIds = new Map<ResearchCategory, Set<string>>(categories.map((category) => [category, new Set<string>()]));
+  for (const entry of segmentEntries) {
+    for (const category of entry.categories) categorySegmentIds.get(category)?.add(entry.segment.id);
   }
   const segments = segmentEntries.map((entry) => entry.segment);
   const candidates: import("@/lib/research/contracts").ClaimCandidate[] = [];

@@ -98,6 +98,21 @@ function formatClaimValue(value: PublicResearchClaim["value"], currency?: string
   return value;
 }
 
+function guideAssessmentLabel(semantic: string): string {
+  const labels: Record<string, string> = {
+    "minimum-qualification-level": "Minimum qualification level",
+    "required-subject-background": "Subject background",
+    "minimum-gpa": "Minimum GPA",
+    "ielts-overall-minimum": "IELTS overall minimum",
+    "ielts-component-minimum": "IELTS component minimum",
+    "toefl-ibt-overall-minimum": "TOEFL iBT overall minimum",
+    "toefl-ibt-component-minimum": "TOEFL iBT component minimum",
+    "pte-academic-overall-minimum": "PTE Academic overall minimum",
+    "required-document": "Required document",
+  };
+  return labels[semantic] ?? semantic.replace(/-/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
 function makeRef(target: GuideSubmission["target"], claimId: string): GuideEvidenceRef {
   return { targetKey: guideTargetKey(target), claimId };
 }
@@ -296,7 +311,7 @@ function assessEnglishTest(
       return {
         id: `english-${claim.id}`,
         semantic: definition.semantic,
-        label: definition.semantic.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        label: guideAssessmentLabel(definition.semantic),
         state: "unclear-requirement" as GuideAssessmentState,
         evidenceRefs,
         detail: "The published English requirement is not a machine-comparable numeric threshold.",
@@ -556,7 +571,7 @@ export function assessGuideRequirements(
       assessments.push({
         id: `${semantic}-unclear`,
         semantic,
-        label: claims[0]!.definition.semantic.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        label: guideAssessmentLabel(claims[0]!.definition.semantic),
         state: "unclear-requirement",
         evidenceRefs: applicable.flatMap(({ evidenceRefs }) => evidenceRefs),
         detail: hasConflict && hasOutdated
@@ -581,7 +596,7 @@ export function assessGuideRequirements(
       assessments.push({
         id: `${semantic}-unclear`,
         semantic,
-        label: claims[0]!.definition.semantic.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        label: guideAssessmentLabel(claims[0]!.definition.semantic),
         state: "unclear-requirement",
         evidenceRefs: applicable.flatMap(({ evidenceRefs }) => evidenceRefs),
         detail: reason,
@@ -595,7 +610,7 @@ export function assessGuideRequirements(
         assessments.push({
           id: `${semantic}-conflict`,
           semantic,
-          label: definition.semantic.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+          label: guideAssessmentLabel(definition.semantic),
           state: "unclear-requirement",
           evidenceRefs: eligible.flatMap(({ evidenceRefs }) => evidenceRefs),
           detail: "Multiple inconsistent published values were found for this requirement.",

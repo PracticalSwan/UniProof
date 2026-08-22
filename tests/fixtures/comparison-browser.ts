@@ -9,19 +9,13 @@ export const comparisonBrowserTargets = {
 } as const;
 
 export const comparisonBrowserCategories = [
-  "admissions",
   "tuition",
   "scholarships",
-  "program-structure",
   "research",
   "outcomes",
-  "support",
 ] as const satisfies readonly ResearchModeCategory[];
 
-const defaultStates: Partial<Record<ResearchModeCategory, ComparisonFixtureCategoryState>> = {
-  admissions: "unknown",
-  "program-structure": "unknown",
-};
+const defaultStates: Partial<Record<ResearchModeCategory, ComparisonFixtureCategoryState>> = {};
 
 export function makeComparisonBrowserResponse(options: {
   target: typeof comparisonBrowserTargets[keyof typeof comparisonBrowserTargets];
@@ -30,8 +24,10 @@ export function makeComparisonBrowserResponse(options: {
   research: boolean;
   scholarship: boolean;
   support?: boolean;
+  categories?: readonly ResearchModeCategory[];
   extraClaims?: readonly ComparisonFixtureClaim[];
   states?: Partial<Record<ResearchModeCategory, ComparisonFixtureCategoryState>>;
+  sourceGaps?: Parameters<typeof makeComparisonDossier>[0]["sourceGaps"];
   canonicalUniversityName?: string;
   canonicalProgramName?: string;
 }): ResearchModeResponse {
@@ -46,9 +42,10 @@ export function makeComparisonBrowserResponse(options: {
   ];
   const dossier = makeComparisonDossier({
     ...options.target,
-    categories: comparisonBrowserCategories,
+    categories: options.categories ?? comparisonBrowserCategories,
     claims,
     states: { ...defaultStates, ...options.states },
+    sourceGaps: options.sourceGaps,
     canonicalUniversityName: options.canonicalUniversityName,
     canonicalProgramName: options.canonicalProgramName,
   });

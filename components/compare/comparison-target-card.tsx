@@ -100,9 +100,14 @@ export function ComparisonTargetCard({
             if (row.state === "unknown") {
               return <p key={row.category} className="text-xs font-semibold text-evidence-inferred-fg">{categoryLabel(row.category)}: evidence unknown.</p>;
             }
-            if (!row.hasConflict && !row.hasOutdated) return null;
+            if (row.sourceGap === undefined && !row.hasConflict && !row.hasOutdated) return null;
             return (
               <div key={row.category} className="space-y-2">
+                {row.sourceGap === undefined ? null : (
+                  <p className="text-xs font-semibold text-evidence-inferred-fg">
+                    {categoryLabel(row.category)}: partial evidence — unscored. {row.sourceGap.message}
+                  </p>
+                )}
                 {row.hasConflict ? (
                   <p className="text-xs font-semibold text-destructive">{categoryLabel(row.category)}: conflicting evidence remains visible and unscored.</p>
                 ) : null}

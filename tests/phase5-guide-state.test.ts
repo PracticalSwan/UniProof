@@ -204,7 +204,10 @@ describe("finalizeGuideResult", () => {
 
     const result = finalizeGuideResult(submission, request, dossier, researchCatalog);
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.result.status).toBe("partial");
+    if (result.ok) {
+      expect(result.result.status).toBe("partial");
+      expect(result.result.assessments.find((item) => item.semantic === "minimum-gpa")?.label).toBe("Minimum GPA");
+    }
   });
 
   it("rejects mismatched target", () => {

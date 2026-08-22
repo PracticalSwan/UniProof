@@ -9,6 +9,7 @@ import {
 } from "@/lib/comparison/contracts";
 import {
   createInitialComparisonFormState,
+  setComparisonPriorityWeight,
   searchComparisonCatalog,
   validateComparisonForm,
   type ComparisonFormState,
@@ -27,6 +28,21 @@ function form(overrides: Partial<ComparisonFormState> = {}): ComparisonFormState
 }
 
 describe("Phase 4 comparison contracts", () => {
+  it("defaults Research work to positive-weight scoring categories and adds a backing category when its weight becomes positive", () => {
+    const initial = createInitialComparisonFormState();
+    expect(initial.categories).toEqual(["tuition", "scholarships", "research", "outcomes"]);
+    expect(initial.categories).not.toContain("admissions");
+    expect(initial.categories).not.toContain("program-structure");
+    expect(initial.categories).not.toContain("support");
+
+    const withSupport = setComparisonPriorityWeight(initial, "support", "25");
+    expect(withSupport.weights.support).toBe("25");
+    expect(withSupport.categories).toEqual(["tuition", "scholarships", "research", "outcomes", "support"]);
+
+    const backToZero = setComparisonPriorityWeight(withSupport, "support", "0");
+    expect(backToZero.categories).toContain("support");
+  });
+
   it("accepts exactly 2, 3, or 4 unique homogeneous targets", () => {
     for (const targets of [
       [universityA, universityB],
@@ -90,7 +106,10 @@ describe("Phase 4 comparison contracts", () => {
       { affordability: "100", research: "50", scholarships: "50", outcomes: "0", support: "0" },
       { affordability: "1", research: "0", scholarships: "0", outcomes: "0", support: "0" },
     ]) {
-      expect(validateComparisonForm(form({ weights }), researchCatalog).submission?.weights).toEqual(
+      expect(validateComparisonForm(form({
+        categories: ["tuition", "scholarships", "research", "outcomes", "support"],
+        weights,
+      }), researchCatalog).submission?.weights).toEqual(
         Object.fromEntries(Object.entries(weights).map(([key, value]) => [key, Number(value)])),
       );
     }

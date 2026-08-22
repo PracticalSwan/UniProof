@@ -166,7 +166,14 @@ function publicSourceGapFor(
   const code = failures
     .filter((failure) => failure.category === category)
     .map((failure) => failure.code)
-    .filter((failureCode) => failureCode === "retrieval" || failureCode === "normalization" || failureCode === "provider-budget")
+    .filter((failureCode) =>
+      failureCode === "retrieval" ||
+      failureCode === "normalization" ||
+      failureCode === "provider-rate-limit" ||
+      failureCode === "provider-budget" ||
+      failureCode === "provider-error" ||
+      failureCode === "timeout"
+    )
     .sort((left, right) => failurePrecedence.indexOf(left) - failurePrecedence.indexOf(right))[0];
   return code === undefined ? undefined : { code, message: failureMessages[code] };
 }

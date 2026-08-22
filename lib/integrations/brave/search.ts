@@ -18,11 +18,12 @@ function queryIsBounded(query: string): boolean {
   return query.length <= RESEARCH_MAX_DISCOVERY_QUERY_CHARACTERS && query.trim().split(/\s+/u).length <= RESEARCH_MAX_DISCOVERY_QUERY_WORDS;
 }
 
-function safeRetryAfter(value: string | null): number {
-  if (value === null) return 0;
+function boundedRetryAfter(value: string | null): number | undefined {
+  if (value === null) return undefined;
   const seconds = Number(value);
-  if (!Number.isFinite(seconds) || seconds < 0) return 0;
-  return Math.min(Math.round(seconds * 1_000), 1_000);
+  if (!Number.isFinite(seconds) || seconds < 0) return undefined;
+  const milliseconds = Math.round(seconds * 1_000);
+  return milliseconds <= 1_000 ? milliseconds : undefined;
 }
 
 export async function searchBrave(
@@ -95,13 +96,12 @@ export async function searchBrave(
           // Status classification and bounded retry behavior must not depend
           // on an untrusted provider body cleanup promise.
         }
-        if (retryCount < 1) {
+        const retryDelay = response.status === 429
+          ? boundedRetryAfter(response.headers.get("retry-after"))
+          : 0;
+        if (retryCount < 1 && retryDelay !== undefined) {
           retryCount += 1;
-          const mayRetry = await waitForRetryDelay(
-            safeRetryAfter(response.headers.get("retry-after")),
-            options.signal,
-            sleep,
-          );
+          const mayRetry = await waitForRetryDelay(retryDelay, options.signal, sleep);
           if (!mayRetry) {
             return {
               outcome: "skipped",

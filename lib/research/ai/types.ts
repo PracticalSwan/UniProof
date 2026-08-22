@@ -44,6 +44,19 @@ export type StructuredTaskTargetContext = {
 
 export const structuredTaskProviders = ["gemini", "groq", "openrouter"] as const satisfies readonly ResearchExtractionProvider[];
 
+export type StructuredProviderUnavailableReason = Extract<
+  ResearchProviderAttemptFailureKind,
+  "rate-limit" | "authentication" | "policy" | "capability"
+>;
+
+export type StructuredProviderHealth = {
+  readonly unavailable: Partial<Record<ResearchExtractionProvider, StructuredProviderUnavailableReason>>;
+};
+
+export function createStructuredProviderHealth(): StructuredProviderHealth {
+  return { unavailable: {} };
+}
+
 type ProviderBudgetMap = Record<ResearchExtractionProvider, number>;
 
 export type StructuredAiBudget = {
@@ -228,6 +241,7 @@ export type StructuredAdapterInput = {
   apiKey?: string;
   signal?: AbortSignal;
   budget?: StructuredAiBudget;
+  providerHealth?: StructuredProviderHealth;
   fetchImpl?: typeof fetch;
   now?: () => number;
   sleep?: (milliseconds: number) => Promise<void>;
@@ -240,6 +254,7 @@ export type StructuredProviderOptions = {
   apiKey?: string;
   signal?: AbortSignal;
   budget?: StructuredAiBudget;
+  providerHealth?: StructuredProviderHealth;
   fetchImpl?: typeof fetch;
   now?: () => number;
   sleep?: (milliseconds: number) => Promise<void>;

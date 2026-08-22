@@ -288,7 +288,14 @@ export function buildGuidePlan(
       isGuideClaimDefinitiveEligible(claim, dossier) && typeof claim.value === "number"
     );
     const feeValues = new Set(eligibleFees.map((claim) => JSON.stringify([claim.value, claim.currency])));
-    if (feeValues.size === 1 && eligibleFees.length > 0) {
+    if (eligibleFees.length === 0 && feeClaims.length > 0) {
+      checklist.push({
+        id: "task-application-fee-review",
+        kind: "application-fee-review",
+        action: "Confirm the current application fee manually; available evidence is not definitive.",
+        evidenceRefs: feeClaims.map((claim) => guideEvidenceRef(submission, claim)),
+      });
+    } else if (feeValues.size === 1 && eligibleFees.length > 0) {
       const representative = eligibleFees[0]!;
       checklist.push({
         id: "task-application-fee-review",

@@ -142,10 +142,11 @@ test.describe("Phase 6A local authentication and saved snapshots", () => {
       const signOutResponsePromise = firstPage.waitForResponse((response) =>
         response.url().endsWith("/api/auth/sign-out") && response.request().method() === "POST",
       );
-      await firstPage.getByRole("button", { name: "Sign out" }).click();
+      const signOutClick = firstPage.getByRole("button", { name: "Sign out" }).click();
       const signOutResponse = await signOutResponsePromise;
       expect(signOutResponse.status()).toBe(200);
       expect(await signOutResponse.json()).toEqual({ signedOut: true });
+      await signOutClick;
       await expect(firstPage.getByRole("banner").getByRole("link", { name: "Sign in" })).toBeVisible();
 
       await secondPage.reload();

@@ -65,7 +65,7 @@ The release review found and fixed two important source-resilience defects. Supp
 - Guide keeps applicant profile values out of the public Research/provider chain and does not predict admission probability.
 - Public browser policy uses a nonce CSP with no third-party runtime analytics/scripts.
 - The expensive Research endpoint has durable deployment-layer rate limiting.
-- The final hardened source passed 602/602 Vitest tests, TypeScript, ESLint, production build, release/workspace verification, dependency audit, and deterministic hosted Preview browser acceptance.
+- The final hardened executable tree passed 625/625 Vitest tests, TypeScript, ESLint, production build, release/workspace verification, dependency audit, Compare 63/63, Guide 55/55, Research 70/70 browser verification, and local Auth/Saved 12/12; the final Production route/bundle/security smoke also passed without claiming successful live evidence production.
 
 ## What we learned
 

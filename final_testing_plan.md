@@ -965,3 +965,16 @@ Codex may change this order based on evidence, but this is the preferred startin
 19. Give the concise READY / READY WITH LIMITATIONS / NOT READY report.
 
 The executor is expected to think beyond this plan when the repository presents new evidence, but it must remain simple, causal, bounded, and release-focused.
+
+
+---
+
+# Final-testing execution record (2026-08-22)
+
+- Accepted-call allowance for this plan: 5 additional Research executions; historical Phase 6C record remains 3/3.
+- Rejected pre-execution request: Edinburgh Artificial Intelligence MSc / Research only, malformed internal target shape, HTTP 400 `invalid-request` in 743 ms. It did not enter accepted Research execution and is not charged.
+- **Accepted final-testing call 1/5:** purpose was to verify that the repaired Production provider path terminates boundedly instead of reproducing the earlier ~161-second Edinburgh Research failure. Public request used `university-edinburgh`, `program-edinburgh-artificial-intelligence-msc`, category `research`.
+- Outcome: HTTP 200 in 18,596 ms; one source, zero claims; `research` finalized `ready` with sanitized `provider-error` source gap and no category failure object. Exact-deployment runtime logs recorded the 200 request and no `/api/research` runtime error cluster was present in the observed hour.
+- Interpretation: **bounded fail-closed behavior verified; successful live evidence production not claimed.** The repaired path avoids the prior multi-minute retry amplification under current provider pressure.
+- Final-testing live quota used: **1/5**. Four additional calls remain unused because no further unresolved live-only hypothesis justifies spending them.
+- Cumulative accepted accounting: **3 historical + 1 final-testing = 4 accepted executions**.

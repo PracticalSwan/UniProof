@@ -1,6 +1,6 @@
 # Vercel Production Operations
 
-This runbook records the Phase 6C Vercel release contract and the observed final-release state, most recently verified on 2026-08-21. Devpost publication is a separate final gate.
+This runbook records the Phase 6C Vercel release contract and the observed final-release state, most recently verified on 2026-08-22. Devpost publication is a separate final gate.
 
 ## Current release configuration
 
@@ -29,16 +29,16 @@ Do not add a second in-process limiter merely to duplicate this protection. Appl
 
 ## Final Production release evidence
 
-- Release source SHA: `30466aa59febd926c279928683118c72f0d1f63f` (`fix: complete final release hardening`).
-- GitHub Actions: run `32398691369`, conclusion `success`; both `application` and `local-supabase` jobs succeeded.
-- Vercel Production deployment: `dpl_GmeqEnMk5cKiC5jsY1KajyrXFEhy` / `https://uniproof-6znv1tj0z-practicalswans-projects.vercel.app`, verified `READY`, target `production`, on 2026-08-21.
-- Canonical alias: `https://uniproof-beta.vercel.app`.
-- Vercel metadata records `githubCommitSha` as the release source SHA above, with GitHub organization `PracticalSwan`, repository `UniProof`, and ref `main`.
-- Runtime: Node `22.x`. The Vercel project setting still displays `24.x`, but the repository's `package.json` `engines.node: "22.x"` overrides the project setting for builds and functions per current Vercel documentation, so the deployment satisfies the Node 22 contract and the setting was intentionally left unchanged.
+- Verified executable SHA: `f797e0a692f113a29b3f4aa3491a216ead292b2a` (`test: stabilize local sign-out response assertion`), containing reliability implementation commit `e612782a92c4e8088d9592c2c51f1f8252745e57`.
+- GitHub Actions: run `32545347640`, conclusion `success`; both `application` and `local-supabase` jobs succeeded.
+- Vercel Production deployment: `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7` / `https://uniproof-1rhm88877-practicalswans-projects.vercel.app`, verified `READY`, target `production`, on 2026-08-22.
+- Canonical alias: `https://uniproof-beta.vercel.app`; deployment metadata lists the alias with no alias error.
+- Vercel metadata records `githubCommitSha` as the verified executable SHA above, GitHub organization `PracticalSwan`, repository `UniProof`, and ref `main`.
+- Runtime remains Node `22.x` by repository contract; the deployment reports four Node.js functions.
 
 ## Security / privacy observations
 
-Final Production verification of the 2026-08-21 release deployment observed:
+Final Production verification of the 2026-08-22 reliability deployment observed:
 
 - HTTP 200 for `/`, `/research`, `/compare`, and `/guide` on the canonical origin;
 - private/no-cache/no-store application responses;
@@ -46,24 +46,23 @@ Final Production verification of the 2026-08-21 release deployment observed:
 - `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, COOP/CORP, restrictive Permissions Policy;
 - Vercel HSTS: `max-age=63072000; includeSubDomains; preload`;
 - all 15 browser script bundles on `/research` remained same-origin;
-- six configured local secret values were compared against the deployed browser bundles without printing them and produced zero matches;
+- five configured local secret values were compared against the deployed browser bundles without printing them and produced zero matches;
 - no provider key names/provider identifiers, browser source-map references, Vercel toolbar, or Vercel runtime analytics markers were found in the deployed page/bundles;
-- recent exact-deployment log inspection showed only the expected successful GET verification traffic, no error-level entries, and no HTTP 5xx entries in the observed window;
-- a bounded desktop/mobile Playwright smoke of `/`, `/research`, `/compare`, and `/guide` rendered every route, completed `/` -> `/research` navigation, and produced zero console errors and zero page errors;
+- exact-deployment log inspection showed expected verification traffic plus the bounded Research POST; no `/api/research` runtime error cluster was present in the observed hour;
+- a bounded desktop/mobile browser smoke loaded `/`, `/research`, `/compare`, and `/guide` at both 390x844 and 1440x900: 8/8 loads returned 200 with zero console/page errors;
 - a non-provider `GET /api/research` request returned the expected HTTP 405, confirming the deployed Research function responds without invoking providers.
 
 UniProof does not duplicate Vercel's HSTS at the application layer.
 
 ## Release smoke evidence
 
-The historical Phase 6C live Research budget was capped at three accepted executions and is exhausted at **3/3**. That record remains immutable. The later `final_testing_plan.md` owns a separate maximum-five allowance and requires an explicit unresolved Production hypothesis before each accepted call.
+The historical Phase 6C live Research budget remains exhausted at **3/3**. The separate `final_testing_plan.md` allowance authorized up to five additional accepted executions and consumed **1/5** during the 2026-08-22 reliability verification.
 
-The third pass used University of Waterloo Bachelor of Computer Science admissions. The request returned HTTP 200 and a schema-valid public response, but the category remained operationally incomplete with zero claims. That pass exposed two deterministic resilience defects subsequently fixed without another live call:
+The accepted final-testing call used The University of Edinburgh, Artificial Intelligence MSc, `research` only. Production returned HTTP 200 in **18,596 ms** with one public source, zero claims, and category state `ready` carrying a sanitized `provider-error` source gap. The corresponding exact-deployment runtime log records `POST /api/research 200`, and no `/api/research` runtime error cluster was found in the observed hour. This does **not** establish successful live evidence production; it establishes that the formerly ~161-second provider-failure path now terminates quickly, exposes uncertainty, and does not continue a multi-minute retry storm.
 
-1. usable same-category claims now survive another selected source failing retrieval/normalization, with a sanitized `sourceGap` marker;
-2. program-scoped Research always retains the catalog-owned official program URL as a trusted direct candidate, even when general web discovery succeeds.
+A preceding malformed public request used an internal target shape and was rejected with HTTP 400 `invalid-request` in 743 ms before Research execution; it is not counted as an accepted call. Final live accounting is **3 historical + 1 final-testing = 4 accepted executions**, leaving four additional final-testing calls unused.
 
-Source-gap claims remain visible in Research but are non-definitive in Compare and Guide. The corrected executable source passed 602/602 Vitest tests and 104/104 deterministic hosted Preview Research/Compare/Guide browser acceptance cases. This does **not** convert the live smoke into a successful evidence-producing run; residual live-provider/source variability remains an explicit release limitation.
+Deterministic evidence remains primary: source-gap claims are visible in Research but non-definitive in Compare and Guide, long provider quota windows fail over rather than being clamped into short retries, persistent provider unavailability is circuit-broken for the current Research run, and no global provider/time budget was increased.
 
 ## Exact-SHA production procedure
 

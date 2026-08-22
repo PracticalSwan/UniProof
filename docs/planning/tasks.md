@@ -310,7 +310,7 @@ Authoritative execution plan: `final_testing_plan.md`.
 - [x] Complete repository/tool/CI/Production inventory and independent architecture, requirements, test-gap, security, UI/UX, and performance audits.
 - [x] Remediate verified evidence-integrity, hostile-normalization, Auth, persistence, private-restore, Compare accessibility/error, Guide focus, and test-harness gaps with focused regressions.
 - [x] Pass the fresh local Supabase reset/lint/advisors/pgTAP/Auth-Saved matrix and the stable source/type/lint/unit/build/built-browser gates recorded in the final-testing closeout.
-- [ ] Publish the final reviewed change set, require exact-SHA CI, connect GitHub to Vercel, verify any automatic Production deployment, and save/reinspect the unsubmitted Devpost draft.
+- [x] Publish the final reviewed change set, require exact-SHA CI, and verify GitHub/Vercel integration plus the automatic Production deployment. The 2026-08-22 reliability executable revision `f797e0a692f113a29b3f4aa3491a216ead292b2a` passed GitHub Actions run `32545347640`; Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7` is `READY` and serves the canonical alias.
 
 ## Side Phase UCE — University Catalog Expansion
 

@@ -24,25 +24,26 @@ This matrix binds Phase 6 hardening/release requirements to implementation and o
 | Secrets/provider internals stay out of tracked/client output | server-only env boundaries | exact-value tracked/bundle scan; no source maps | Verified; no configured secret value/key name/provider identifier in browser bundle |
 | Protected local screenshots stay private | `.vercelignore`, Git review | Git status + release verifier | `ui-flow-screenshots/` remains untracked/unpublished |
 | Release screenshots are separate and reviewable | `docs/assets/screenshots/phase-6/` | deterministic hosted capture + visual inspection | 8 reviewed PNGs retained |
-| Live provider smoke is bounded | Phase 6C runbook + `final_testing_plan.md` | accepted call accounting | Historical Phase 6C **3/3 exhausted**; separate final-testing allowance is maximum five hypothesis-driven calls |
-| GitHub CI is least privilege and deterministic | `.github/workflows/ci.yml` | GitHub Actions run `32367630411` | **Verified** on release SHA `21d645baaf9eca381a167246d22538c23bb29427`; application and local-Supabase jobs succeeded |
-| Exact repository/deployment traceability | Git + Vercel | public Git SHA + GitHub Actions + Vercel deployment metadata | **Verified**: Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` records `githubCommitSha` and `releaseSha` = `21d645baaf9eca381a167246d22538c23bb29427` |
+| Live provider smoke is bounded | Phase 6C runbook + `final_testing_plan.md` | accepted call accounting | Historical Phase 6C **3/3 exhausted**; final-testing **1/5 used**; cumulative accepted total **4** |
+| GitHub CI is least privilege and deterministic | `.github/workflows/ci.yml` | GitHub Actions run `32545347640` | **Verified** on executable SHA `f797e0a692f113a29b3f4aa3491a216ead292b2a`; application and local-Supabase jobs succeeded |
+| Exact repository/deployment traceability | Git + Vercel | public Git SHA + GitHub Actions + Vercel deployment metadata | **Verified executable revision**: Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7` records `githubCommitSha` = `f797e0a692f113a29b3f4aa3491a216ead292b2a` and serves the canonical alias |
 | Devpost rules/assets are current | `docs/hackathon.md`, `docs/submission/` | Devpost recheck 2026-08-20 | Draft-ready; final video/submission pending |
 
 ## Current executable verification
 
-Before the documentation-only release synchronization, the hardened executable tree passed:
+The 2026-08-22 reliability executable revision passed:
 
-- Vitest **602/602**;
+- Vitest **625/625** across 41 files;
 - TypeScript and ESLint;
-- Next.js 16.3.1 production build on Node 22.19.0;
+- Next.js 16.3.1 production build on the Node 22 contract;
 - release/workspace verifiers;
 - `npm audit --omit=dev` with **0 vulnerabilities**;
-- deterministic hosted Preview Research/Compare/Guide browser acceptance **104/104**;
-- exact-value secret/client-bundle scan with zero configured-secret matches and zero browser source maps.
+- Compare **63/63**, Guide **55/55**, and Research **70/70** browser verification;
+- local Supabase Auth/Saved **12/12**, plus schema reset/lint/advisors and pgTAP in exact-SHA CI;
+- exact-value secret/client-bundle scan with five configured secrets checked and zero configured-secret matches/provider-key markers/source-map markers.
 
-Release screenshots were captured from the verified hosted Preview with deterministic intercepted Research fixtures. The executable release was then published as `21d645baaf9eca381a167246d22538c23bb29427`; GitHub Actions run `32367630411` completed successfully on that exact SHA, and Vercel Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` was promoted to the canonical origin. Post-deploy route/header/WAF/client-bundle/log verification was deterministic and consumed no additional live Research quota. This documentation-only closeout records that already-observed external state and does not alter the deployed executable source.
+Executable SHA `f797e0a692f113a29b3f4aa3491a216ead292b2a` passed GitHub Actions run `32545347640` with both `application` and `local-supabase` jobs successful. Vercel Git integration created Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7`, `READY`, target `production`, metadata-bound to that SHA and serving `https://uniproof-beta.vercel.app`. Post-deploy route/header/WAF/client-bundle/log checks passed, including 8/8 mobile/desktop core-route loads with zero console/page errors.
 
 ## Live-smoke limitation
 
-All three historical Phase 6C accepted live Research executions were used. The third call (University of Waterloo Bachelor of Computer Science, admissions) returned HTTP 200 and a schema-valid public envelope, but the category was operationally incomplete with zero claims/sources. No fourth call was permitted under that Phase 6C allowance. `final_testing_plan.md` separately authorizes up to five new accepted executions only for explicit unresolved Production hypotheses; final accounting must report `3 historical + N final-testing` and the Devpost text must not claim successful live evidence unless one is actually observed.
+All three historical Phase 6C accepted Research executions remain accounted separately. The 2026-08-22 final-testing plan consumed **1/5** additional accepted execution for the specific unresolved hypothesis that the repaired provider path should terminate boundedly under current provider pressure. Edinburgh Artificial Intelligence MSc, Research only, returned HTTP 200 in about **18.6 seconds**, exposed one source and zero claims, and finalized `research` as `ready` with a sanitized `provider-error` source gap. This is fail-closed operational evidence, not successful live evidence production. A preceding malformed public request returned HTTP 400 before Research execution and is not charged. Final accounting is **3 historical + 1 final-testing = 4 accepted executions**.

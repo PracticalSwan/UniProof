@@ -621,6 +621,9 @@ The application may therefore be **production-released and submission-ready exce
 
 **Observed Phase 6C release-gate evidence (2026-08-20):** the anonymous release satisfies every pre-Devpost item above. Hardened Preview acceptance passed 104/104 deterministic Research/Compare/Guide browser cases; executable SHA `21d645baaf9eca381a167246d22538c23bb29427` passed GitHub Actions run `32367630411`; Vercel Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` is metadata-bound to that SHA and serves the canonical origin; the exact Research WAF rule remains enabled; and deterministic Production route/header/security/client-bundle/log checks passed without a fourth live Research call. Hosted Auth/save remains intentionally absent. The release state is therefore `submission-ready / pending final video`, not Devpost-submitted.
 
+
+**Observed 2026-08-22 Research/Compare/Guide reliability release evidence:** the current executable revision `f797e0a692f113a29b3f4aa3491a216ead292b2a` passed GitHub Actions run `32545347640` with both `application` and `local-supabase` jobs green. Vercel Git integration created Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7`, `READY`, target `production`, metadata-bound to that SHA and serving the canonical origin. The WAF remains exact POST `/api/research`, fixed 20/60s/IP. Final browser/static/privacy verification passed, and the separate final-testing allowance consumed 1/5 accepted call: Edinburgh Artificial Intelligence MSc Research-only returned HTTP 200 in about 18.6 seconds with one source, zero claims, and a sanitized `provider-error` source gap. This is bounded fail-closed evidence, not successful live evidence production. Cumulative accepted accounting is 3 historical + 1 final-testing = 4. Devpost remains unsubmitted pending the final video and explicit submission authorization.
+
 ## 10. Explicit exclusions
 
 Do not add during Phase 6 unless the user separately changes scope:

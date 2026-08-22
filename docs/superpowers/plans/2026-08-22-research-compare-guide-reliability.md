@@ -30,4 +30,11 @@ Make bounded Research finish useful category work efficiently under provider pre
 - Production build: `npx next build` passed on Next.js 16.3.1 / Node 22 contract.
 - `scripts/verify-workspace.ps1` and `scripts/verify-release-config.mjs --profile=ci` passed.
 - `git diff --check` passed; `ui-flow-screenshots/` remains untracked and contains the expected 10 protected PNG files.
-- Publication evidence (commit SHA, exact-SHA CI, Production deployment metadata, post-deploy checks, bounded live-provider result) must be appended only after those actions are observed.
+## Publication evidence
+- Reliability implementation commit: `e612782a92c4e8088d9592c2c51f1f8252745e57`; follow-up Playwright response-body race stabilization: `f797e0a692f113a29b3f4aa3491a216ead292b2a`.
+- Exact-SHA GitHub Actions run `32545347640` completed successfully on `f797e0a692f113a29b3f4aa3491a216ead292b2a`; both `application` and `local-supabase` jobs succeeded. The initial run exposed only the Playwright sign-out response-body race and was not used for release approval.
+- Vercel Git integration produced Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7`, `READY`, target `production`, metadata-bound to the same executable SHA; `uniproof-beta.vercel.app` is an attached alias with no alias error.
+- Production `/`, `/research`, `/compare`, and `/guide` returned 200; GET `/api/research` returned 405 without provider dispatch. CSP/cache/HSTS/frame/MIME/referrer protections and the live 20/60s/IP WAF rule were reverified.
+- Production mobile/desktop smoke covered the four core routes in 8/8 loads with zero console/page errors. All 15 `/research` scripts were same-origin; five configured local secret values were checked without printing them and produced zero deployed-bundle matches, provider/key markers, or source-map markers.
+- Final-testing live call: Edinburgh Artificial Intelligence MSc, `research` only, HTTP 200 in 18,596 ms; one source, zero claims, category `ready` with sanitized `provider-error` source gap. Exact-deployment runtime logs record the 200 request and no runtime error cluster exists for `/api/research` in the observed hour.
+- The live result is intentionally not described as successful evidence production. It verifies bounded/fail-closed completion and removes the prior multi-minute retry amplification. Final-testing accepted-call use is 1/5; cumulative accounting is 3 historical + 1 final-testing = 4 accepted executions.

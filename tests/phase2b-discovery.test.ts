@@ -488,6 +488,46 @@ describe("Phase 2B discovery", () => {
     expect(sanitized?.title).toBe("Admissions <script>");
   });
 
+  it("supplements a generic Tavily category result with an official-domain Brave query", async () => {
+    let braveCalls = 0;
+    let braveQueryText = "";
+    const generic = normalizeCandidateSource(
+      { url: "https://cs.example.edu/programs/bsc", title: "BSc Computing", sourceType: "university" },
+      { discoveryProvider: "tavily", requestedCategory: "tuition", discoveryQueryId: "category-tuition", discoveredAt: timestamp },
+    );
+    const tuition = normalizeCandidateSource(
+      { url: "https://example.edu/tuition-and-fees", title: "Tuition and Fees", sourceType: "university" },
+      { discoveryProvider: "brave", requestedCategory: "tuition", discoveryQueryId: "category-tuition", discoveredAt: timestamp },
+    );
+    expect(generic).not.toBeNull();
+    expect(tuition).not.toBeNull();
+
+    const result = await discoverResearch(
+      request({ target: { university: { id: "u-1" }, program: { id: "p-1", universityId: "u-1" } }, categories: ["tuition"] }),
+      {
+        enableRor: false,
+        targetResolver: {
+          resolveUniversity: () => ({ id: "u-1", name: "Example University", websiteUrl: "https://example.edu/" }),
+          resolveProgram: () => ({ id: "p-1", universityId: "u-1", name: "BSc Computing", officialUrl: "https://cs.example.edu/programs/bsc" }),
+        },
+        tavilySearch: async () => ({ outcome: "success", candidates: generic === null ? [] : [generic], retryCount: 0 }),
+        braveSearch: async (query) => {
+          braveCalls += 1;
+          braveQueryText = query.text;
+          return { outcome: "success", candidates: tuition === null ? [] : [tuition], retryCount: 0 };
+        },
+      },
+    );
+
+    expect(braveCalls).toBe(1);
+    expect(braveQueryText.startsWith("site:example.edu ")).toBe(true);
+    expect(result.candidateSources.map((candidate) => candidate.url)).toEqual(expect.arrayContaining([
+      "https://cs.example.edu/programs/bsc",
+      "https://example.edu/tuition-and-fees",
+    ]));
+    expect(result.coveredCategories).toEqual(["tuition"]);
+  });
+
   it("stops at Tavily success and does not call Brave for the satisfied query", async () => {
     let braveCalls = 0;
     const candidate = normalizeCandidateSource(

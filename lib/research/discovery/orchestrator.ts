@@ -17,7 +17,7 @@ import {
 } from "@/lib/security/research-limits";
 import { dedupeCandidates } from "./dedupe";
 import { directDiscovery } from "./direct";
-import { containsSensitiveResearchData, planDiscoveryQueries } from "./query-plan";
+import { boundDiscoveryQuery, containsSensitiveResearchData, planDiscoveryQueries } from "./query-plan";
 import { resolveResearchTarget, targetHostMatches } from "./resolve-target";
 import type {
   DiscoveryAttempt,
@@ -133,6 +133,57 @@ type CategoryProgress = {
 
 function completedGeneralWeb(result: ProviderSearchResult): boolean {
   return result.outcome === "success" || result.outcome === "empty";
+}
+
+const CATEGORY_AFFINITY_TERMS: Record<ResearchCategory, readonly string[]> = {
+  admissions: ["admission", "admissions", "application", "apply", "entry requirement", "english language"],
+  tuition: ["tuition", "fee", "fees", "cost"],
+  scholarships: ["scholarship", "scholarships", "funding", "financial aid"],
+  "program-structure": ["curriculum", "module", "modules", "course", "courses", "credit", "credits", "duration"],
+  research: ["research", "lab", "labs", "laboratory", "faculty"],
+  outcomes: ["employment", "career", "careers", "outcome", "outcomes"],
+  support: ["international student", "student support", "student service", "student services", "support"],
+};
+
+function normalizedCandidateMetadata(candidate: CandidateSource): string {
+  let path = "";
+  try {
+    path = decodeURIComponent(new URL(candidate.url).pathname);
+  } catch {
+    // Candidate URLs have already passed normalization; retain title-only affinity if decoding fails.
+  }
+  return [candidate.title, path]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/gu, " ");
+}
+
+function hasCategoryAffinity(candidate: CandidateSource, category: ResearchCategory | undefined): boolean {
+  if (category === undefined) return true;
+  const metadata = normalizedCandidateMetadata(candidate);
+  if (metadata === "") return false;
+  const tokens = new Set(metadata.split(" "));
+  return CATEGORY_AFFINITY_TERMS[category].some((term) => term.includes(" ") ? metadata.includes(term) : tokens.has(term));
+}
+
+function providerSatisfiedQuery(
+  result: ProviderSearchResult,
+  category: ResearchCategory | undefined,
+  officialHost: string | undefined,
+): boolean {
+  if (result.outcome !== "success" || result.candidates.length === 0) return false;
+  if (category === undefined || officialHost === undefined) return true;
+  return result.candidates.some((candidate) => candidate.sourceType === "university" && hasCategoryAffinity(candidate, category));
+}
+
+function officialDomainSupplementQuery(query: import("./types").DiscoveryQuery): import("./types").DiscoveryQuery {
+  const officialHost = query.target.officialHost;
+  if (query.kind !== "category" || officialHost === undefined) return query;
+  return { ...query, text: boundDiscoveryQuery(`site:${officialHost} ${query.text}`) };
 }
 
 function persistentDiscoveryFailure(
@@ -344,7 +395,7 @@ export async function discoverResearch(input: unknown, options: DiscoveryOptions
       }
       if (tavily.outcome === "success" && tavily.candidates.length > 0) {
         appendCandidates(candidates, tavily.candidates, resolution.target, associations);
-        candidateFound = true;
+        candidateFound = providerSatisfiedQuery(tavily, query.category, resolution.target.officialHost);
       } else if (tavily.warning !== undefined) {
         const warning = boundedWarning(tavily.warning);
         if (warning !== undefined) warnings.push(warning);
@@ -367,7 +418,7 @@ export async function discoverResearch(input: unknown, options: DiscoveryOptions
             break;
           }
           const dispatched = await executeProvider(
-            () => braveSearch(query, { apiKey: options.braveApiKey, signal: runController.signal }),
+            () => braveSearch(officialDomainSupplementQuery(query), { apiKey: options.braveApiKey, signal: runController.signal }),
             deadline,
             { outcome: "failed", candidates: [], retryCount: 0, failureKind: "upstream", warning: "Brave request failed" },
           );
@@ -387,7 +438,7 @@ export async function discoverResearch(input: unknown, options: DiscoveryOptions
         }
         if (brave.outcome === "success" && brave.candidates.length > 0) {
           appendCandidates(candidates, brave.candidates, resolution.target, associations);
-          candidateFound = true;
+          candidateFound = providerSatisfiedQuery(brave, query.category, resolution.target.officialHost);
         } else if (brave.warning !== undefined) {
           const warning = boundedWarning(brave.warning);
           if (warning !== undefined) warnings.push(warning);

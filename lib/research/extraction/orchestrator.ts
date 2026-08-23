@@ -312,9 +312,7 @@ function routeDocumentSegments(
   segments: readonly ExtractionSegment[],
   scopedCategories: readonly ResearchCategory[],
 ): Array<{ segment: ExtractionSegment; categories: readonly ResearchCategory[] }> {
-  if (scopedCategories.length <= 1) {
-    return segments.map((segment) => ({ segment, categories: scopedCategories }));
-  }
+  if (scopedCategories.length === 0) return [];
 
   const scores = segments.map((segment) => new Map(
     scopedCategories.map((category) => [category, segmentCategoryScore(segment, category)]),

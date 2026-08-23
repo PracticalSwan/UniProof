@@ -383,6 +383,28 @@ test.describe("Phase 4 Compare lifecycle and ownership", () => {
     await expect(page.locator("[data-comparison-card='1']")).toContainText("Research incomplete");
   });
 
+  test("keeps a valid failed Research dossier as an unscored partial target instead of failing the whole comparison", async ({ page, research }) => {
+    const failedMit = makeComparisonBrowserResponse({
+      target: comparisonBrowserTargets.mit,
+      tuition: 10_000,
+      employment: 82,
+      research: true,
+      scholarship: true,
+      states: { tuition: "incomplete", scholarships: "incomplete", research: "incomplete", outcomes: "incomplete" },
+    });
+    research.enqueueJson(failedMit);
+    research.enqueueJson(stanfordResponse!);
+    await openCompare(page);
+    await selectDefaultComparisonTargets(page);
+    await submitComparison(page);
+
+    await expect(page.getByRole("heading", { level: 2, name: "Comparison results" })).toBeVisible();
+    await expect(page.getByText(/Partial comparison:/)).toBeVisible();
+    await expect(page.locator("[data-comparison-card='1']")).toContainText("Suppressed: insufficient comparable evidence");
+    await expect(page.locator("[data-comparison-card='1']")).toContainText("Tuition: research incomplete.");
+    await expect(page.getByRole("heading", { name: "Comparison could not be calculated" })).toHaveCount(0);
+  });
+
   test("distinguishes supported source-gap evidence from zero-claim incomplete research", async ({ page, research }) => {
     const sourceGapMit = makeComparisonBrowserResponse({
       target: comparisonBrowserTargets.mit,

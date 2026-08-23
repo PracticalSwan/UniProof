@@ -337,15 +337,6 @@ export function GuideWorkspace({ catalog }: GuideWorkspaceProps) {
       }
 
       const dossier = outcome.dossier;
-      if (dossier.run.status === "failed") {
-        dispatch({
-          type: "fail",
-          sequence,
-          error: { code: "internal-error", message: "The research run failed. Try refreshing the requirements." },
-        });
-        return;
-      }
-
       const finalization = finalizeGuideResult(submission, researchRequest, dossier, catalog);
       if (finalization.ok) {
         await closeEvidenceBeforeReplacement();

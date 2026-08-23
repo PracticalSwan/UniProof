@@ -1206,7 +1206,7 @@ describe("Phase 2D sequential fallback, budget, and setup", () => {
         },
       },
     });
-    expect(prompts.length).toBeGreaterThanOrEqual(3);
+    expect(prompts).toHaveLength(2);
     expect(prompts[0]).toContain("Tuition fees");
     expect(prompts[1]).toContain("Research groups and faculty work on artificial intelligence.");
     expect(result.completedCategories).toEqual(["tuition", "research"]);
@@ -1250,8 +1250,8 @@ describe("Phase 2D sequential fallback, budget, and setup", () => {
       providerOptions: { fetchImpl: async () => { calls += 1; return new Response("", { status: 503 }); }, sleep: async () => {} },
     });
     expect(RESEARCH_MAX_EXTRACTION_HTTP_ATTEMPTS_PER_RUN).toBe(24);
-    expect(calls).toBe(6);
-    expect(result.budget.used).toBe(6);
+    expect(calls).toBe(3);
+    expect(result.budget.used).toBe(3);
     expect(result.unfinished).toBe(true);
     expect(result.failures.some((failure) => failure.kind === "budget")).toBe(false);
   });

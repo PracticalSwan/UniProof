@@ -171,16 +171,22 @@ describe("Phase 4 comparison workspace state", () => {
     });
   });
 
-  it("requires at least two usable succeeded/partial dossiers and excludes failed dossiers/transport errors", () => {
+  it("preserves valid failed dossiers as transparent partial comparison outcomes", () => {
     const s = submission();
     const good = finalizeComparisonOutcomes(s, [usable(targetA), usable(targetB, "partial"), transport(targetC)]);
     expect(good.ok).toBe(true);
     if (good.ok) expect(good.status).toBe("partial");
 
-    expect(finalizeComparisonOutcomes(s, [usable(targetA), failedDossier(targetB), transport(targetC)])).toMatchObject({
-      ok: false,
-      error: { code: "insufficient-usable-targets" },
-    });
+    const degraded = finalizeComparisonOutcomes(s, [usable(targetA), failedDossier(targetB), transport(targetC)]);
+    expect(degraded.ok).toBe(true);
+    if (degraded.ok) {
+      expect(degraded.status).toBe("partial");
+      expect(degraded.dossiers.map((dossier) => dossier.target.university.id)).toEqual([
+        targetA.universityId,
+        targetB.universityId,
+      ]);
+      expect(degraded.dossiers[1]?.run.status).toBe("failed");
+    }
   });
 
   it("derives retry keys from retryable outcomes and undispatched immutable targets", () => {

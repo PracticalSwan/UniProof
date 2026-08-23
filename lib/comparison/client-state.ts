@@ -197,7 +197,7 @@ export function comparisonWorkspaceReducer(
 }
 
 export function isUsableComparisonDossier(dossier: ResearchDossier): boolean {
-  return dossier.run.status === "succeeded" || dossier.run.status === "partial";
+  return dossier.run.status === "succeeded" || dossier.run.status === "partial" || dossier.run.status === "failed";
 }
 
 export function finalizeComparisonOutcomes(

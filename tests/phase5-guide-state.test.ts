@@ -251,7 +251,7 @@ describe("finalizeGuideResult", () => {
     expect(result.ok).toBe(false);
   });
 
-  it("rejects failed dossier", () => {
+  it("preserves a valid failed dossier as a partial manual-review Guide result", () => {
     const dossier = buildGuideDossier({
       universityId: testUniversity.id,
       programId: testProgram.id,
@@ -261,7 +261,12 @@ describe("finalizeGuideResult", () => {
       scholarshipState: "incomplete",
     });
     const result = finalizeGuideResult(submission, request, dossier, researchCatalog);
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.result.status).toBe("partial");
+      expect(result.result.dossier.run.status).toBe("failed");
+      expect(result.result.dossier.categories.every((row) => row.state === "incomplete")).toBe(true);
+    }
   });
 
   it("returns sanitized error without raw Zod details", () => {

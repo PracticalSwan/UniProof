@@ -218,8 +218,6 @@ export function finalizeGuideResult(
   );
   if (catalogProgram === undefined) return { ok: false, error: assessmentError };
 
-  if (dos.run.status === "failed") return { ok: false, error: assessmentError };
-
   try {
     const assessment = assessGuideRequirements(sub, dos);
     const plan = buildGuidePlan(sub, dos, assessment);

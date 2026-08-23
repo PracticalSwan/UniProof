@@ -745,7 +745,7 @@ describe("Phase 2F orchestration", () => {
   it("gives the extraction seam only public task data and enforces the shared budget", async () => {
     const observed: unknown[] = [];
     let calls = 0;
-    const text = "x".repeat(200_000);
+    const text = " admissions requirements ".repeat(10_000);
     const options = baseOptions({
       retrieve: async (url: string) => retrieval(url, text),
       extraction: {
@@ -785,7 +785,8 @@ describe("Phase 2F orchestration", () => {
 
   it("preserves claim-bearing extraction work when later segments exhaust the bounded AI budget", async () => {
     const passage = "The application deadline is 2027-01-01.";
-    const text = `${passage}\n\n${"x".repeat(199_000)}`;
+    const filler = " admissions requirements ".repeat(10_000);
+    const text = `${passage}\n\n${filler}`;
     let calls = 0;
     const result = await runPhase2Research(
       { target: { university: { name: "Example University" } }, categories: ["admissions"] },

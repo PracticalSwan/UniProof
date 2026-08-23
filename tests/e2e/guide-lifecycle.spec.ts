@@ -74,6 +74,27 @@ test.describe("Guide lifecycle", () => {
     await expect(page.getByText("Unclear requirement", { exact: true })).toBeVisible();
   });
 
+  test("renders a valid failed Research dossier as partial manual-review output instead of an internal error", async ({ page, research }) => {
+    await prepareGuide(page);
+    research.enqueueJson({
+      ok: true,
+      dossier: buildGuideDossier({
+        universityId: target.university.id,
+        programId: target.program.id,
+        runStatus: "failed",
+        admissionsState: "incomplete",
+        tuitionState: "incomplete",
+        scholarshipState: "incomplete",
+      }),
+    });
+    await submitGuide(page);
+
+    await expect(page.getByText("Partial result ready", { exact: false })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole("heading", { level: 2, name: "Requirement assessment" })).toBeVisible();
+    await expect(page.getByText("Admissions: research incomplete.", { exact: false })).toBeVisible();
+    await expect(page.getByText("UniProof could not complete this research request.")).toHaveCount(0);
+  });
+
   test("same-tick duplicate submission dispatches at most one Research request", async ({ page, research }) => {
     await prepareGuide(page);
     const pending = research.enqueueDeferredJson({ ok: true, dossier: unknownDossier() });

@@ -333,10 +333,10 @@ export function verifyRepositoryReleaseContracts(
 
   if (existsSync(path.join(root, "lib/security/research-limits.ts"))) {
     const limits = readText(root, "lib/security/research-limits.ts");
-    if (!limits.includes("export const RESEARCH_TOTAL_DEADLINE_MS = 240_000;")) {
+    if (!limits.includes("export const RESEARCH_TOTAL_DEADLINE_MS = 120_000;")) {
       issues.push(issue(
         "lib/security/research-limits.ts",
-        "Research must retain the reviewed 240-second application deadline below the 300-second host ceiling.",
+        "Research must retain the reviewed 120-second application deadline below the 300-second host ceiling.",
       ));
     }
   }

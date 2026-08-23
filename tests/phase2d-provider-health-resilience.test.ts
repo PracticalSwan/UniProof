@@ -45,6 +45,43 @@ describe("structured provider health resilience", () => {
     });
 
     expect(second).toMatchObject({ ok: true });
+    expect(health.unavailable.groq).toBeUndefined();
+    expect(health.consecutiveTransientFailures.groq).toBeUndefined();
+    expect(calls).toBe(2);
+  });
+
+  it("quarantines a provider after two consecutive transient upstream failures in one Research run", async () => {
+    const health = createStructuredProviderHealth();
+    let calls = 0;
+
+    for (const stage of ["extraction", "reconciliation"] as const) {
+      const result = await runGroqStructuredTask({
+        apiKey: "x",
+        prompt: `public ${stage} task`,
+        schema: portableExtractionJsonSchema,
+        providerHealth: health,
+        stage,
+        fetchImpl: async () => {
+          calls += 1;
+          return new Response("", { status: 503 });
+        },
+      });
+      expect(result).toMatchObject({ ok: false, failureKind: "upstream" });
+    }
+
+    expect(health.unavailable.groq).toBe("upstream");
+    const skipped = await runGroqStructuredTask({
+      apiKey: "x",
+      prompt: "public later task",
+      schema: portableExtractionJsonSchema,
+      providerHealth: health,
+      fetchImpl: async () => {
+        calls += 1;
+        throw new Error("transient-circuited provider must not dispatch again");
+      },
+    });
+
+    expect(skipped).toMatchObject({ ok: false, failureKind: "upstream" });
     expect(calls).toBe(2);
   });
 

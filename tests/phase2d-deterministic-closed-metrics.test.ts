@@ -87,6 +87,15 @@ describe("deterministic closed Compare metrics", () => {
       expect.objectContaining({ category: "research", property: "research opportunity available", value: true, extractionMethod: "rule" }),
     ]));
 
+    const offered = extract(
+      "Example University offers various scholarship opportunities to support outstanding international students.",
+      ["scholarships"],
+    );
+    expect(offered.completedCategories).toEqual(["scholarships"]);
+    expect(offered.candidates).toEqual([
+      expect.objectContaining({ category: "scholarships", property: "scholarship available", value: true, extractionMethod: "rule" }),
+    ]);
+
     const negative = extract("Scholarships are not available for this programme.", ["scholarships"]);
     expect(negative).toMatchObject({ candidates: [], completedCategories: [] });
   });

@@ -160,8 +160,8 @@ function jsonRequest(value: unknown, headers: Record<string, string> = {}): Requ
 const validBody = { universityId: "university-mit", categories: ["admissions"] };
 
 describe("research execution budget", () => {
-  it("uses the reviewed 240-second application deadline", () => {
-    expect(RESEARCH_TOTAL_DEADLINE_MS).toBe(240_000);
+  it("uses the reviewed 120-second application deadline", () => {
+    expect(RESEARCH_TOTAL_DEADLINE_MS).toBe(120_000);
   });
 
   it("classifies caller pre-abort as cancelled without starting work", async () => {

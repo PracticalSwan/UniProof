@@ -67,6 +67,8 @@ function normalizeProviderAttempts(attempts: readonly ResearchProviderAttempt[])
       attempt.failureKind === "authentication" ||
       attempt.failureKind === "policy" ||
       attempt.failureKind === "capability" ||
+      attempt.failureKind === "timeout" ||
+      attempt.failureKind === "upstream" ||
       (attempt.failureKind === "budget" && attempt.budgetScope !== "total")
     ) {
       const key = attempt.stage + ":" + attempt.provider + ":" + attempt.failureKind;

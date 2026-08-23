@@ -46,15 +46,16 @@ export const structuredTaskProviders = ["gemini", "groq", "openrouter"] as const
 
 export type StructuredProviderUnavailableReason = Extract<
   ResearchProviderAttemptFailureKind,
-  "rate-limit" | "authentication" | "policy" | "capability"
+  "rate-limit" | "authentication" | "policy" | "capability" | "timeout" | "upstream"
 >;
 
 export type StructuredProviderHealth = {
   readonly unavailable: Partial<Record<ResearchExtractionProvider, StructuredProviderUnavailableReason>>;
+  readonly consecutiveTransientFailures: Partial<Record<ResearchExtractionProvider, number>>;
 };
 
 export function createStructuredProviderHealth(): StructuredProviderHealth {
-  return { unavailable: {} };
+  return { unavailable: {}, consecutiveTransientFailures: {} };
 }
 
 type ProviderBudgetMap = Record<ResearchExtractionProvider, number>;

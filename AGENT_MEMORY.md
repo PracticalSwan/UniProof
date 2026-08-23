@@ -800,3 +800,12 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - Fix: preserve Tavily results, but when URL/title metadata lacks category affinity and the official host is known, issue one bounded Brave supplement constrained with `site:<official-host>`. Good category-specific Tavily results and targets without a trusted official host do not incur the extra call. Affinity matching is token-aware and affects discovery routing only, not evidence classification.
 - Verification before publication: targeted 82/82; full Vitest **643/643** across **44/44** files; TypeScript; full ESLint; Next.js 16.3.1 production build; release/workspace verifiers; dependency audit **0 vulnerabilities**; diff check passed.
 - Protected `ui-flow-screenshots/` and local `output/` diagnostics remain untracked and outside publication.
+
+## 2026-08-23 — ChatGPT / GPT-5.6 Sol — Bounded transient-provider circuit
+
+- The `5917ce3` Production Chulalongkorn validation exceeded the 300-second client window despite eventually logging HTTP 200, proving richer source discovery alone could worsen latency when transient provider failures repeated across extraction tasks.
+- Added a run-scoped two-strike transient circuit for structured AI: one timeout/upstream failure remains recoverable, success resets the counter, and two consecutive transient failures quarantine that provider for the rest of the run. Existing durable failure quarantine remains unchanged. Circuit-open skipped attempt history is deduplicated.
+- Reduced the application Research deadline from 240 seconds to **120 seconds**, retaining Vercel `maxDuration=300`, and updated the release verifier to enforce the new bound.
+- Expanded deterministic scholarship availability only for explicit official affirmative wording such as `offers various scholarship opportunities`; no negative inference, semester-to-annual tuition conversion, or missing period inference was introduced.
+- Fresh local verification: focused **116/116**; full Vitest **644/644** across **44/44** files; TypeScript; full ESLint; Next.js production build; release/workspace verifiers; dependency audit **0 vulnerabilities**; diff check passed.
+- Protected `ui-flow-screenshots/` and local `output/` diagnostics remain untracked and outside publication.

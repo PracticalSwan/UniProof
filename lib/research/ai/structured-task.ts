@@ -125,6 +125,40 @@ function providerUnavailableReason(
     : undefined;
 }
 
+const TRANSIENT_PROVIDER_FAILURE_THRESHOLD = 2;
+
+function resetTransientProviderFailures(
+  options: StructuredProviderOptions,
+  provider: ResearchExtractionProvider,
+): void {
+  if (options.providerHealth === undefined) return;
+  delete options.providerHealth.consecutiveTransientFailures[provider];
+}
+
+function recordProviderFailure(
+  options: StructuredProviderOptions,
+  provider: ResearchExtractionProvider,
+  failureKind: ResearchProviderAttemptFailureKind,
+): void {
+  const health = options.providerHealth;
+  if (health === undefined) return;
+  const durableReason = providerUnavailableReason(failureKind);
+  if (durableReason !== undefined) {
+    delete health.consecutiveTransientFailures[provider];
+    health.unavailable[provider] = durableReason;
+    return;
+  }
+  if (failureKind === "timeout" || failureKind === "upstream") {
+    const failures = (health.consecutiveTransientFailures[provider] ?? 0) + 1;
+    health.consecutiveTransientFailures[provider] = failures;
+    if (failures >= TRANSIENT_PROVIDER_FAILURE_THRESHOLD) {
+      health.unavailable[provider] = failureKind;
+    }
+    return;
+  }
+  delete health.consecutiveTransientFailures[provider];
+}
+
 function cancelResponseBody(response: Response, reason: string): void {
   try {
     const cancellation = response.body?.cancel(reason);
@@ -410,6 +444,7 @@ export async function runProviderTransport(
       return { ok: false, provider: spec.provider, failureKind: "upstream", attempts, aborted: true };
     }
     if (dispatched.outcome.kind === "success") {
+      resetTransientProviderFailures(options, spec.provider);
       return {
         ok: true,
         provider: spec.provider,
@@ -422,10 +457,7 @@ export async function runProviderTransport(
     const failureKind = dispatched.outcome.failureKind;
     const retryable = failureKind === "rate-limit" && dispatched.outcome.retryAfterMs !== undefined;
     if (!retryable || retryCount >= maxRetries) {
-      const healthReason = providerUnavailableReason(failureKind);
-      if (healthReason !== undefined && options.providerHealth !== undefined) {
-        options.providerHealth.unavailable[spec.provider] = healthReason;
-      }
+      recordProviderFailure(options, spec.provider, failureKind);
       return { ok: false, provider: spec.provider, failureKind, attempts };
     }
     const delay = failureKind === "rate-limit"

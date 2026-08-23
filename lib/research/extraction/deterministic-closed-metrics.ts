@@ -28,7 +28,7 @@ export type DeterministicClosedMetricResult = {
 
 const closedMetricCategories = new Set<ResearchCategory>(["tuition", "scholarships", "research", "outcomes"]);
 const negativeAvailability = /\b(?:no|not|isn't|aren't|without)\b[^.!?\n]{0,80}\b(?:scholarships?|funding|research opportunities?|thesis options?)\b|\b(?:scholarships?|funding|research opportunities?|thesis options?)\b[^.!?\n]{0,50}\bnot\s+available\b/iu;
-const scholarshipAvailable = /\b(?:scholarships?\s+(?:are|is)\s+available|scholarship\s+opportunit(?:y|ies)\s+(?:are|is)\s+available|funding\s+(?:is\s+)?available)\b/iu;
+const scholarshipAvailable = /\b(?:scholarships?\s+(?:are|is)\s+available|scholarship\s+opportunit(?:y|ies)\s+(?:are|is)\s+available|funding\s+(?:is\s+)?available|(?:offers?|provides?)\s+(?:various\s+)?scholarship\s+opportunit(?:y|ies))\b/iu;
 const researchAvailable = /\b(?:research\s+opportunit(?:y|ies)\s+(?:are|is)\s+available|thesis\s+options?\s+(?:are|is)\s+available|research\s+thesis\s+(?:is\s+)?available)\b/iu;
 const employmentRate = /\b(?:graduate\s+)?employment\s+(?:outcome\s+)?rate\b/iu;
 const annualTuition = /\btuition\b/iu;

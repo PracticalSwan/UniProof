@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { searchBrave } from "@/lib/integrations/brave/search";
@@ -159,9 +161,28 @@ function jsonRequest(value: unknown, headers: Record<string, string> = {}): Requ
 
 const validBody = { universityId: "university-mit", categories: ["admissions"] };
 
+const activeDeadlineDocs = [
+  "docs/design.md",
+  "docs/operations/vercel-production.md",
+  "docs/planning/phase-6-hardening-submission-readiness.md",
+  "docs/planning/phase-6-requirements-traceability.md",
+  "docs/requirements.md",
+  "docs/security-threat-model.md",
+  "docs/security.md",
+  "docs/submission/devpost-draft.md",
+] as const;
+
 describe("research execution budget", () => {
   it("uses the reviewed 120-second application deadline", () => {
     expect(RESEARCH_TOTAL_DEADLINE_MS).toBe(120_000);
+  });
+
+  it("keeps active release documentation synchronized to the 120-second deadline", () => {
+    for (const path of activeDeadlineDocs) {
+      const text = readFileSync(path, "utf8");
+      expect(text, path).toMatch(/120[- ]second|120 seconds/);
+      expect(text, path).not.toMatch(/240[- ]second|240 seconds|240,000ms/);
+    }
   });
 
   it("classifies caller pre-abort as cancelled without starting work", async () => {

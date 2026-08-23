@@ -311,6 +311,7 @@ Authoritative execution plan: `final_testing_plan.md`.
 - [x] Remediate verified evidence-integrity, hostile-normalization, Auth, persistence, private-restore, Compare accessibility/error, Guide focus, and test-harness gaps with focused regressions.
 - [x] Pass the fresh local Supabase reset/lint/advisors/pgTAP/Auth-Saved matrix and the stable source/type/lint/unit/build/built-browser gates recorded in the final-testing closeout.
 - [x] Publish the final reviewed change set, require exact-SHA CI, and verify GitHub/Vercel integration plus the automatic Production deployment. The 2026-08-22 reliability executable revision `f797e0a692f113a29b3f4aa3491a216ead292b2a` passed GitHub Actions run `32545347640`; Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7` is `READY` and serves the canonical alias.
+- [x] Complete the 2026-08-23 provider-resilience follow-up at executable SHA `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c`: GitHub Actions run `32629551286` succeeded, Production deployment `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA` is `READY`, the application deadline is 120 seconds beneath the 300-second host cap, and bounded live Research/Compare/Guide checks all returned HTTP 200 while preserving fail-closed partial evidence under provider pressure. Follow-up inspection also confirmed that Compare Research-category checkboxes, not zero-weight sliders, own request scope; an explicit Scholarships-only browser regression protects the one-category dispatch path.
 
 ## Side Phase UCE — University Catalog Expansion
 

@@ -4,8 +4,8 @@ This matrix binds Phase 6 hardening/release requirements to implementation and o
 
 | Requirement | Implementation owner | Verification evidence | Current status |
 | --- | --- | --- | --- |
-| Research has a 240-second application deadline under a 300-second host ceiling | `lib/security/research-limits.ts`, execution budget, Research route | deadline regressions, production build, Vercel deployment build | Verified configuration/deployment |
-| Caller cancellation/deadline ownership remains deterministic | Research execution budget/orchestrator | lifecycle regressions + hosted intercepted browser acceptance | Verified deterministically; no new live provider call after 3/3 budget |
+| Research has a 120-second application deadline under a 300-second host ceiling | `lib/security/research-limits.ts`, execution budget, Research route | deadline regressions, production build, Vercel deployment build | Verified configuration/deployment |
+| Caller cancellation/deadline ownership remains deterministic | Research execution budget/orchestrator | lifecycle regressions + hosted intercepted browser acceptance | Verified deterministically; later bounded 2026-08-23 Production mode checks completed under the same 120-second contract |
 | Partial selected-source failure preserves usable claims without becoming definitive downstream evidence | pipeline/orchestrator/public dossier, Compare scoring, Guide eligibility | Phase 2F/3B/4/5 regressions + Research browser source-gap regression | Verified |
 | Program-scoped Research retains the catalog-owned official program page even when web discovery succeeds | target resolver + discovery orchestrator | Phase 2B + end-to-end Phase 2F regressions | Verified |
 | Raw deployment HTTP 429/504 is sanitized before body/schema parsing and not blind-retried | Research transport, Compare/Guide lifecycle | unit/browser regressions + hosted deterministic acceptance | Verified |
@@ -24,26 +24,25 @@ This matrix binds Phase 6 hardening/release requirements to implementation and o
 | Secrets/provider internals stay out of tracked/client output | server-only env boundaries | exact-value tracked/bundle scan; no source maps | Verified; no configured secret value/key name/provider identifier in browser bundle |
 | Protected local screenshots stay private | `.vercelignore`, Git review | Git status + release verifier | `ui-flow-screenshots/` remains untracked/unpublished |
 | Release screenshots are separate and reviewable | `docs/assets/screenshots/phase-6/` | deterministic hosted capture + visual inspection | 8 reviewed PNGs retained |
-| Live provider smoke is bounded | Phase 6C runbook + `final_testing_plan.md` | accepted call accounting | Historical Phase 6C **3/3 exhausted**; final-testing **1/5 used**; cumulative accepted total **4** |
-| GitHub CI is least privilege and deterministic | `.github/workflows/ci.yml` | GitHub Actions run `32545347640` | **Verified** on executable SHA `f797e0a692f113a29b3f4aa3491a216ead292b2a`; application and local-Supabase jobs succeeded |
-| Exact repository/deployment traceability | Git + Vercel | public Git SHA + GitHub Actions + Vercel deployment metadata | **Verified executable revision**: Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7` records `githubCommitSha` = `f797e0a692f113a29b3f4aa3491a216ead292b2a` and serves the canonical alias |
+| Live provider smoke is bounded | Phase 6C runbook + later explicit reliability authorization | accepted call records + deliberate cooldown/serialization evidence | Historical Phase 6C **3/3 exhausted**; later reliability checks were separately authorized and are recorded by date rather than folded into the obsolete 2026-08-22 remaining-call count |
+| GitHub CI is least privilege and deterministic | `.github/workflows/ci.yml` | GitHub Actions run `32629551286` | **Verified** on live-validated executable SHA `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c`; CI succeeded |
+| Exact repository/deployment traceability | Git + Vercel | public Git SHA + GitHub Actions + Vercel deployment inspection | **Verified live-validated executable baseline**: Production deployment `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA` serves `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c` at the canonical alias; this follow-up changes documentation/tests only |
 | Devpost rules/assets are current | `docs/hackathon.md`, `docs/submission/` | Devpost recheck 2026-08-20 | Draft-ready; final video/submission pending |
 
 ## Current executable verification
 
-The 2026-08-22 reliability executable revision passed:
+The live-validated 2026-08-23 executable baseline `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c` passed:
 
-- Vitest **625/625** across 41 files;
-- TypeScript and ESLint;
+- Vitest **644/644** across 44 files before the documentation/test-only follow-up;
+- TypeScript and full ESLint;
 - Next.js 16.3.1 production build on the Node 22 contract;
-- release/workspace verifiers;
-- `npm audit --omit=dev` with **0 vulnerabilities**;
-- Compare **63/63**, Guide **55/55**, and Research **70/70** browser verification;
-- local Supabase Auth/Saved **12/12**, plus schema reset/lint/advisors and pgTAP in exact-SHA CI;
-- exact-value secret/client-bundle scan with five configured secrets checked and zero configured-secret matches/provider-key markers/source-map markers.
+- release/workspace verifiers and dependency audit with **0 vulnerabilities**;
+- the previously verified Compare+Guide browser matrix **120/120** for the runtime remediation;
+- exact-SHA GitHub Actions run `32629551286`, conclusion `success`;
+- Vercel Production deployment `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA`, `READY`, target `production`, serving `https://uniproof-beta.vercel.app`.
 
-Executable SHA `f797e0a692f113a29b3f4aa3491a216ead292b2a` passed GitHub Actions run `32545347640` with both `application` and `local-supabase` jobs successful. Vercel Git integration created Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7`, `READY`, target `production`, metadata-bound to that SHA and serving `https://uniproof-beta.vercel.app`. Post-deploy route/header/WAF/client-bundle/log checks passed, including 8/8 mobile/desktop core-route loads with zero console/page errors.
+The current documentation/test-only follow-up adds a deadline-contract regression and a Compare explicit-scope regression without modifying Production runtime modules. On this working tree, Vitest is **645/645** across 44 files and the complete Compare form browser spec is **10/10**; TypeScript, targeted ESLint, release/workspace verifiers, and `git diff --check` also pass.
 
 ## Live-smoke limitation
 
-All three historical Phase 6C accepted Research executions remain accounted separately. The 2026-08-22 final-testing plan consumed **1/5** additional accepted execution for the specific unresolved hypothesis that the repaired provider path should terminate boundedly under current provider pressure. Edinburgh Artificial Intelligence MSc, Research only, returned HTTP 200 in about **18.6 seconds**, exposed one source and zero claims, and finalized `research` as `ready` with a sanitized `provider-error` source gap. This is fail-closed operational evidence, not successful live evidence production. A preceding malformed public request returned HTTP 400 before Research execution and is not charged. Final accounting is **3 historical + 1 final-testing = 4 accepted executions**.
+Historical Phase 6C accepted Research executions remain accounted separately at **3/3**. Later reliability testing was separately authorized rather than treated as remaining capacity from the obsolete 2026-08-22 five-call plan. On 2026-08-23, bounded Production browser checks returned HTTP 200 for Chulalongkorn Admissions-only Research, both serialized MIT/Stanford Compare target Research requests, and Chulalongkorn Guide. Deliberate 60-second cooldowns were used between mode/provider bursts. Provider rate-limit/upstream gaps remained sanitized and visible; these checks establish bounded fail-closed mode behavior under current provider pressure, not universal provider availability.

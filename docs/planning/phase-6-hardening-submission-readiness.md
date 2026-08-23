@@ -267,11 +267,11 @@ The current provider stages are individually bounded but the whole Research pipe
 
 Server-owned limits:
 
-- application whole-run deadline: **240 seconds** from accepted Research dispatch to finalization;
+- application whole-run deadline: **120 seconds** from accepted Research dispatch to finalization;
 - Vercel `app/api/research/route.ts`: `export const maxDuration = 300` seconds;
 - retain all existing smaller discovery/provider/stage deadlines and attempt ceilings.
 
-The 60-second difference is finalization/serialization/cancellation/platform headroom. When the 240-second application deadline expires, stop new discovery/provider retries/fallback dispatch, abort in-flight work where supported, preserve already validated evidence, and return the truthful partial/failed lifecycle through existing contracts with unfinished work classified as operational `timeout`. A real caller abort remains `cancelled`. Never wait for Vercel's hard timeout as normal control flow and never start the 240-second expensive-run timer for requests rejected before accepted Research dispatch.
+The 180-second difference is finalization/serialization/cancellation/platform headroom. When the 120-second application deadline expires, stop new discovery/provider retries/fallback dispatch, abort in-flight work where supported, preserve already validated evidence, and return the truthful partial/failed lifecycle through existing contracts with unfinished work classified as operational `timeout`. A real caller abort remains `cancelled`. Never wait for Vercel's hard timeout as normal control flow and never start the 120-second expensive-run timer for requests rejected before accepted Research dispatch.
 
 Phase 6B also opts only the Research function into Vercel Node request cancellation through repository configuration (`supportsCancellation: true`) so the existing `Request.signal` path can receive client disconnects where the deployed platform supports it. Local tests prove signal propagation and post-abort ownership; actual Vercel cancellation delivery remains Phase 6C live evidence. If the selected Vercel project has Fluid Compute disabled or rejects `maxDuration=300`, deployment remains blocked until the values are revised and the complete deadline/partial-result matrix is rerun; do not silently rely on a different account default.
 
@@ -303,13 +303,13 @@ Vercel Node request cancellation is opt-in, not automatic. Phase 6B must add rep
 Phase 6C deploy-time testing must determine the actual Vercel Node runtime behavior and verify that:
 
 - client navigation/abort/disconnect reaches the Research route after the configured cancellation opt-in;
-- caller abort remains distinguishable from the independent 240-second application deadline;
+- caller abort remains distinguishable from the independent 120-second application deadline;
 - the route stops new fallback/retry work after cancellation/deadline;
 - no later provider call starts after terminal ownership;
 - a platform hard timeout (normally HTTP 504) is treated client-side as a sanitized deployment-timeout outcome even if its body is HTML/plain/empty rather than application JSON;
 - sanitized logs do not contain prompts/source bodies/profile data/secrets.
 
-If platform cancellation is not delivered reliably, the 240-second application-owned deadline remains mandatory and the residual risk is documented rather than hidden. Do not add background/waitUntil work for provider calls merely to survive a cancelled user request.
+If platform cancellation is not delivered reliably, the 120-second application-owned deadline remains mandatory and the residual risk is documented rather than hidden. Do not add background/waitUntil work for provider calls merely to survive a cancelled user request.
 
 ### 5.4 Production secrets and environment separation
 
@@ -610,7 +610,7 @@ For the anonymous hackathon release:
 - hosted Supabase Auth/save must be either fully configured and verified **or intentionally absent**; the current release chooses absence because production email delivery is not configured;
 - authorized Vercel Preview and exact-SHA Production deployment must be verified;
 - durable rate limiting must be active and observed;
-- the bounded live-smoke budget must be truthfully recorded. The historical Phase 6C allowance consumed **3/3** accepted calls and produced no successful evidence-bearing smoke; `final_testing_plan.md` separately governs up to five new hypothesis-driven calls and requires `3 historical + N final-testing` accounting;
+- the bounded live-smoke budget must be truthfully recorded. The historical Phase 6C allowance consumed **3/3** accepted calls and produced no successful evidence-bearing smoke; the later `final_testing_plan.md` maximum-five allowance is also historical, and any subsequent reliability calls require separate explicit authorization plus dated accounting;
 - final Production security/secret/privacy/client-bundle checks must pass;
 - README/screenshots/demo materials must describe only verified behavior and clearly distinguish deterministic fixture screenshots from live provider output;
 - exact public repository/deployed commit must be traceable and its GitHub Actions run green;
@@ -622,7 +622,9 @@ The application may therefore be **production-released and submission-ready exce
 **Observed Phase 6C release-gate evidence (2026-08-20):** the anonymous release satisfies every pre-Devpost item above. Hardened Preview acceptance passed 104/104 deterministic Research/Compare/Guide browser cases; executable SHA `21d645baaf9eca381a167246d22538c23bb29427` passed GitHub Actions run `32367630411`; Vercel Production deployment `dpl_3BppbKoR2sEshhGqoKStotZ7xyhN` is metadata-bound to that SHA and serves the canonical origin; the exact Research WAF rule remains enabled; and deterministic Production route/header/security/client-bundle/log checks passed without a fourth live Research call. Hosted Auth/save remains intentionally absent. The release state is therefore `submission-ready / pending final video`, not Devpost-submitted.
 
 
-**Observed 2026-08-22 Research/Compare/Guide reliability release evidence:** the current executable revision `f797e0a692f113a29b3f4aa3491a216ead292b2a` passed GitHub Actions run `32545347640` with both `application` and `local-supabase` jobs green. Vercel Git integration created Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7`, `READY`, target `production`, metadata-bound to that SHA and serving the canonical origin. The WAF remains exact POST `/api/research`, fixed 20/60s/IP. Final browser/static/privacy verification passed, and the separate final-testing allowance consumed 1/5 accepted call: Edinburgh Artificial Intelligence MSc Research-only returned HTTP 200 in about 18.6 seconds with one source, zero claims, and a sanitized `provider-error` source gap. This is bounded fail-closed evidence, not successful live evidence production. Cumulative accepted accounting is 3 historical + 1 final-testing = 4. Devpost remains unsubmitted pending the final video and explicit submission authorization.
+**Observed 2026-08-22 Research/Compare/Guide reliability release evidence:** the then-current executable revision `f797e0a692f113a29b3f4aa3491a216ead292b2a` passed GitHub Actions run `32545347640` with both `application` and `local-supabase` jobs green. Vercel Git integration created Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7`, `READY`, target `production`, metadata-bound to that SHA and serving the canonical origin. The WAF remained exact POST `/api/research`, fixed 20/60s/IP. Final browser/static/privacy verification passed, and that date's separate final-testing accounting recorded one accepted Edinburgh Research-only call. This paragraph is retained as historical release evidence rather than current quota/accounting state.
+
+**Observed 2026-08-23 provider-resilience evidence:** executable baseline `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c` passed GitHub Actions run `32629551286` and is served by Production deployment `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA` at the canonical origin. The application deadline is 120 seconds beneath the unchanged 300-second host cap. Separately authorized browser checks, spaced with deliberate cooldowns, returned HTTP 200 for Research, both serialized Compare target Research requests, and Guide; provider gaps remained sanitized and modes degraded to partial/non-definitive evidence rather than generic whole-mode failure. Devpost remains unsubmitted pending the final video and explicit submission authorization.
 
 ## 10. Explicit exclusions
 

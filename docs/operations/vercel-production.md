@@ -1,11 +1,11 @@
 # Vercel Production Operations
 
-This runbook records the Phase 6C Vercel release contract and the observed final-release state, most recently verified on 2026-08-22. Devpost publication is a separate final gate.
+This runbook records the Phase 6C Vercel release contract and the observed Production state, most recently verified on 2026-08-23. Devpost publication is a separate final gate.
 
 ## Current release configuration
 
 - Canonical origin: `https://uniproof-beta.vercel.app`
-- Runtime contract: Node `22.x`; Research function cap 300 seconds; application-owned Research deadline 240 seconds.
+- Runtime contract: Node `22.x`; Research function cap 300 seconds; application-owned Research deadline 120 seconds.
 - Research mode: `live` in Preview and Production.
 - Discovery: Tavily primary, Brave fallback.
 - Structured AI in the hosted release: Groq primary, OpenRouter fallback.
@@ -29,12 +29,12 @@ Do not add a second in-process limiter merely to duplicate this protection. Appl
 
 ## Final Production release evidence
 
-- Verified executable SHA: `f797e0a692f113a29b3f4aa3491a216ead292b2a` (`test: stabilize local sign-out response assertion`), containing reliability implementation commit `e612782a92c4e8088d9592c2c51f1f8252745e57`.
-- GitHub Actions: run `32545347640`, conclusion `success`; both `application` and `local-supabase` jobs succeeded.
-- Vercel Production deployment: `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7` / `https://uniproof-1rhm88877-practicalswans-projects.vercel.app`, verified `READY`, target `production`, on 2026-08-22.
-- Canonical alias: `https://uniproof-beta.vercel.app`; deployment metadata lists the alias with no alias error.
-- Vercel metadata records `githubCommitSha` as the verified executable SHA above, GitHub organization `PracticalSwan`, repository `UniProof`, and ref `main`.
-- Runtime remains Node `22.x` by repository contract; the deployment reports four Node.js functions.
+- Verified executable SHA: `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c` (`fix: bound transient research provider failures`).
+- GitHub Actions: run `32629551286`, conclusion `success`, on that exact SHA.
+- Vercel Production deployment: `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA` / `https://uniproof-bb5bx8ldw-practicalswans-projects.vercel.app`, verified `READY`, target `production`, on 2026-08-23.
+- Canonical alias: `https://uniproof-beta.vercel.app`; `vercel inspect` resolved the alias to that Production deployment with no alias error.
+- The deployment was built from the pushed `main` checkout at the verified executable SHA above; the remote Vercel build completed Next.js compilation and TypeScript successfully.
+- Runtime remains Node `22.x` by repository contract.
 
 ## Security / privacy observations
 
@@ -56,11 +56,11 @@ UniProof does not duplicate Vercel's HSTS at the application layer.
 
 ## Release smoke evidence
 
-The historical Phase 6C live Research budget remains exhausted at **3/3**. The separate `final_testing_plan.md` allowance authorized up to five additional accepted executions and consumed **1/5** during the 2026-08-22 reliability verification.
+The historical Phase 6C live Research allowance remains exhausted at **3/3**. The later 2026-08-22 `final_testing_plan.md` five-call accounting is historical as well; subsequent reliability testing was separately authorized and should not be interpreted through that obsolete remaining-call count.
 
-The accepted final-testing call used The University of Edinburgh, Artificial Intelligence MSc, `research` only. Production returned HTTP 200 in **18,596 ms** with one public source, zero claims, and category state `ready` carrying a sanitized `provider-error` source gap. The corresponding exact-deployment runtime log records `POST /api/research 200`, and no `/api/research` runtime error cluster was found in the observed hour. This does **not** establish successful live evidence production; it establishes that the formerly ~161-second provider-failure path now terminates quickly, exposes uncertainty, and does not continue a multi-minute retry storm.
+On the current 2026-08-23 Production deployment, a Chulalongkorn MSc Admissions-only Research browser run returned HTTP 200 in about **21.0 seconds**, `runStatus: succeeded`, Admissions `ready` with three claims, and no generic mode error. After a deliberate 60-second test cooldown, a two-target MIT/Stanford Compare run serialized the underlying Research requests with another 60-second gap; both returned HTTP 200 and the UI rendered a partial comparison without whole-mode failure. After another 60-second cooldown, Guide for the Chulalongkorn MSc target returned HTTP 200 in about **73.0 seconds**, rendered a partial requirement assessment, and the Research request contained only the public target/categories rather than citizenship, GPA, or applicant-profile fields.
 
-A preceding malformed public request used an internal target shape and was rejected with HTTP 400 `invalid-request` in 743 ms before Research execution; it is not counted as an accepted call. Final live accounting is **3 historical + 1 final-testing = 4 accepted executions**, leaving four additional final-testing calls unused.
+The Compare validation also clarified request-scope semantics: priority weights determine scoring, while the seven Research-category checkboxes independently determine Research scope. Explicitly selected zero-weight categories are intentionally retained; when only Scholarships is selected, deterministic browser regression coverage proves both Compare target requests contain only `categories: ["scholarships"]`. Provider `rate-limit`/upstream gaps remained observable even with test cooldowns, so those external conditions are handled fail-closed rather than masked by arbitrary client delays.
 
 Deterministic evidence remains primary: source-gap claims are visible in Research but non-definitive in Compare and Guide, long provider quota windows fail over rather than being clamped into short retries, persistent provider unavailability is circuit-broken for the current Research run, and no global provider/time budget was increased.
 

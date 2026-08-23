@@ -8,7 +8,11 @@ import {
   setComparisonWeight,
   submitComparison,
 } from "@/tests/e2e/helpers/compare-browser";
-import { defaultComparisonBrowserResponses } from "@/tests/fixtures/comparison-browser";
+import {
+  comparisonBrowserTargets,
+  defaultComparisonBrowserResponses,
+  makeComparisonBrowserResponse,
+} from "@/tests/fixtures/comparison-browser";
 
 test.describe("Phase 4 Compare form", () => {
   test("replaces the illustrative examples with the live catalog-driven form", async ({ page }) => {
@@ -172,6 +176,45 @@ test.describe("Phase 4 Compare form", () => {
     await submitComparison(page);
     await expect(page.getByRole("heading", { level: 2, name: "Comparison results" })).toBeVisible();
     expect(research.requests).toHaveLength(2);
+  });
+
+  test("dispatches only explicitly selected Research categories even when zero-weight categories were selected by default", async ({ page, research }) => {
+    await openCompare(page);
+    await selectDefaultComparisonTargets(page);
+
+    await setComparisonWeight(page, "Affordability", 0);
+    await setComparisonWeight(page, "Research", 0);
+    await setComparisonWeight(page, "Scholarships", 100);
+    await setComparisonWeight(page, "Outcomes", 0);
+    await setComparisonWeight(page, "Support", 0);
+    await page.getByRole("checkbox", { name: "Tuition" }).uncheck();
+    await page.getByRole("checkbox", { name: "Research", exact: true }).uncheck();
+    await page.getByRole("checkbox", { name: "Outcomes" }).uncheck();
+
+    research.enqueueJson(makeComparisonBrowserResponse({
+      target: comparisonBrowserTargets.mit,
+      tuition: 10_000,
+      employment: 82,
+      research: true,
+      scholarship: true,
+      categories: ["scholarships"],
+    }));
+    research.enqueueJson(makeComparisonBrowserResponse({
+      target: comparisonBrowserTargets.stanford,
+      tuition: 20_000,
+      employment: 91,
+      research: true,
+      scholarship: false,
+      categories: ["scholarships"],
+    }));
+
+    await submitComparison(page);
+    await expect(page.getByRole("heading", { level: 2, name: "Comparison results" })).toBeVisible();
+    expect(research.requests).toHaveLength(2);
+    for (const request of research.requests) {
+      expectComparisonRequestShape(request.body);
+      expect(request.body).toMatchObject({ categories: ["scholarships"] });
+    }
   });
 
   test("rejects positive-weight/category mismatch and keeps display toggles out of Research requests", async ({ page, research }) => {

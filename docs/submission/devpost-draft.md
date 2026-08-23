@@ -41,7 +41,7 @@ The hosted release uses Tavily with Brave Search fallback for discovery and Groq
 
 Compare and Guide do not ask a model to invent a winner, fit score, or admission probability. They consume the already validated public Research dossier through closed semantic registries and deterministic rules.
 
-Production hardening includes a request-nonce Content Security Policy, private/no-store application responses, strict same-origin mutation boundaries, bounded request/provider budgets, a 240-second application-owned Research deadline beneath the Vercel function limit, sanitized platform 429/504 handling, and a Vercel WAF rule scoped only to `POST /api/research` at 20 requests per 60 seconds per source IP.
+Production hardening includes a request-nonce Content Security Policy, private/no-store application responses, strict same-origin mutation boundaries, bounded request/provider budgets, a 120-second application-owned Research deadline beneath the Vercel function limit, sanitized platform 429/504 handling, and a Vercel WAF rule scoped only to `POST /api/research` at 20 requests per 60 seconds per source IP.
 
 Optional Supabase Auth/save support is implemented and locally tested, but it is intentionally not exposed in the public hackathon deployment because production email delivery was not configured. Judges can use the complete anonymous Research/Compare/Guide core without an account.
 

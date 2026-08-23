@@ -809,3 +809,11 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - Expanded deterministic scholarship availability only for explicit official affirmative wording such as `offers various scholarship opportunities`; no negative inference, semester-to-annual tuition conversion, or missing period inference was introduced.
 - Fresh local verification: focused **116/116**; full Vitest **644/644** across **44/44** files; TypeScript; full ESLint; Next.js production build; release/workspace verifiers; dependency audit **0 vulnerabilities**; diff check passed.
 - Protected `ui-flow-screenshots/` and local `output/` diagnostics remain untracked and outside publication.
+
+## 2026-08-23 — ChatGPT / GPT-5.6 Sol — Post-live Compare scope and deadline documentation correction
+
+- Current Production executable SHA `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c` passed GitHub Actions run `32629551286` and is served by Vercel deployment `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA` at the canonical alias.
+- Live browser testing with deliberate cooldowns returned HTTP 200 for Research, both Compare target Research requests, and Guide; provider rate-limit/upstream gaps remained sanitized and the modes degraded to useful partial output rather than whole-mode failure.
+- Corrected the initial post-test diagnosis about Compare request amplification: weights control scoring while Research-category checkboxes independently control request scope. Explicit zero-weight categories are intentionally retained. A new Playwright regression proves that selecting only Scholarships yields only `categories: ["scholarships"]` for both Compare target requests.
+- Found a real release-contract drift instead: active design/requirements/security/operations/traceability/submission docs still advertised the superseded 240-second Research deadline. Synchronized active docs to the deployed 120-second application deadline beneath the 300-second host cap and added a Vitest regression that fails if those active docs drift back to 240 seconds. Historical 2026-08-19 plans retain their original 240-second record.
+- No production runtime code changed in this correction; protected `ui-flow-screenshots/` and untracked `output/` remain outside the intended change set.

@@ -1,6 +1,8 @@
 # Contributing to UniProof
 
-UniProof is under active hackathon development. Contributions should preserve the project's evidence-first behavior, privacy boundaries, deterministic fallbacks, and narrow scope.
+> **Project status (2026-09-23):** UniProof is closed and contributions are not actively solicited. This document remains as reference guidance only; any reactivation or hosted deployment requires a new owner decision. See [`docs/operations/project-closure.md`](docs/operations/project-closure.md).
+
+The project was developed for the Pixel Forge AI Hackathon 2026. Contributions, if the owner reopens the project, should preserve its evidence-first behavior, privacy boundaries, deterministic fallbacks, and narrow scope.
 
 ## Before you start
 

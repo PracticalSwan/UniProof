@@ -1,6 +1,8 @@
 # UniProof Demo / Devpost Checklist
 
-## Production
+> **Historical checklist:** This records checks for the former hosted release. The Vercel project was removed on 2026-09-23; none of its production checks establish current availability. See [`../operations/project-closure.md`](../operations/project-closure.md).
+
+## Former production release
 
 - [ ] `https://uniproof-beta.vercel.app` opens without authentication.
 - [ ] Research, Compare, and Guide navigation works on desktop and mobile.

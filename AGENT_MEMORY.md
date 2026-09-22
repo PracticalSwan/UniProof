@@ -817,3 +817,26 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - Corrected the initial post-test diagnosis about Compare request amplification: weights control scoring while Research-category checkboxes independently control request scope. Explicit zero-weight categories are intentionally retained. A new Playwright regression proves that selecting only Scholarships yields only `categories: ["scholarships"]` for both Compare target requests.
 - Found a real release-contract drift instead: active design/requirements/security/operations/traceability/submission docs still advertised the superseded 240-second Research deadline. Synchronized active docs to the deployed 120-second application deadline beneath the 300-second host cap and added a Vitest regression that fails if those active docs drift back to 240 seconds. Historical 2026-08-19 plans retain their original 240-second record.
 - No production runtime code changed in this correction; protected `ui-flow-screenshots/` and untracked `output/` remain outside the intended change set.
+
+## 2026-09-23 — UniProof hosted project closure
+
+- Deleted the exact Vercel project `uniproof` in `practicalswans-projects`. Fresh CLI inspection returned `project_not_found`, the scoped project listing had no match, and `https://uniproof-beta.vercel.app` returned HTTP 404. Project deployments, aliases, settings, and environment variables were removed with the project.
+- The connected Supabase project list had no `uniproof` match; do not delete the unrelated inactive account project. The Supabase CLI could not enumerate projects from this unlinked local folder, so use the connected provider project list as the observed account-level check.
+- Provider-account API keys and global CLI installations/sessions remain untouched. No GitHub state was changed; the owner will archive the repository.
+- Local credential/link/cache files and generated artifacts were left in place after the user narrowed destructive authorization to provider projects; the attempted local deletion was rejected by policy. Keep `sithu-win.png` and `ui-flow-screenshots/` intact.
+- CodeGraph is initialized locally and ignored by Git; current index: 247 files, 3,489 nodes, 12,320 edges. It mapped provider-key and Supabase auth/persistence flows before closure.
+
+## 2026-09-23 — UniProof local cleanup authorization update
+
+- The user later explicitly authorized removing local project credentials and caches, while reiterating that provider-dashboard credentials must remain untouched.
+- An exact removal attempt for the project-local `.env.local` was rejected by the automatic approval review with `blocked by policy` before execution. No local credential or cache files were removed; do not try another tool or shell to bypass the rejection.
+- Provider website keys, global CLIs/sessions, unrelated resources, and GitHub remain untouched. See `docs/operations/project-closure.md` for the closure record and remaining local state.
+
+## 2026-09-23 — UniProof closure state after local cleanup
+
+- This entry supersedes the earlier local-cleanup notes above: fresh inspection after the owner ran the cleanup confirmed `.env.local`, `.vercel/`, `.next/`, `node_modules/`, `.playwright-cli/`, `test-results/`, `supabase/.temp/`, `supabase/.branches/`, `output/`, and `tsconfig.tsbuildinfo` are absent. The project-specific `supabase_edge_runtime_uniproof` Docker volume is also absent.
+- `.codegraph/` is intentionally retained and Git-ignored. `codegraph status` reported an up-to-date index of 247 files, 3,489 nodes, and 12,320 edges.
+- Fresh Vercel and Supabase connected-account project listings had no UniProof match; the former Vercel alias returned HTTP 404. GitHub reported `archived: false`; the owner retains archival. No provider-dashboard keys or globally installed CLIs/sessions were removed.
+- `sithu-win.png` and `ui-flow-screenshots/` remain present and untracked; do not include them in closeout commits.
+- Source, local migrations, provider adapters, test suites, and historical release evidence remain. The application test/build baseline is the recorded 2026-08-23 release evidence; no app tests/builds were rerun during this documentation/configuration-only closure after dependencies/build outputs were removed.
+- See `docs/operations/project-closure.md` for complete scope, current verification, and limits. Do not treat dated release or Devpost instructions as current or recreate hosting without new explicit owner authorization.

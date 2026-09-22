@@ -1,5 +1,7 @@
 # UniProof MVP Requirements
 
+> **Historical specification:** This describes the hackathon MVP requirements retained for source/reference. The project closed on 2026-09-23; these requirements do not represent an active hosted service or authorization to recreate one. See [`operations/project-closure.md`](operations/project-closure.md).
+
 ## Goal
 
 Build a functional evidence-first university decision tool for international students during the Pixel Forge AI Hackathon.

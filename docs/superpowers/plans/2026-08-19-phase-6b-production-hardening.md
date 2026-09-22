@@ -1,5 +1,7 @@
 # Phase 6B Production Hardening Implementation Plan
 
+> **Historical plan:** Production hardening and verification belong to the former Vercel deployment, which was removed on 2026-09-23. Retain this plan as implementation evidence; do not treat its hosted steps as current or recreate resources without new explicit owner authorization. See [`../../operations/project-closure.md`](../../operations/project-closure.md).
+
 > **Execution model:** ZERO SUBAGENTS. GLM-5.3 Max must perform implementation, debugging, security/privacy review, accessibility review, testing, documentation, and both final review passes in the main agent only. Do not spawn a reviewer, specialist, parallel worker, or any other child agent.
 
 **Goal:** Harden the reviewed Phase 6A UniProof application for a Vercel production environment without deploying it: add a truthful whole-Research execution deadline, opt in to host cancellation, safely classify platform rate-limit/timeout responses, migrate Gemini structured calls to stable v1 Interactions, freeze a durable WAF contract, add production-configuration verification and least-privilege CI, and rerun the complete Phase 0–6B local/built/security matrix.

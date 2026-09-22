@@ -1,5 +1,7 @@
 # UniProof Agentic Development Workflow
 
+> **Closure status (2026-09-23):** The source is retained for reference, but the hosted project is closed. Read [`operations/project-closure.md`](operations/project-closure.md) and verify mutable state before using old release instructions. Do not recreate Vercel/Supabase resources without a new explicit owner request; preserve the locally retained `.codegraph/` index and protected owner files.
+
 ## Controller Model
 
 The main agent is the command center. It owns task classification, scope, architecture, security decisions, integration, verification, and final reporting.

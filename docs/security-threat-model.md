@@ -1,6 +1,8 @@
 # UniProof Security and Privacy Threat Model
 
-Status: development-stage threat model refreshed through the locally implemented/browser-verified **Phase 6A identity, ownership, and persistence boundary** on 2026-08-19. Phase 6A controls were exercised with local Supabase Auth/Mailpit, RLS/pgTAP, deterministic Research fixtures, and dev/built browser regression; hosted Supabase, production email/session behavior, durable distributed abuse control, live providers, and deployment remain outside this evidence. This document assumes no public deployment and does not restrict the local developing AI agent's authorized repository/tool access.
+> **Current deployment boundary (2026-09-23):** The Vercel project has been deleted; no UniProof project appears in the connected Supabase account. This retained threat model describes application/source risks and includes historical release evidence, not a live service assessment. Reassess hosting and provider assumptions before any future exposure. See [`operations/project-closure.md`](operations/project-closure.md).
+
+Status: development-stage threat model refreshed through the locally implemented/browser-verified **Phase 6A identity, ownership, and persistence boundary** on 2026-08-19. Phase 6A controls were exercised with local Supabase Auth/Mailpit, RLS/pgTAP, deterministic Research fixtures, and dev/built browser regression; hosted Supabase, production email/session behavior, durable distributed abuse control, live providers, and deployment were outside that snapshot's evidence. That 2026-08-19 snapshot assumed no public deployment and did not restrict the local developing AI agent's authorized repository/tool access.
 
 Baseline commit when this threat model was refreshed: `9d01a57c1df8f4aa471d5313811c70f2177a5415`.
 

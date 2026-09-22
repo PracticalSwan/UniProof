@@ -1,19 +1,21 @@
 # Pixel Forge AI Hackathon Constraints
 
-Source of truth: official Devpost Hackathons plugin overview/rules/dates/requirements/judging responses, re-verified on **2026-08-21**. Event metadata is mutable; re-check it immediately before final submission.
+> **Historical event record:** The submission deadline passed on 2026-08-22, and UniProof's Vercel project was removed on 2026-09-23. The Devpost entry/submission state has not been checked as part of closure. Rules and assets below describe the 2026-08-21 snapshot only; do not use them as current event instructions. See [`operations/project-closure.md`](operations/project-closure.md).
 
-## Current Event State
+Source of truth: official Devpost Hackathons plugin overview/rules/dates/requirements/judging responses, re-verified on **2026-08-21**. This is a dated event snapshot; the deadline has passed and this file does not establish whether a submission was made.
 
-- Current Devpost title: `Pixel Forge AI Hackathon ($18,000+ in Prizes)`.
-- Current phase: submissions open.
+## Event snapshot at 2026-08-21
+
+- Devpost title at the 2026-08-21 check: `Pixel Forge AI Hackathon ($18,000+ in Prizes)`.
+- Submission phase at that check: submissions open.
 - Submission deadline: **2026-08-22 16:00 UTC**.
 - Deadline in Bangkok time: **2026-08-22 23:00 ICT**.
 - Judging criteria shown by Devpost: Originality, Design, Potential Impact, Technological Implementation.
-- Official submission form currently exposes no hackathon-specific custom questions or tracks; the global project form and required deliverables still apply.
+- The official submission form at that check exposed no hackathon-specific custom questions or tracks; the global project form and required deliverables still applied.
 
 ## Eligibility and Build Rules That Affect This Repository
 
-The current overview lists participation as ages 13+, students only, companies/professional organizations excluded, maximum team size four, and countries/territories subject to Devpost's standard exceptions. Re-check the exact participant/account eligibility immediately before submission rather than inferring it from repository work.
+The overview retrieved for the 2026-08-21 check listed participation as ages 13+, students only, companies/professional organizations excluded, maximum team size four, and countries/territories subject to Devpost's standard exceptions. Those details are historical and were not rechecked after the event.
 
 Projects must be built during the hackathon period. Existing frameworks/templates are allowed when substantial new work is completed during the hackathon. AI must be a meaningful/core part of the project. The submission must be open source.
 
@@ -30,7 +32,7 @@ Repository/application work for UniProof began on 2026-08-16 during the active h
 
 ## Required Submission Assets
 
-Before final submission, verify all of the following live:
+At the time, a final submission would have required live verification of:
 
 - Hosted project URL judges can access without an account.
 - Public open-source code repository.
@@ -38,7 +40,7 @@ Before final submission, verify all of the following live:
 - Approximately three-minute demo video showing the problem, product, and meaningful AI integration.
 - Completed Devpost submission before the deadline.
 
-Current UniProof release assets:
+Historical UniProof release assets (the Vercel project was removed 2026-09-23):
 
 - Production origin: `https://uniproof-beta.vercel.app`
 - Executable release SHA: `21d645baaf9eca381a167246d22538c23bb29427`
@@ -50,10 +52,10 @@ Current UniProof release assets:
 - Recording script: `docs/submission/demo-script.md`
 - Final checklist: `docs/submission/demo-checklist.md`
 
-The official plugin reports `video_required: true`, `zip_file_required: false`, and no custom submission fields for this event. The public website is still required by the organizer's prose/rules even though the global structured `website_required` flag is false, so UniProof keeps the canonical live URL prominent.
+The official plugin reported `video_required: true`, `zip_file_required: false`, and no custom submission fields at the 2026-08-21 check. The public website was required by the organizer's prose/rules even though the global structured `website_required` flag was false. The former canonical URL is offline now.
 
-## Submission hold
+## Historical submission hold (as of 2026-08-21)
 
-The final demo video has not been supplied. **Do not submit UniProof to Devpost, click the final submit control, or represent the Devpost entry as complete** until the final video is provided, checked for duration/content/privacy/public accessibility, the draft is reconciled with that recording, and the user explicitly authorizes the exact final submission.
+At the 2026-08-21 check, the final demo video had not been supplied. That was the submission hold at the time. Current Devpost entry/submission status is not verified by this repository or the 2026-09-23 project closure.
 
 Everything else may be prepared and published before that hold is released.

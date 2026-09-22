@@ -1,6 +1,6 @@
 # UniProof — Devpost Draft
 
-> **Draft only. Do not submit until the final demo video is supplied, checked, and explicitly approved.**
+> **Historical draft:** The event deadline passed on 2026-08-22 and the Vercel project was removed on 2026-09-23. The current Devpost entry/submission state has not been verified. Treat this content as an archive of the draft, not a live submission or current set of links. See [`../operations/project-closure.md`](../operations/project-closure.md).
 
 ## Project title
 
@@ -12,7 +12,7 @@ Evidence-first AI for researching universities, comparing fit, and turning publi
 
 ## Links
 
-- Live app: https://uniproof-beta.vercel.app
+- Former live app (removed 2026-09-23; the alias returned 404 on that date): https://uniproof-beta.vercel.app
 - Source: https://github.com/PracticalSwan/UniProof
 - License: MIT (`LICENSE` in the repository)
 - Demo video: **PENDING — final approximately three-minute public video not yet supplied**
@@ -37,13 +37,13 @@ The checked-in MVP catalog contains 30 universities and 45 computing programs ac
 
 UniProof is a Next.js 16 / React 19 / TypeScript application with strict Zod contracts at trust boundaries. Public Research uses bounded search discovery, SSRF-resistant DNS-pinned retrieval, normalized public-source documents, structured AI extraction/reconciliation, and deterministic application-owned evidence gates.
 
-The hosted release uses Tavily with Brave Search fallback for discovery and Groq with OpenRouter fallback for structured AI. The Gemini adapter remains implemented and tested but is intentionally not configured in the public release because current Gemini API terms restrict API clients directed toward or likely to be accessed by people under 18, while university applicants can include minors.
+The former hosted release used Tavily with Brave Search fallback for discovery and Groq with OpenRouter fallback for structured AI. The Gemini adapter remains implemented and tested in source but was not configured in the public release because Gemini API terms checked at that time restricted API clients directed toward or likely to be accessed by people under 18, while university applicants can include minors.
 
 Compare and Guide do not ask a model to invent a winner, fit score, or admission probability. They consume the already validated public Research dossier through closed semantic registries and deterministic rules.
 
-Production hardening includes a request-nonce Content Security Policy, private/no-store application responses, strict same-origin mutation boundaries, bounded request/provider budgets, a 120-second application-owned Research deadline beneath the Vercel function limit, sanitized platform 429/504 handling, and a Vercel WAF rule scoped only to `POST /api/research` at 20 requests per 60 seconds per source IP.
+Former-production hardening included a request-nonce Content Security Policy, private/no-store application responses, strict same-origin mutation boundaries, bounded request/provider budgets, a 120-second application-owned Research deadline beneath the Vercel function limit, sanitized platform 429/504 handling, and a Vercel WAF rule scoped only to `POST /api/research` at 20 requests per 60 seconds per source IP.
 
-Optional Supabase Auth/save support is implemented and locally tested, but it is intentionally not exposed in the public hackathon deployment because production email delivery was not configured. Judges can use the complete anonymous Research/Compare/Guide core without an account.
+Optional Supabase Auth/save support was implemented and locally tested, but it was not exposed in the former public hackathon deployment because production email delivery had not been configured. At the time, judges could use the complete anonymous Research/Compare/Guide core without an account.
 
 ## AI integration
 
@@ -85,6 +85,6 @@ AI research products need more than model quality. Identity binding, source owne
 - **Potential Impact:** reduces the risk that international applicants act on unsupported, stale, or context-mismatched university information.
 - **Technological Implementation:** bounded multi-provider research, SSRF-resistant retrieval, strict runtime contracts, deterministic evidence/scoring/assessment layers, privacy separation, CSP, WAF, and extensive automated browser/unit verification.
 
-## Final submission hold
+## Historical final submission hold
 
-Before posting, verify the final public video, duration, links, current Devpost fields/rules, production deployment, and repository state. The Devpost final-submit action is intentionally outside this draft.
+At the time this draft was prepared, the final video and submission approval were pending. The present Devpost entry/submission state is not known from this repository. No Devpost submission, withdrawal, or account change was performed as part of project closure.

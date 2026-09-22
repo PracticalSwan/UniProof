@@ -2,15 +2,17 @@
 
 UniProof is an evidence-first AI platform for international students researching universities, comparing supported options, and turning published application requirements into an actionable plan.
 
-The project is being developed for the Pixel Forge AI Hackathon 2026. Its core product rule is simple: important claims should remain traceable to evidence, and missing, stale, conflicting, or incomparable information should stay explicit instead of being guessed.
+The project was developed for the Pixel Forge AI Hackathon 2026. Its core product rule is simple: important claims should remain traceable to evidence, and missing, stale, conflicting, or incomparable information should stay explicit instead of being guessed.
+
+> **Project status (2026-09-23):** The Vercel project was removed and `https://uniproof-beta.vercel.app` returns 404. No UniProof project was present in the connected Supabase account. Project-local credentials and generated caches were removed; `.codegraph/` is intentionally retained. The source repository remains available, and its owner will archive GitHub separately. See [`docs/operations/project-closure.md`](docs/operations/project-closure.md) for verified state and boundaries.
 
 ## Product modes
 
 | Mode | Purpose | Status |
 | --- | --- | --- |
-| **Research** | Build structured university/program dossiers with source-level evidence, freshness, conflicts, unknowns, and partial-result handling | Implemented and browser-verified |
-| **Compare** | Compare 2–4 compatible supported targets with deterministic user-priority fit, coverage, gaps, and exact evidence references | Implemented and browser-verified |
-| **Guide** | Compare one applicant profile with one supported program's published requirements and derive risks, checklist items, deadlines, and official next steps | Implemented and browser-verified |
+| **Research** | Build structured university/program dossiers with source-level evidence, freshness, conflicts, unknowns, and partial-result handling | Implemented and browser-verified during development |
+| **Compare** | Compare 2–4 compatible supported targets with deterministic user-priority fit, coverage, gaps, and exact evidence references | Implemented and browser-verified during development |
+| **Guide** | Compare one applicant profile with one supported program's published requirements and derive risks, checklist items, deadlines, and official next steps | Implemented and browser-verified during development |
 
 Detailed roadmap: [`docs/planning/tasks.md`](docs/planning/tasks.md)
 
@@ -22,7 +24,7 @@ University research is difficult because information is spread across official p
 
 The current evidence model distinguishes verified, corroborated, university-reported, conflicting, anecdotal, inferred, outdated, unknown, and operationally incomplete information. Comparison and Guide add deterministic application-owned gates on top of that evidence instead of asking an AI model to invent a score or admission probability.
 
-## Current architecture
+## Architecture as implemented
 
 ```text
 Supported catalog
@@ -33,8 +35,8 @@ POST /api/research
       +--> Tavily -> Brave -> direct/structured degraded discovery
       +--> bounded DNS-pinned public retrieval
       +--> structured AI extraction/reconciliation
-           hosted release: Groq -> OpenRouter
-           Gemini adapter retained/tested but not configured publicly
+           former hosted release: Groq -> OpenRouter
+           Gemini adapter retained/tested; it was not configured in the former hosted release
       |
       v
 validated ResearchDossier
@@ -61,7 +63,7 @@ Important boundaries:
 - conflicting/missing/incompatible evidence fails closed rather than becoming a guessed fact or zero score;
 - production browser policy uses nonce-based CSP and restrictive security headers without third-party runtime analytics/scripts.
 
-See [`docs/design.md`](docs/design.md), [`docs/security.md`](docs/security.md), and [`docs/security-threat-model.md`](docs/security-threat-model.md) for the maintained architecture and threat model.
+See [`docs/design.md`](docs/design.md), [`docs/security.md`](docs/security.md), and [`docs/security-threat-model.md`](docs/security-threat-model.md) for the retained architecture and threat model.
 
 ## Supported catalog
 
@@ -157,7 +159,7 @@ supabase db reset
 supabase test db
 ```
 
-Configure only the local public browser values `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the local Supabase stack in your ignored local environment, then start Next.js normally. Local Magic Links are delivered to the Supabase Mailpit development inbox and must be opened in the same browser that requested them; a short-lived intent cookie rejects cross-browser account swapping. **Do not put a service-role key in browser variables or ordinary saved-artifact routes.** The public hackathon deployment intentionally leaves hosted Supabase browser/Auth variables absent because production email delivery is not configured; anonymous Research/Compare/Guide remains the judge-facing release.
+Configure only the local public browser values `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the local Supabase stack in your ignored local environment, then start Next.js normally. Local Magic Links are delivered to the Supabase Mailpit development inbox and must be opened in the same browser that requested them; a short-lived intent cookie rejects cross-browser account swapping. **Do not put a service-role key in browser variables or ordinary saved-artifact routes.** The former public hackathon deployment left hosted Supabase browser/Auth variables absent because production email delivery had not been configured; anonymous Research/Compare/Guide was the judge-facing release.
 
 ### Verification commands
 
@@ -221,13 +223,15 @@ See [`SECURITY.md`](SECURITY.md) before reporting a vulnerability or changing a 
 
 ## Contributing
 
-Contributions are welcome while the project remains under active hackathon development. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md). Pull requests should include focused scope, appropriate regression coverage, security/privacy impact, and documentation/changelog updates when public behavior changes.
+The project is closed and contributions are not actively solicited. [`CONTRIBUTING.md`](CONTRIBUTING.md) remains as reference guidance if the owner reactivates the project.
 
 Never use a real person's academic/private information in fixtures, bug reports, screenshots, or traces.
 
-## Release status
+## Historical hosted release (last verified 2026-08-23; removed 2026-09-23)
 
-The anonymous Phase 0-6C application is live at **https://uniproof-beta.vercel.app**. The verified executable revision is Git SHA `f797e0a692f113a29b3f4aa3491a216ead292b2a`; GitHub Actions run `32545347640` succeeded on that exact SHA, and Vercel Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7` is metadata-bound to it and serves the canonical alias. The expensive public Research route is protected by one Vercel WAF rule scoped exactly to `POST /api/research`, fixed-window **20 requests / 60 seconds / source IP**, returning 429 on excess. Production browser policy uses request nonces, `connect-src 'self'`, private/no-store caching, and Vercel-delivered HSTS. Hosted discovery is Tavily -> Brave; hosted structured AI is Groq -> OpenRouter. Gemini and hosted Supabase Auth/save are intentionally absent from the public environment for the release reasons documented above.
+> The following release, deployment, security, and test details describe the former hosted service. They are historical evidence, not current availability or operating instructions. The Vercel project and alias were removed on 2026-09-23; see [`docs/operations/project-closure.md`](docs/operations/project-closure.md).
+
+The anonymous Phase 0-6C application was previously live at **https://uniproof-beta.vercel.app**. The earlier executable revision was Git SHA `f797e0a692f113a29b3f4aa3491a216ead292b2a`; GitHub Actions run `32545347640` succeeded on that exact SHA, and Vercel Production deployment `dpl_8pYdBJEyvcohHuMm2e2cXt7cAYm7` served the canonical alias. The expensive public Research route was protected by one Vercel WAF rule scoped exactly to `POST /api/research`, fixed-window **20 requests / 60 seconds / source IP**, returning 429 on excess. Production browser policy used request nonces, `connect-src 'self'`, private/no-store caching, and Vercel-delivered HSTS. Hosted discovery was Tavily -> Brave; hosted structured AI was Groq -> OpenRouter. Gemini and hosted Supabase Auth/save were intentionally absent from the public environment for the release reasons documented above.
 
 The 2026-08-22 reliability pass removed request amplification without raising global time or attempt budgets: long provider `Retry-After` windows now fail over instead of being clamped into immediate retries, persistent provider unavailability is remembered for the remainder of one Research run, discovery uses the same bounded persistent-failure circuit, broad documents are routed/scheduled by category intent, and Compare defaults request only categories that can affect positive default weights. Source-gap claims remain visible in Research but are non-definitive in Compare and Guide.
 
@@ -235,7 +239,7 @@ The historical Phase 6C smoke budget remains **3/3 accepted live Research execut
 
 The verified executable tree passed **625/625 Vitest tests**, TypeScript, ESLint, production build, release/workspace verification, and `npm audit --omit=dev` with zero vulnerabilities. Browser verification passed Compare **63/63**, Guide **55/55**, Research **70/70**, and local Supabase Auth/Saved **12/12**. Production mobile/desktop route smoke loaded all four core routes in 8/8 checks with zero console/page errors; the deployed `/research` bundle remained same-origin and free of configured-secret matches/provider-key markers/source-map markers. Release screenshots under `docs/assets/screenshots/phase-6/` remain deterministic presentation evidence, not live-provider outputs.
 
-Devpost remains deliberately **not submitted** until the final approximately three-minute public demo video is supplied and reviewed. Draft submission text, recording script, and the final checklist are under `docs/submission/`.
+At the last documented Devpost check (2026-08-21), the draft was deliberately not submitted because the final video was pending. The current entry/submission state is unverified; archived draft text and recording guidance remain under `docs/submission/`.
 
 ## License
 

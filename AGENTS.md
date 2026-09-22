@@ -14,6 +14,10 @@ The hackathon MVP has three product modes:
 
 Core product rule: important factual claims must remain traceable to stored evidence. Missing or conflicting evidence is displayed, not guessed away.
 
+## Closure status
+
+As verified on 2026-09-23, the UniProof Vercel project was deleted, the former public alias returns 404, and the connected Supabase account has no matching UniProof project. Project-local credentials and generated caches were removed except `.codegraph/`, which the owner explicitly chose to retain. The source and reusable conventions remain in this repository. Read [`docs/operations/project-closure.md`](docs/operations/project-closure.md) for exact evidence and limits. Do not recreate hosted resources or treat historical release instructions as current without a new, explicit owner request. Do not archive GitHub; that action remains with the owner.
+
 ## Mandatory Session Start
 
 `LESSONS.md` MUST be the first manual project file read at the start of every session, before code inspection, planning, or edits.
@@ -199,6 +203,7 @@ For every other removal or cleanup operation:
 
 Additional rules:
 
+- Preserve `.codegraph/` during this project's closure and routine cleanup. It is intentionally retained locally and ignored by Git; remove it only if the owner later explicitly requests that exact deletion.
 - Build outputs, caches, generated coverage, temporary exports, and similar regenerable artifacts may be removed when cleanup is useful and their regeneration path is known.
 - One-off diagnostic scripts, temporary debug instrumentation, obsolete commented-out implementation, empty directories, abandoned experiments, and superseded implementation files may be removed only after their purpose is complete and relevant references/tests show they are no longer needed.
 - Remove dead code only with evidence that it is unreachable or unused. Do not delete code merely because an agent cannot immediately find a caller.

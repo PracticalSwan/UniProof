@@ -1,10 +1,17 @@
 # Changelog
 
-All notable project changes are documented here while UniProof remains in pre-release hackathon development.
+This changelog preserves the implementation and release history of UniProof. The project closed on 2026-09-23; see [`docs/operations/project-closure.md`](docs/operations/project-closure.md) for the current repository, provider, and local cleanup state.
 
-The project has not published a tagged release yet. Until the first release, completed and planned repository work is recorded under **Unreleased** and the canonical implementation status remains `docs/planning/tasks.md`.
+The project did not publish a tagged release. Historical implementation work is retained below and in `docs/planning/tasks.md`; those plans are not active work orders.
 
-## Unreleased
+## Historical changes (no tagged release)
+
+### Closure — 2026-09-23
+
+- Removed the UniProof Vercel project; the former public alias now returns 404.
+- Confirmed no UniProof project in the connected Supabase account.
+- Removed project-local credential and generated cache paths while retaining `.codegraph/` by owner direction.
+- Preserved source, project conventions, protected user files, global CLIs, provider-dashboard credentials, and owner-controlled GitHub archival state.
 
 ### Added
 

@@ -1,5 +1,7 @@
 # 2026-08-22 Research / Compare / Guide Reliability Pass
 
+> **Historical implementation and release record:** This work was completed against the then-hosted release. The Vercel project has since been removed (2026-09-23); deployment and live-provider details below are not current. See [`../../operations/project-closure.md`](../../operations/project-closure.md).
+
 ## Goal
 Make bounded Research finish useful category work efficiently under provider pressure, keep Compare fail-closed but score when definitive evidence exists, and keep Guide private/reliable without increasing global budgets or weakening evidence gates.
 
@@ -79,7 +81,7 @@ Make bounded Research finish useful category work efficiently under provider pre
 - Fresh local verification before publication: focused reliability suite 116/116, full Vitest 644/644 across 44 files, TypeScript, full ESLint, Next.js 16.3.1 production build, release/workspace verifiers, dependency audit 0 vulnerabilities, and diff check passed. The previously verified Compare+Guide browser behavior is unchanged because this revision touches only server-side discovery/provider/extraction and release limits.
 
 ## 2026-08-23 post-live contract/documentation correction
-- Current Production at executable SHA `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c` passed GitHub Actions run `32629551286` and is served by Vercel deployment `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA` on the canonical alias.
+- Production at the recorded executable SHA `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c` passed GitHub Actions run `32629551286` and was served by Vercel deployment `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA` on the canonical alias until project deletion on 2026-09-23.
 - Bounded live browser validation returned HTTP 200 for Research, both sequential Compare target Research requests, and Guide. External provider `rate-limit`/upstream gaps remained visible but did not become generic whole-mode failures.
 - The initial interpretation that zero-weight Compare priorities were still causing unwanted Research dispatch was disproved: Research-category checkboxes are an independent explicit scope control, and the design intentionally retains explicitly selected zero-weight categories. A browser regression now proves that explicitly selecting only Scholarships produces only `categories: ["scholarships"]` for both target requests.
 - A real documentation defect was found instead: active release/security/operations documentation still advertised the superseded 240-second Research deadline. Active source-of-truth docs are synchronized to the deployed 120-second application deadline beneath the unchanged 300-second Vercel host cap, while historical 2026-08-19 plans retain their original 240-second design record.

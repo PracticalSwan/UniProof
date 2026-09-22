@@ -1,6 +1,8 @@
 # UniProof Hackathon Task Plan
 
-Deadline snapshot: 2026-08-22 16:00 UTC / 23:00 ICT. Re-verify Devpost before final submission.
+> **Historical roadmap:** This checklist records completed and deferred hackathon work through 2026-08-23. The project closed on 2026-09-23; remaining unchecked items are not active work orders. See [`../operations/project-closure.md`](../operations/project-closure.md).
+
+Deadline snapshot at the time: 2026-08-22 16:00 UTC / 23:00 ICT; the deadline has passed.
 
 ## Phase 0 — Repository Foundation
 

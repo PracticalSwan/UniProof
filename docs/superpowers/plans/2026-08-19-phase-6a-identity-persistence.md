@@ -1,5 +1,7 @@
 # Phase 6A Identity, Ownership, and Persistence Implementation Plan
 
+> **Historical plan:** The local Supabase Auth/RLS implementation and evidence are retained, but this plan was completed during development. The connected Supabase account currently has no UniProof project; do not use this plan to create or modify hosted resources without new explicit owner authorization. See [`../../operations/project-closure.md`](../../operations/project-closure.md).
+
 > **For Codex GLM-5.3 Max:** ZERO SUBAGENTS for this entire Phase 6A batch. Do not spawn, delegate to, or invoke reviewer/specialist/subagent processes. Execute planning checks, implementation, testing, security/privacy review, accessibility review, documentation synchronization, and the final independent-style defect review in the main agent only. Follow `AGENTS.md` and the applicable local skills inline.
 
 **Goal:** Add optional Supabase authentication and a private, cross-device-ready saved-snapshot architecture without making auth mandatory, exposing applicant data to Research providers, weakening evidence semantics, or trusting browser-supplied ownership.

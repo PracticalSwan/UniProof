@@ -1,5 +1,7 @@
 # Phase 6C Deployment and Hackathon Submission Implementation Plan
 
+> **Historical execution plan; do not run as current instructions.** The Vercel project was deleted and the connected Supabase account has no UniProof project as of 2026-09-23. GitHub archival remains with the owner and the current Devpost entry/submission state is unverified. Any future external action requires fresh, explicit owner authorization for its exact target. See [`../../operations/project-closure.md`](../../operations/project-closure.md).
+
 > **For agentic workers:** REQUIRED PROCEDURE: follow `AGENTS.md` model-specific execution/review rules. This plan contains external actions. Reaching a checkbox is not authorization to perform it; obtain/confirm the explicit user authorization required for the exact Supabase, Vercel, GitHub, provider-quota, publication, or Devpost action before invoking it.
 
 **Goal:** Safely release the already locally verified Phase 0–6B application to the intended Supabase/Vercel targets, verify production security and bounded live behavior, prepare truthful release assets, and submit the exact verified project to Devpost only after final user authorization.
@@ -35,8 +37,8 @@
 
 ### Execution result through the final pre-commit gate
 
-- Vercel Preview configuration is live with Tavily -> Brave discovery, Groq -> OpenRouter structured AI, `UNIPROOF_RESEARCH_MODE=live`, no hosted Gemini key, and no hosted Supabase browser/Auth variables.
-- One WAF rule is enabled for exact `POST /api/research`, source-IP fixed window, 20 requests/60 seconds, excess 429.
+- Vercel Preview configuration was live at the time of this execution record with Tavily -> Brave discovery, Groq -> OpenRouter structured AI, `UNIPROOF_RESEARCH_MODE=live`, no hosted Gemini key, and no hosted Supabase browser/Auth variables.
+- At last verification, one WAF rule was enabled for exact `POST /api/research`, source-IP fixed window, 20 requests/60 seconds, excess 429.
 - The hardened executable source passed 602/602 Vitest tests, TypeScript, ESLint, production build, release/workspace checks, dependency audit, and 104/104 deterministic hosted Preview Research/Compare/Guide acceptance cases.
 - The live Research allowance is exhausted at 3/3. The third accepted call returned HTTP 200/schema-valid but an operationally incomplete admissions category with zero claims; it exposed source-resilience defects that were fixed with deterministic regressions without a fourth live call.
 - Eight release screenshots were captured from the verified hosted Preview with intercepted deterministic fixtures under `docs/assets/screenshots/phase-6/`; they are presentation evidence, not live-provider-output evidence.

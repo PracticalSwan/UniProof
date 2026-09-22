@@ -1,8 +1,10 @@
 # Phase 6 Requirements Traceability
 
+> **Historical verification matrix:** Status values below describe evidence observed through 2026-08-23. The Vercel project was deleted 2026-09-23, so hosted configuration and deployment rows do not describe current resources. This closeout did not rerun application tests. See [`../operations/project-closure.md`](../operations/project-closure.md).
+
 This matrix binds Phase 6 hardening/release requirements to implementation and observed evidence. Devpost final submission remains intentionally excluded until the final video is supplied and explicitly approved.
 
-| Requirement | Implementation owner | Verification evidence | Current status |
+| Requirement | Implementation owner | Verification evidence | Status at last validation (2026-08-23) |
 | --- | --- | --- | --- |
 | Research has a 120-second application deadline under a 300-second host ceiling | `lib/security/research-limits.ts`, execution budget, Research route | deadline regressions, production build, Vercel deployment build | Verified configuration/deployment |
 | Caller cancellation/deadline ownership remains deterministic | Research execution budget/orchestrator | lifecycle regressions + hosted intercepted browser acceptance | Verified deterministically; later bounded 2026-08-23 Production mode checks completed under the same 120-second contract |
@@ -29,7 +31,7 @@ This matrix binds Phase 6 hardening/release requirements to implementation and o
 | Exact repository/deployment traceability | Git + Vercel | public Git SHA + GitHub Actions + Vercel deployment inspection | **Verified live-validated executable baseline**: Production deployment `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA` serves `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c` at the canonical alias; this follow-up changes documentation/tests only |
 | Devpost rules/assets are current | `docs/hackathon.md`, `docs/submission/` | Devpost recheck 2026-08-20 | Draft-ready; final video/submission pending |
 
-## Current executable verification
+## Executable verification through 2026-08-23
 
 The live-validated 2026-08-23 executable baseline `e2ae1414c6f856a0bdeb2aa8a473dcb32215ab3c` passed:
 
@@ -41,7 +43,7 @@ The live-validated 2026-08-23 executable baseline `e2ae1414c6f856a0bdeb2aa8a473d
 - exact-SHA GitHub Actions run `32629551286`, conclusion `success`;
 - Vercel Production deployment `dpl_GAXGwwiY1KASC3S3Rwt8VisncaNA`, `READY`, target `production`, serving `https://uniproof-beta.vercel.app`.
 
-The current documentation/test-only follow-up adds a deadline-contract regression and a Compare explicit-scope regression without modifying Production runtime modules. On this working tree, Vitest is **645/645** across 44 files and the complete Compare form browser spec is **10/10**; TypeScript, targeted ESLint, release/workspace verifiers, and `git diff --check` also pass.
+The 2026-08-23 documentation/test-only follow-up added a deadline-contract regression and a Compare explicit-scope regression without modifying Production runtime modules. At that time, Vitest was **645/645** across 44 files and the complete Compare form browser spec was **10/10**; TypeScript, targeted ESLint, release/workspace verifiers, and `git diff --check` passed.
 
 ## Live-smoke limitation
 

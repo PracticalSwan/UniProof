@@ -1,6 +1,6 @@
 # UniProof Demo Script — Target 2:20–2:35
 
-> Designed to leave speaking buffer under a three-minute Devpost video. Use the production URL. Do not expose provider keys, local terminals, private applicant information, or Devpost account details on screen.
+> **Historical recording script:** The production project and URL were removed on 2026-09-23. Do not follow its live-service steps unless the owner explicitly reactivates hosting. The script is retained as a description of the former demo flow; the current Devpost state is unverified. See [`../operations/project-closure.md`](../operations/project-closure.md).
 
 ## Before recording
 
@@ -72,7 +72,7 @@ Then continue without repeated retries.
 
 **Say:**
 
-“The hosted release uses Tavily with Brave fallback for discovery and Groq with OpenRouter fallback for structured AI. It has strict runtime schemas, bounded provider budgets, nonce CSP, no third-party runtime analytics, and deployment-layer rate limiting on Research. UniProof’s core idea is simple: AI can help interpret sources, but evidence policy should decide what the product is allowed to claim.”
+“The former hosted release used Tavily with Brave fallback for discovery and Groq with OpenRouter fallback for structured AI. It had strict runtime schemas, bounded provider budgets, nonce CSP, no third-party runtime analytics, and deployment-layer rate limiting on Research. UniProof’s core idea is simple: AI can help interpret sources, but evidence policy should decide what the product is allowed to claim.”
 
 **End screen:** UniProof name plus production URL.
 

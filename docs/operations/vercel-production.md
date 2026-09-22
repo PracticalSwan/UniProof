@@ -1,8 +1,10 @@
-# Vercel Production Operations
+# Historical Vercel Production Operations
 
-This runbook records the Phase 6C Vercel release contract and the observed Production state, most recently verified on 2026-08-23. Devpost publication is a separate final gate.
+> **Historical record:** The UniProof Vercel project was deleted on 2026-09-23. Its deployments, aliases, environment variables, WAF rules, and project settings are no longer available. The canonical alias returned HTTP 404 after deletion. The sections below preserve the Phase 6C release state verified on 2026-08-23; do not execute them to recreate or deploy a project without new explicit owner authorization. See [`project-closure.md`](project-closure.md).
 
-## Current release configuration
+This document preserves the Phase 6C Vercel release contract and the observed Production state from 2026-08-23. Devpost publication was a separate final gate.
+
+## Last verified release configuration (2026-08-23)
 
 - Canonical origin: `https://uniproof-beta.vercel.app`
 - Runtime contract: Node `22.x`; Research function cap 300 seconds; application-owned Research deadline 120 seconds.
@@ -13,9 +15,9 @@ This runbook records the Phase 6C Vercel release contract and the observed Produ
 - Hosted Supabase Auth/save: intentionally absent from the public environment because production email delivery is not configured. Anonymous Research/Compare/Guide is the judge-facing release.
 - `.vercelignore` excludes private env files, protected `ui-flow-screenshots/`, and generated verification output from deployment input.
 
-## WAF contract — active
+## Historical WAF contract (removed 2026-09-23)
 
-Exactly one durable custom rate-limit rule is enabled:
+At last verification, exactly one durable custom rate-limit rule was enabled:
 
 - method: `POST`
 - path: `/api/research`
@@ -58,7 +60,7 @@ UniProof does not duplicate Vercel's HSTS at the application layer.
 
 The historical Phase 6C live Research allowance remains exhausted at **3/3**. The later 2026-08-22 `final_testing_plan.md` five-call accounting is historical as well; subsequent reliability testing was separately authorized and should not be interpreted through that obsolete remaining-call count.
 
-On the current 2026-08-23 Production deployment, a Chulalongkorn MSc Admissions-only Research browser run returned HTTP 200 in about **21.0 seconds**, `runStatus: succeeded`, Admissions `ready` with three claims, and no generic mode error. After a deliberate 60-second test cooldown, a two-target MIT/Stanford Compare run serialized the underlying Research requests with another 60-second gap; both returned HTTP 200 and the UI rendered a partial comparison without whole-mode failure. After another 60-second cooldown, Guide for the Chulalongkorn MSc target returned HTTP 200 in about **73.0 seconds**, rendered a partial requirement assessment, and the Research request contained only the public target/categories rather than citizenship, GPA, or applicant-profile fields.
+On the 2026-08-23 Production deployment, a Chulalongkorn MSc Admissions-only Research browser run returned HTTP 200 in about **21.0 seconds**, `runStatus: succeeded`, Admissions `ready` with three claims, and no generic mode error. After a deliberate 60-second test cooldown, a two-target MIT/Stanford Compare run serialized the underlying Research requests with another 60-second gap; both returned HTTP 200 and the UI rendered a partial comparison without whole-mode failure. After another 60-second cooldown, Guide for the Chulalongkorn MSc target returned HTTP 200 in about **73.0 seconds**, rendered a partial requirement assessment, and the Research request contained only the public target/categories rather than citizenship, GPA, or applicant-profile fields.
 
 The Compare validation also clarified request-scope semantics: priority weights determine scoring, while the seven Research-category checkboxes independently determine Research scope. Explicitly selected zero-weight categories are intentionally retained; when only Scholarships is selected, deterministic browser regression coverage proves both Compare target requests contain only `categories: ["scholarships"]`. Provider `rate-limit`/upstream gaps remained observable even with test cooldowns, so those external conditions are handled fail-closed rather than masked by arbitrary client delays.
 

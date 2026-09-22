@@ -12,6 +12,7 @@ The project did not publish a tagged release. Historical implementation work is 
 - Confirmed no UniProof project in the connected Supabase account.
 - Removed project-local credential and generated cache paths while retaining `.codegraph/` by owner direction.
 - Preserved source, project conventions, protected user files, global CLIs, provider-dashboard credentials, and owner-controlled GitHub archival state.
+- Closure commit CI passed application tests/type checks/lint/build and local Supabase checks, but failed the production dependency audit; see the closure record for affected locked versions and advisories.
 
 ### Added
 

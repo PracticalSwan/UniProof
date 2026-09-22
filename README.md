@@ -4,7 +4,7 @@ UniProof is an evidence-first AI platform for international students researching
 
 The project was developed for the Pixel Forge AI Hackathon 2026. Its core product rule is simple: important claims should remain traceable to evidence, and missing, stale, conflicting, or incomparable information should stay explicit instead of being guessed.
 
-> **Project status (2026-09-23):** The Vercel project was removed and `https://uniproof-beta.vercel.app` returns 404. No UniProof project was present in the connected Supabase account. Project-local credentials and generated caches were removed; `.codegraph/` is intentionally retained. The source repository remains available, and its owner will archive GitHub separately. See [`docs/operations/project-closure.md`](docs/operations/project-closure.md) for verified state and boundaries.
+> **Project status (2026-09-23):** The Vercel project was removed and `https://uniproof-beta.vercel.app` returns 404. No UniProof project was present in the connected Supabase account. Project-local credentials and generated caches were removed; `.codegraph/` is intentionally retained. GitHub CI for closure commit `9b9ab42` passed application tests, type checks, lint, build, and local Supabase gates, but failed the production dependency audit for the locked Next.js and Sharp versions. The source repository remains available, and its owner will archive GitHub separately. See [`docs/operations/project-closure.md`](docs/operations/project-closure.md) for the full status and boundaries.
 
 ## Product modes
 

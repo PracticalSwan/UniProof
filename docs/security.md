@@ -2,6 +2,10 @@
 
 > **Security reference:** This document describes source-level controls and historical hosted verification. The Vercel project was deleted on 2026-09-23, so dated production controls below are not currently active. Any future public deployment needs a fresh security and provider-configuration review. See [`operations/project-closure.md`](operations/project-closure.md).
 
+## Current dependency audit status (2026-09-23)
+
+GitHub Actions run [`35794000124`](https://github.com/PracticalSwan/UniProof/actions/runs/35794000124) failed `npm audit --omit=dev`. The lockfile resolves `next@16.3.1`, which is in the affected ranges for the critical [Windows-hosted server RCE](https://github.com/vercel/next.js/security/advisories/GHSA-p293-qw3h-jr36) and [AVIF image-optimization RCE](https://github.com/vercel/next.js/security/advisories/GHSA-2xp9-vwfh-vxw4); both advisories list 16.3.3 as a patched version. It also resolves `sharp@0.35.3`, below the patched 0.35.4 release for the high-severity [libheif advisory](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c). The UniProof Vercel project is deleted, so this is a retained-source/reactivation risk rather than evidence of an active Vercel deployment. Dependencies were not changed during closure; while these versions remain locked, do not expose a Windows-hosted copy to untrusted traffic or process untrusted AVIF/image input. Update the dependency constraints and lockfile to patched versions and pass CI before any future public reactivation.
+
 ## Primary Trust Boundaries
 
 1. Browser to Next.js server actions/route handlers.

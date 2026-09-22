@@ -840,3 +840,10 @@ This file is append-only. Never rewrite or delete earlier entries to correct his
 - `sithu-win.png` and `ui-flow-screenshots/` remain present and untracked; do not include them in closeout commits.
 - Source, local migrations, provider adapters, test suites, and historical release evidence remain. The application test/build baseline is the recorded 2026-08-23 release evidence; no app tests/builds were rerun during this documentation/configuration-only closure after dependencies/build outputs were removed.
 - See `docs/operations/project-closure.md` for complete scope, current verification, and limits. Do not treat dated release or Devpost instructions as current or recreate hosting without new explicit owner authorization.
+
+## 2026-09-23 — UniProof post-push CI dependency audit
+
+- This entry supersedes the preceding closure entry's statement that 2026-08-23 was the last application test/build verification. That remains the last full release/live verification; this newer CI run verified source checks but failed its dependency audit.
+- GitHub Actions run `35794000124` for closure commit `9b9ab42aef630d24416b6c704fe55d2cfbc47ccb` completed with failure at `npm audit --omit=dev`. Unit/contract tests, TypeScript, ESLint, production build, and the local-Supabase job all passed; later application workspace/release/browser checks were skipped.
+- The lockfile resolves `next@16.3.1` and transitive `sharp@0.35.3`, which the run reported affected by two critical Next.js advisories and one high-severity Sharp/libheif advisory. See [`docs/security.md`](docs/security.md) and [`docs/operations/project-closure.md`](docs/operations/project-closure.md) for IDs and primary advisory links.
+- No dependencies were changed because this task closed the hosted project and retained the source rather than reactivating it. No UniProof Vercel service remains. Treat dependency remediation and a complete passing CI run as prerequisites for any future public reactivation.

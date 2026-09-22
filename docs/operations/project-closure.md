@@ -25,7 +25,7 @@ This record describes the observed closure boundary. It does not authorize re-cr
 
 ## Retained implementation and verification boundary
 
-The repository remains a usable source/reference project containing the Research, Compare, and Guide implementation, provider adapters, local Supabase configuration and migrations, test suites, and project-specific instructions. Its last recorded full implementation verification belongs to the 2026-08-23 release history in [`vercel-production.md`](vercel-production.md) and the Phase 6 plans. This documentation/configuration-only closure changed no runtime source and did not reinstall dependencies or rerun application tests/builds; local dependencies and build outputs were intentionally removed.
+The repository retains the Research, Compare, and Guide implementation, provider adapters, local Supabase configuration and migrations, test suites, and project-specific instructions. The last full feature/release evidence remains dated 2026-08-23 in [`vercel-production.md`](vercel-production.md) and the Phase 6 plans. Local closure work changed documentation and the ignore rule only; it did not install dependencies or run application checks in this Windows checkout. The post-push GitHub CI result below is newer source-verification evidence.
 
 ## Closeout verification (2026-09-23)
 
@@ -35,7 +35,17 @@ The repository remains a usable source/reference project containing the Research
 - `codegraph status`: **PASS**; index up to date with 247 files, 3,489 nodes, and 12,320 edges.
 - Bounded local secret-pattern scan of added documentation lines: **PASS**, zero matches. `gitleaks`, `trufflehog`, `detect-secrets`, and a secret-scanning MCP were unavailable, so this is not a history-wide credential scan. No secret values were printed.
 - A read-only provider project-list check found no UniProof match in Vercel or Supabase. The former Vercel alias returned HTTP 404. GitHub reported `archived: false`.
-- Application tests, type checks, lint, and builds were **not rerun** for this documentation/closure update; `node_modules/` and `.next/` were intentionally removed. The last recorded application/release verification is dated 2026-08-23 and remains historical.
+- Application tests, type checks, lint, and builds were **not run in the local Windows checkout** because `node_modules/` and `.next/` were intentionally removed. See the post-push GitHub CI result below for fresh hosted-runner checks.
+
+## Post-push GitHub CI (2026-09-23)
+
+GitHub Actions run [`35794000124`](https://github.com/PracticalSwan/UniProof/actions/runs/35794000124), for closure commit `9b9ab42aef630d24416b6c704fe55d2cfbc47ccb`, completed with **failure**:
+
+- The `local-supabase` job **passed**, including Supabase start/reset, SQL lint, database advisors, pgTAP, Auth/Saved browser gates, and Supabase stop.
+- The `application` job **passed** unit/contract tests, TypeScript, ESLint, and production build.
+- `npm audit --omit=dev` **failed**: the lockfile resolves `next@16.3.1`, affected by critical [GHSA-p293-qw3h-jr36](https://github.com/vercel/next.js/security/advisories/GHSA-p293-qw3h-jr36) and [GHSA-2xp9-vwfh-vxw4](https://github.com/vercel/next.js/security/advisories/GHSA-2xp9-vwfh-vxw4), and transitive `sharp@0.35.3`, affected by high-severity [GHSA-rgj7-g3m4-5g8c](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c). The advisories list patched versions `next@16.3.3` and `sharp@0.35.4`.
+- The application job's later Workspace contract, Release contract, and Critical anonymous browser smoke steps were **skipped** after the audit failure. They are not verified by this CI run.
+- No dependency or runtime-source changes were made for closure. A future reactivation requires a separate dependency update and a complete passing CI run. The UniProof Vercel project is absent; no other hosting provider was checked.
 
 ## Historical release record
 
